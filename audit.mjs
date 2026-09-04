@@ -51,12 +51,16 @@ ok('El pasado conserva el ejercicio quitado', R.resolverRutina('gymA','2026-08-1
 ok('El futuro ya no lo tiene', !R.resolverRutina('gymA','2026-09-15',rut).some(e=>e.id==='A-1'));
 
 console.log('\n── NAVEGADOR · SIN ERRORES EN NINGUNA VISTA ──');
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' });
 const p = await b.newPage({ viewport: { width: 430, height: 900 } });
 p.on('pageerror', e => errs.push('PAGE: ' + e.message.split('\n')[0]));
 p.on('console', m => { if (m.type()==='error') errs.push('CONSOLE: ' + m.text().slice(0,120)); });
 await p.goto('http://localhost:4173/', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
-const ago = generarMes({anio:2026,mes:7}).dias;
+const hoyAudit = new Date();
+const ago = generarMes({ anio: hoyAudit.getFullYear(), mes: hoyAudit.getMonth() }).dias;
+// La app arranca en la sesión de hoy: se pasa al calendario primero
+await p.locator('text=Calendario').first().click().catch(() => {});
+await p.waitForTimeout(500);
 // Recorrer TODOS los días del mes abriendo cada sesión
 for (const d of ago) {
   await p.evaluate(nn => [...document.querySelectorAll('main button')].find(x=>x.textContent.trim().startsWith(nn+' ·'))?.click(), d.dia);
@@ -68,8 +72,13 @@ ok(`Abrir los 31 días del mes sin errores`, errs.length === 0, errs.slice(0,3).
 // Navegar 12 meses
 for (let i=0;i<12;i++){ await p.locator('button[aria-label="Mes siguiente"]').click(); await p.waitForTimeout(120); }
 ok('Navegar 12 meses adelante sin errores', errs.length === 0, errs.slice(0,2).join(' | '));
-ok('Y el título es correcto', (await p.locator('header h1').first().textContent()) === 'Agosto 2027',
-  await p.locator('header h1').first().textContent());
+// El título se comprueba contra el mes de HOY + 12, no contra uno fijo: si no,
+// la prueba caduca sola al pasar los meses.
+const NOM = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const hoyN = new Date();
+const esperadoTitulo = `${NOM[hoyN.getMonth()]} ${hoyN.getFullYear() + 1}`;
+ok('Y el título es correcto tras 12 meses', (await p.locator('header h1').first().textContent()) === esperadoTitulo,
+  `${await p.locator('header h1').first().textContent()} · esperado ${esperadoTitulo}`);
 await b.close();
 
 console.log(`\n══ AUDITORÍA: ${n-f}/${n} · errores de página: ${errs.length} ══`);

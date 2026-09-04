@@ -124,3 +124,116 @@ export function tablaRitmos(segPor100) {
     };
   });
 }
+
+// ═══════════════ HISTORIAL Y SUGERENCIA DE CARGA ═══════════════
+// El progreso se indexa por FECHA y dentro por ID de ejercicio. Buscar por ID en
+// todo el histórico hace que el historial siga al ejercicio aunque cambie de
+// sesión (rutinas versionadas) — el requisito 3 del punto 6.
+
+// Sesiones registradas de un ejercicio, de más antigua a más reciente.
+export function historialEjercicio(progress = {}, exId, hasta = null) {
+  return Object.entries(progress)
+    .filter(([fecha]) => !hasta || fecha < hasta)
+    .map(([fecha, dia]) => {
+      const p = dia?.[exId];
+      const logs = (p?.logs ?? []).filter(l => l && (l.kg != null || l.reps != null));
+      if (!logs.length && p?.lastre == null) return null;
+      return {
+        fecha,
+        logs,
+        lastre: p?.lastre ?? null,
+        kgMax: logs.length ? Math.max(...logs.map(l => l.kg ?? 0)) : (p?.lastre ?? 0),
+        repsMax: logs.length ? Math.max(...logs.map(l => l.reps ?? 0)) : 0,
+        // Volumen = suma de kg × reps de cada serie
+        volumen: logs.reduce((a, l) => a + (l.kg ?? 0) * (l.reps ?? 0), 0),
+        series: logs.length,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
+// La última sesión registrada, o null si es la primera vez.
+export function ultimaSesion(progress, exId, hasta = null) {
+  const h = historialEjercicio(progress, exId, hasta);
+  return h.length ? h.at(-1) : null;
+}
+
+const repsObjetivo = (reps) => {
+  const m = String(reps ?? '').match(/(\d+)\s*-\s*(\d+)/);
+  if (m) return { min: Number(m[1]), max: Number(m[2]) };
+  const s = String(reps ?? '').match(/(\d+)/);
+  return s ? { min: Number(s[1]), max: Number(s[1]) } : null;
+};
+
+// Incremento lineal según el tren. Sale del campo `progresion` del ejercicio
+// ('+2.5 kg', '+5 kg') y cae a 2.5 si no lo declara.
+const incrementoDe = (ex) => {
+  const m = String(ex.progresion ?? '').match(/([\d.]+)/);
+  return m ? Number(m[1]) : 2.5;
+};
+
+// ─── Sugerencia de carga para la próxima sesión ───
+// Devuelve { kg, motivo, tipo } · tipo: 'subir' | 'mantener' | 'reset' | 'primera' | 'no-aplica'
+// SIEMPRE editable: es una sugerencia, no una imposición.
+export function sugerirCarga(ex, progress, { hasta = null, descarga = false } = {}) {
+  if (!ex) return null;
+
+  // Los isométricos progresan en TIEMPO hasta 60s (P3), no en carga
+  if (ex.iso && !ex.lineal) {
+    return { kg: null, tipo: 'no-aplica', motivo: 'Aquí progresas en tiempo, no en carga: solo subes peso al pasar de 60s (P3).' };
+  }
+
+  const hist = historialEjercicio(progress, ex.id, hasta);
+  if (!hist.length) {
+    return { kg: null, tipo: 'primera', motivo: 'Primera vez con este ejercicio: empieza conservador y anota la carga.' };
+  }
+  const ult = hist.at(-1);
+  const kg = ult.kgMax || null;
+
+  // En descarga NO se sube: misma carga, la mitad de las series (P4)
+  if (descarga) {
+    return { kg, tipo: 'mantener',
+      motivo: `Semana de descarga (P4): misma carga que el ${ult.fecha.slice(8)}, la mitad de las series y RIR +2. No es semana de subir.` };
+  }
+
+  const obj = repsObjetivo(ex.reps);
+
+  // Acarreos: progresan en carga mientras aguantes la distancia con postura (P2)
+  if (ex.acarreo) {
+    return { kg, tipo: 'mantener',
+      motivo: `Última vez ${kg ?? '—'} kg. Sube carga solo si mantuviste los 30 m con postura perfecta; si te inclinaste, baja (P2).` };
+  }
+
+  // Aislamientos: doble progresión con RIR, no lineal
+  if (!ex.lineal) {
+    const tope = obj && ult.repsMax >= obj.max;
+    return {
+      kg, tipo: tope ? 'subir' : 'mantener',
+      motivo: tope
+        ? `Llegaste a ${ult.repsMax} reps, el tope del rango. Sube al salto mínimo disponible y vuelve al extremo bajo.`
+        : `Doble progresión: quédate en ${kg ?? '—'} kg y sube reps hasta ${obj?.max ?? 'el tope'} antes de tocar el peso.`,
+    };
+  }
+
+  // ─── Compuestos con progresión lineal ───
+  // P6: dos sesiones seguidas fallando el objetivo → reset del 10%
+  const dosUltimas = hist.slice(-2);
+  const falloDoble = dosUltimas.length === 2 && obj &&
+    dosUltimas.every(s => s.repsMax > 0 && s.repsMax < obj.min);
+  if (falloDoble) {
+    const nuevo = kg ? Math.round(kg * 0.9 * 2) / 2 : null;
+    return { kg: nuevo, tipo: 'reset',
+      motivo: `Fallaste el objetivo de ${obj.min} reps dos sesiones seguidas (${dosUltimas.map(s => s.repsMax).join(' y ')}). Reset del 10%: de ${kg} a ${nuevo} kg, y vuelves a subir desde ahí (P6).` };
+  }
+
+  // Completó el rango en todas las series → sube
+  const completo = obj && ult.series > 0 && ult.logs.every(l => (l.reps ?? 0) >= obj.min);
+  const inc = incrementoDe(ex);
+  if (completo) {
+    return { kg: kg ? kg + inc : null, tipo: 'subir',
+      motivo: `Completaste las ${ult.series} series en rango el ${ult.fecha.slice(8)}. Sube ${inc} kg.` };
+  }
+  return { kg, tipo: 'mantener',
+    motivo: `No completaste el rango la última vez (${ult.repsMax} reps máx). Repite ${kg ?? '—'} kg hasta cerrarlo.` };
+}

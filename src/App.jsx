@@ -7,13 +7,15 @@ import {
 import {
   TURNO_INFO, SESION_INFO, SESIONES, DIAS_SEMANA,
   MUSCULOS, CAT_MUSCULO, RANGO_VOLUMEN, PARTES, COMPLEMENTOS, DOBLES,
-  PALAS_MAX_M, PISCINA_DURACION_MIN, CARDIO_FLEXIBLE,
+  PALAS_MAX_M, PISCINA_DURACION_MIN, CARDIO_FLEXIBLE, GRUPOS_SESION,
+  SECUENCIA_NATACION, SECUENCIA_GYM,
 } from './data.js';
 import {
   generarMes, infoMes, ANCLA_DEFAULT, FESTIVOS_DEFAULT,
   combinacionValida, ordenDoble, validarSeparacion,
 } from './generador.js';
-import { calcularAvisosReset, S4, calcularCSS, tablaRitmos, mmss } from './reglas.js';
+import { calcularAvisosReset, S4, calcularCSS, tablaRitmos, mmss,
+  historialEjercicio, ultimaSesion, sugerirCarga } from './reglas.js';
 import { verificarSesion } from './validador.js';
 import {
   resolverRutina, estaEditada, guardarVersion, restaurarPlan, huerfanosDelDia,
@@ -208,7 +210,7 @@ const RestTimer = ({ timer, onSkip, color }) => {
 };
 
 // ═══════════════ EXERCISE CARD ═══════════════
-const ExerciseCard = ({ ex, prog, pr, onToggleSet, onLog, onLastre, onBanda, color, avisoReset }) => {
+const ExerciseCard = ({ ex, prog, pr, onToggleSet, onLog, onLastre, onBanda, color, avisoReset, ultima, sugerencia, onUsarSugerido }) => {
   const setCount = typeof ex.series === 'number' ? ex.series : 1;
   const p = prog || { sets: [], logs: [], lastre: null };
   const allDone = setCount > 0 && p.sets?.length === setCount && p.sets.every(Boolean);
@@ -251,6 +253,48 @@ const ExerciseCard = ({ ex, prog, pr, onToggleSet, onLog, onLastre, onBanda, col
             {ex.nota && <p className="text-[11px] text-slate-500 mt-0.5">{ex.nota}</p>}
           </div>
         </div>
+
+        {/* Historial y sugerencia · visibles sin tocar nada */}
+        {(ultima || sugerencia) && (
+          <div className="mb-2 px-2.5 py-2 rounded-lg bg-[#0f1417] border border-[#232c34] space-y-1">
+            <div className="text-[11px] text-slate-300 leading-relaxed">
+              {ultima ? (
+                <>
+                  <span className="text-slate-500">Última vez ({ultima.fecha.slice(8)}/{ultima.fecha.slice(5, 7)}):</span>{' '}
+                  <span className="font-bold" style={{ fontFamily: 'ui-monospace, monospace' }}>
+                    {ultima.kgMax ? `${ultima.kgMax} kg` : '—'}
+                    {ultima.logs.length ? ` × ${ultima.logs.map(l => l.reps ?? '–').join(', ')}` : ''}
+                  </span>
+                </>
+              ) : (
+                <span className="text-slate-500">Primera vez con este ejercicio.</span>
+              )}
+            </div>
+            {sugerencia && sugerencia.tipo !== 'primera' && sugerencia.tipo !== 'no-aplica' && (
+              <div className="text-[11px] leading-relaxed"
+                style={{ color: sugerencia.tipo === 'reset' ? '#fb923c' : sugerencia.tipo === 'subir' ? '#4ade80' : '#94a3b8' }}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold">
+                    Sugerido: {sugerencia.kg != null ? `${sugerencia.kg} kg` : '—'}
+                  </span>
+                  {/* Un toque en vez de teclear la misma cifra en cada serie.
+                      Solo rellena las que aún no tienen carga: nunca pisa lo anotado. */}
+                  {sugerencia.kg != null && onUsarSugerido && (
+                    <button onClick={() => onUsarSugerido(ex.id, sugerencia.kg, setCount)}
+                      aria-label={`Usar ${sugerencia.kg} kg en ${ex.nombre}`}
+                      className="text-[9px] font-bold uppercase px-2 py-0.5 rounded border border-current opacity-90">
+                      Usar
+                    </button>
+                  )}
+                </div>
+                <span className="text-slate-500">{sugerencia.motivo}</span>
+              </div>
+            )}
+            {sugerencia && (sugerencia.tipo === 'primera' || sugerencia.tipo === 'no-aplica') && (
+              <div className="text-[11px] text-slate-500 leading-relaxed">{sugerencia.motivo}</div>
+            )}
+          </div>
+        )}
 
         {/* Palas · límite por carga de hombro */}
         {ex.palas && (
@@ -377,6 +421,306 @@ const ExerciseCard = ({ ex, prog, pr, onToggleSet, onLog, onLastre, onBanda, col
 
 
 
+
+
+
+
+// ═══════════════ MENÚ DE SESIONES AGRUPADO ═══════════════
+// 16 opciones sueltas cuestan de leer. Se agrupan por el campo `grupo` de
+// SESION_INFO — no por una lista escrita aquí, que se quedaría desfasada.
+// Arranca desplegada la categoría de lo que ese día ya tenía.
+const MenuSesiones = ({ sesion, onElegir }) => {
+  const porGrupo = useMemo(() => {
+    const g = {};
+    Object.entries(SESION_INFO).forEach(([k, v]) => {
+      if (k === 'natacion') return;   // el tipo genérico no se elige a mano
+      (g[v.grupo] ??= []).push({ k, ...v });
+    });
+    return g;
+  }, []);
+  const grupoActual = SESION_INFO[sesion]?.grupo ?? 'gym';
+  const [abierto, setAbierto] = useState(grupoActual);
+
+  return (
+    <div className="space-y-1.5">
+      {Object.entries(GRUPOS_SESION).map(([gk, gv]) => {
+        const items = porGrupo[gk] ?? [];
+        if (!items.length) return null;
+        const desplegado = abierto === gk;
+        const contieneActual = items.some(i => i.k === sesion);
+        return (
+          <div key={gk} className="rounded-lg border border-[#2a3540] overflow-hidden">
+            <button onClick={() => setAbierto(desplegado ? null : gk)}
+              aria-label={`Categoría ${gv.label}`} aria-expanded={desplegado}
+              className="w-full px-2.5 py-2 flex items-center gap-2 text-left">
+              <IconFor name={gv.icon} size={15} color={gv.color} />
+              <span className="text-xs font-bold flex-1" style={{ color: contieneActual ? gv.color : '#94a3b8' }}>
+                {gv.label}
+              </span>
+              {contieneActual && !desplegado && (
+                <span className="text-[10px] text-slate-400">{SESION_INFO[sesion].label}</span>
+              )}
+              <ChevronRight size={14} className={`text-slate-500 transition-transform ${desplegado ? 'rotate-90' : ''}`} />
+            </button>
+            {desplegado && (
+              <div className="grid grid-cols-2 gap-1.5 p-2 pt-0">
+                {items.map(v => (
+                  <button key={v.k} onClick={() => onElegir(v.k)}
+                    aria-label={`Elegir ${v.label}`} aria-pressed={sesion === v.k}
+                    className={`py-2 px-2 rounded-lg border-2 text-left transition-all ${sesion === v.k ? '' : 'border-[#2a3540]'}`}
+                    style={sesion === v.k ? { borderColor: v.color, background: v.color + '22' } : undefined}>
+                    <div className="text-xs font-bold" style={{ color: sesion === v.k ? v.color : '#cbd5e1' }}>{v.label}</div>
+                    <div className="text-[10px] text-slate-500 leading-tight">{v.tipo}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ═══════════════ SELECTOR DE VARIANTE DENTRO DEL DÍA ═══════════════
+// El tipo (gym / natación) se elige en configuración; CUÁL de la cola toca se ve
+// y se cambia aquí. Fijar una a mano no adelanta la cola: la que tocaba se hace
+// en la siguiente sesión (ver POLITICA_FIJADO en generador.js).
+const SelectorVariante = ({ dia, secundaria = false, onFijar, onSoltar, registrados = 0 }) => {
+  const [abierto, setAbierto] = useState(false);
+  const [porConfirmar, setPorConfirmar] = useState(null);   // clave elegida pendiente de confirmar
+  const esNat = (secundaria ? dia.sesionSecundaria : dia.sesion) === 'natacion';
+  const esGym = String(secundaria ? dia.sesionSecundaria : dia.sesion).startsWith('gym');
+  if (!esNat && !esGym) return null;
+
+  const opciones = esNat ? [...SECUENCIA_NATACION, 'natCSS'] : SECUENCIA_GYM;
+  const actual = esNat
+    ? (secundaria ? dia.varianteSecundaria : dia.variante)
+    : (secundaria ? dia.sesionSecundaria : dia.sesion);
+  const fijadaPorMi = esNat
+    ? !!(secundaria ? dia.varianteFijadaSecundaria : dia.varianteFijada)
+    : !!dia.fijado && !dia.fijadoAuto;
+  const sugerida = esNat ? (secundaria ? dia.sugeridaSecundaria : dia.sugerida) : dia.sugeridaGym;
+
+  return (
+    <div className="mb-3 rounded-lg border border-[#232c34] bg-[#151b21]">
+      <button onClick={() => setAbierto(!abierto)} className="w-full px-3 py-2.5 flex items-center gap-2 text-left">
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">
+            {secundaria ? 'Segunda sesión' : 'Sesión de hoy'}
+          </div>
+          <div className="text-sm font-bold" style={{ color: SESION_INFO[actual]?.color }}>
+            {SESION_INFO[actual]?.label}
+            <span className="text-[11px] font-normal text-slate-500"> · {SESION_INFO[actual]?.tipo}</span>
+          </div>
+        </div>
+        {fijadaPorMi && (
+          <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border border-amber-700/60 bg-amber-950/30 text-amber-300 flex-shrink-0">
+            elegida
+          </span>
+        )}
+        <ChevronRight size={15} className={`text-slate-500 flex-shrink-0 transition-transform ${abierto ? 'rotate-90' : ''}`} />
+      </button>
+
+      {abierto && (
+        <div className="px-3 pb-3 space-y-2">
+          {/* Misma protección que el modal de edición: cambiar de sesión un día
+              con entrenamiento registrado dejaría ese registro apuntando a
+              ejercicios de otra sesión. Se avisa y se exige confirmar. */}
+          {porConfirmar && (
+            <div className="px-2.5 py-2 rounded-lg border-l-4 border-red-500 bg-red-950/25">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={14} className="text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-[11px] text-red-100 leading-relaxed">
+                  Este día ya tiene <span className="font-bold">{registrados} ejercicio(s) registrados</span>.
+                  Cambiar a {SESION_INFO[porConfirmar]?.label} dejaría ese registro apuntando a ejercicios que
+                  no existen ahí, así que <span className="font-bold">se borrará</span>. Tus PRs no se tocan.
+                </p>
+              </div>
+              <div className="flex gap-1.5 mt-2">
+                <button onClick={() => setPorConfirmar(null)}
+                  className="flex-1 py-1.5 rounded border border-[#2a3540] text-slate-300 text-[10px] font-bold uppercase">
+                  Cancelar
+                </button>
+                <button onClick={() => { onFijar(dia.fecha, porConfirmar, secundaria, true); setPorConfirmar(null); setAbierto(false); }}
+                  className="flex-1 py-1.5 rounded bg-red-600 text-white text-[10px] font-bold uppercase">
+                  Cambiar y borrar
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-1.5">
+            {opciones.map(k => {
+              const activa = k === actual;
+              const esSugerida = k === sugerida;
+              const elegir = () => {
+                if (k === actual) { setAbierto(false); return; }
+                if (registrados > 0) { setPorConfirmar(k); return; }
+                onFijar(dia.fecha, k, secundaria);
+                setAbierto(false);
+              };
+              return (
+                <button key={k} onClick={elegir}
+                  className={`py-2 px-2 rounded-lg border-2 text-left transition-all ${activa ? '' : 'border-[#2a3540]'}`}
+                  style={activa ? { borderColor: SESION_INFO[k].color, background: SESION_INFO[k].color + '1f' } : undefined}>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold" style={{ color: SESION_INFO[k].color }}>{SESION_INFO[k].label}</span>
+                    {esSugerida && (
+                      <span className="text-[8px] font-bold uppercase px-1 py-0.5 rounded bg-slate-700 text-slate-300">toca</span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-slate-500 leading-tight">{SESION_INFO[k].tipo}</div>
+                </button>
+              );
+            })}
+          </div>
+          {fijadaPorMi ? (
+            <button onClick={() => { onSoltar(dia.fecha, secundaria); setAbierto(false); }}
+              className="w-full py-2 rounded-lg border border-[#2a3540] text-slate-400 text-[10px] font-bold uppercase flex items-center justify-center gap-1.5">
+              <RotateCcw size={12} /> Volver a la que toca por rotación
+            </button>
+          ) : (
+            <p className="text-[9px] text-slate-600 leading-relaxed">
+              Elegir otra no adelanta la cola: la que tocaba se hace en la siguiente sesión, no se pierde.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ═══════════════ FICHA DE SESIÓN (solo lectura) ═══════════════
+// Un ejercicio renderizado en modo consulta: sin checkboxes, sin inputs.
+// Se usa en la biblioteca y en la ficha que se abre desde el nombre del día,
+// para no duplicar la lógica de presentación de ExerciseCard.
+const FichaEjercicio = ({ ex }) => (
+  <div className="rounded-lg border border-[#232c34] bg-[#151b21] p-2.5">
+    <div className="flex items-center gap-2 flex-wrap mb-1">
+      {ex.bs && (
+        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border"
+          style={{
+            background: ex.bstipo === 'ant' ? '#7c2d1233' : '#5b21b633',
+            borderColor: ex.bstipo === 'ant' ? '#c2410c88' : '#7c3aed88',
+            color: ex.bstipo === 'ant' ? '#fdba74' : '#c4b5fd',
+          }}>{ex.bs}</span>
+      )}
+      {ex.opcional && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border border-slate-600 text-slate-400">Opcional</span>}
+    </div>
+    <div className="text-sm font-bold text-slate-100 leading-tight">{ex.nombre}</div>
+    {ex.nota && <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{ex.nota}</p>}
+    <div className="grid grid-cols-4 gap-1.5 mt-2">
+      {[
+        ['Series', ex.series],
+        ['Reps', ex.reps],
+        ex.lineal ? ['Lineal', ex.progresion] : ['RIR', ex.rir ?? '—'],
+        ['Desc.', ex.descanso],
+      ].map(([l, v], i) => (
+        <div key={i} className="px-1.5 py-1 rounded text-center border bg-[#0f1417] border-[#232c34]">
+          <div className="text-[8px] uppercase tracking-wide text-slate-600 font-semibold">{l}</div>
+          <div className="text-xs font-bold text-slate-200" style={{ fontFamily: 'ui-monospace, monospace' }}>{v}</div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const FichaSesion = ({ sesionKey, ejercicios, onCerrar }) => {
+  const ses = SESIONES[sesionKey];
+  const info = SESION_INFO[sesionKey];
+  if (!ses) return null;
+  const lista = ejercicios ?? ses.ejercicios;
+  const series = lista.filter(e => !e.opcional).reduce((a, e) => a + (typeof e.series === 'number' ? e.series : 0), 0);
+  return (
+    <div className="min-h-screen bg-[#0f1417]">
+      <header className="sticky top-0 z-30 bg-[#0f1417]/95 backdrop-blur border-b border-[#232c34] px-4 py-3">
+        <button onClick={onCerrar} className="flex items-center gap-1.5 text-slate-400 text-xs font-bold uppercase tracking-wide mb-2">
+          <ArrowLeft size={14} /> Volver
+        </button>
+        <div className="flex items-start gap-3">
+          <div className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ background: info.color + '22', border: `1.5px solid ${info.color}` }}>
+            <IconFor name={info.icon} size={20} color={info.color} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg font-bold text-slate-50 leading-tight">{ses.nombre}</h1>
+            <p className="text-[11px] uppercase tracking-wide mt-0.5" style={{ color: info.color }}>
+              {info.tipo} · {ses.duracion}{lista.length ? ` · ${series} series` : ''}
+            </p>
+          </div>
+        </div>
+        <p className="text-[10px] text-slate-600 mt-2">Solo consulta · esto no cambia tu calendario</p>
+      </header>
+      <main className="px-3 py-3 max-w-2xl mx-auto pb-16 space-y-2">
+        {ses.chequeo && (
+          <div className="px-3 py-2.5 rounded-lg border-l-4 bg-[#151b21] mb-1" style={{ borderColor: info.color }}>
+            <p className="text-[12px] text-slate-300 leading-relaxed">{ses.chequeo}</p>
+          </div>
+        )}
+        {ses.recortada && (
+          <div className="px-3 py-2 rounded-lg border border-[#232c34] bg-[#151b21] mb-1">
+            <div className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Versión recortada (45 min)</div>
+            <p className="text-[11px] text-slate-400 mt-0.5">{ses.recortada}</p>
+          </div>
+        )}
+        {lista.length === 0
+          ? <p className="text-[12px] text-slate-500 py-6 text-center">Día de recuperación: sin ejercicios.</p>
+          : lista.map(ex => <FichaEjercicio key={ex.id} ex={ex} />)}
+      </main>
+    </div>
+  );
+};
+
+// ═══════════════ BIBLIOTECA DE RUTINAS ═══════════════
+// Consultar qué trae cada sesión sin pasar por el calendario ni tocar nada.
+const Biblioteca = ({ onAbrir, onCerrar }) => {
+  const porGrupo = useMemo(() => {
+    const g = {};
+    Object.entries(SESION_INFO).forEach(([k, v]) => {
+      if (k === 'natacion') return;          // el tipo genérico no se consulta
+      (g[v.grupo] ??= []).push({ k, ...v });
+    });
+    return g;
+  }, []);
+  return (
+    <div className="min-h-screen bg-[#0f1417]">
+      <header className="sticky top-0 z-30 bg-[#0f1417]/95 backdrop-blur border-b border-[#232c34] px-4 py-3">
+        <button onClick={onCerrar} className="flex items-center gap-1.5 text-slate-400 text-xs font-bold uppercase tracking-wide mb-2">
+          <ArrowLeft size={14} /> Calendario
+        </button>
+        <h1 className="text-xl font-bold text-slate-50 leading-none">Biblioteca de rutinas</h1>
+        <p className="text-[11px] text-slate-500 mt-1">Qué trae cada sesión. Solo consulta.</p>
+      </header>
+      <main className="px-3 py-3 max-w-2xl mx-auto pb-16 space-y-4">
+        {Object.entries(GRUPOS_SESION).map(([gk, gv]) => {
+          const items = porGrupo[gk] ?? [];
+          if (!items.length) return null;
+          return (
+            <div key={gk}>
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <IconFor name={gv.icon} size={15} color={gv.color} />
+                <h2 className="text-[11px] uppercase tracking-wide font-bold" style={{ color: gv.color }}>{gv.label}</h2>
+              </div>
+              <div className="space-y-1.5">
+                {items.map(it => (
+                  <button key={it.k} onClick={() => onAbrir(it.k)}
+                    className="w-full px-3 py-2.5 rounded-lg border border-[#232c34] bg-[#151b21] flex items-center gap-2.5 text-left">
+                    <IconFor name={it.icon} size={16} color={it.color} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold" style={{ color: it.color }}>{it.label}</div>
+                      <div className="text-[11px] text-slate-500">{it.tipo}</div>
+                    </div>
+                    <ChevronRight size={15} className="text-slate-600 flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </main>
+    </div>
+  );
+};
 
 // ═══════════════ EDITOR DE RUTINA ═══════════════
 // Libertad total sobre la sesión, con el verificador informando en vivo.
@@ -867,7 +1211,8 @@ const PanelDia = ({ dia, onSecundaria, onComplemento, onAbrirSesion }) => {
 };
 
 // ═══════════════ SESSION VIEW ═══════════════
-const SessionView = ({ diaData, sesionKey, ejerciciosVigentes, huerfanos = [], onEditarRutina, rutinaEditada, progress, prMap, onBack, onToggleSet, onLog, onLastre, onBanda, onReset, restTimer, onSkipTimer, avisosReset = {}, onSueno, onSecundaria, onComplemento, onAbrirSesion, esSecundaria, css, onCSS, onFlexible, onConvertirFlexible }) => {
+const SessionView = ({ diaData, sesionKey, ejerciciosVigentes, huerfanos = [], onEditarRutina, rutinaEditada, progress, prMap, onBack, onToggleSet, onLog, onLastre, onBanda, onReset, restTimer, onSkipTimer, avisosReset = {}, onSueno, onSecundaria, onComplemento, onAbrirSesion, esSecundaria, css, onCSS, onFlexible, onConvertirFlexible,
+  onFijarVariante, onSoltarVariante, onVerFicha, progresoTotal = {}, onUsarSugerido }) => {
   const ses = SESIONES[sesionKey];
   const color = ses.color;
   // Los ejercicios salen de la rutina VIGENTE en esta fecha, no de la base:
@@ -917,7 +1262,13 @@ const SessionView = ({ diaData, sesionKey, ejerciciosVigentes, huerfanos = [], o
               <IconFor name={SESION_INFO[sesionKey]?.icon} size={20} color={color} />
             </div>
             <div className="flex-1">
-              <h1 className="text-xl font-bold text-slate-50 leading-none">{ses.nombre}</h1>
+              {/* El nombre abre la ficha de la sesión: es la consulta más frecuente */}
+              <button onClick={() => onVerFicha?.(sesionKey)} className="text-left">
+                <h1 className="text-xl font-bold text-slate-50 leading-none flex items-center gap-1.5">
+                  {ses.nombre}
+                  <ChevronRight size={15} className="text-slate-500 flex-shrink-0" />
+                </h1>
+              </button>
               <div className="text-[11px] uppercase tracking-wide mt-1 font-medium" style={{ color }}>
                 {mesDeISO(diaData.fecha)} {diaData.dia} · {diaData.sem} · {diaData.momento}
               </div>
@@ -984,6 +1335,18 @@ const SessionView = ({ diaData, sesionKey, ejerciciosVigentes, huerfanos = [], o
                 : ' · Práctica libre (no había franja guiada compatible con este turno).'}
             </p>
           </div>
+        )}
+
+        {/* Cuál de la cola toca hoy, y cambiarla sin romper la rotación */}
+        {!esSecundaria && onFijarVariante && (
+          <>
+            <SelectorVariante dia={diaData} onFijar={onFijarVariante} onSoltar={onSoltarVariante}
+              registrados={Object.keys(dayProg).filter(k => !k.startsWith('__')).length} />
+            {diaData.sesionSecundaria && (
+              <SelectorVariante dia={diaData} secundaria onFijar={onFijarVariante} onSoltar={onSoltarVariante}
+                registrados={Object.keys(dayProg).filter(k => !k.startsWith('__')).length} />
+            )}
+          </>
         )}
 
         {/* Semana de descarga · P4. Se avisa EL DÍA, no solo en el resumen semanal */}
@@ -1069,7 +1432,10 @@ const SessionView = ({ diaData, sesionKey, ejerciciosVigentes, huerfanos = [], o
                 {ejs.map(ex => (
                   <ExerciseCard key={ex.id} ex={ex} prog={dayProg[ex.id]} pr={prMap[ex.id]}
                     onToggleSet={onToggleSet} onLog={onLog} onLastre={onLastre} onBanda={onBanda} color={color}
-                    avisoReset={avisosReset[ex.id]} />
+                    avisoReset={avisosReset[ex.id]}
+                    onUsarSugerido={onUsarSugerido}
+                    ultima={ultimaSesion(progresoTotal, ex.id, diaData.fecha)}
+                    sugerencia={sugerirCarga(ex, progresoTotal, { hasta: diaData.fecha, descarga: !!diaData.descarga })} />
                 ))}
               </div>
             ))}
@@ -1136,16 +1502,7 @@ const EditModal = ({ dia, onSave, onLiberar, onClose, ejerciciosRegistrados = 0 
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wide text-slate-500 font-bold mb-2">Sesión</div>
-            <div className="grid grid-cols-2 gap-1.5">
-              {Object.entries(SESION_INFO).map(([k, v]) => (
-                <button key={k} onClick={() => setSesion(k)}
-                  className={`py-2 px-2 rounded-lg border-2 text-xs font-bold flex items-center gap-2 transition-all ${sesion === k ? '' : 'border-[#2a3540] text-slate-400'}`}
-                  style={{ borderColor: sesion === k ? v.color : undefined, background: sesion === k ? v.color + '22' : undefined, color: sesion === k ? v.color : undefined }}>
-                  <IconFor name={v.icon} size={14} color={sesion === k ? v.color : '#64748b'} />
-                  {v.label}
-                </button>
-              ))}
-            </div>
+            <MenuSesiones sesion={sesion} onElegir={setSesion} />
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wide text-slate-500 font-bold mb-2">Festivo</div>
@@ -1293,10 +1650,12 @@ const VolumenMuscular = ({ calendario, progress, todayISO, rutina = {} }) => {
         <div className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Volumen por grupo muscular</div>
         <div className="flex items-center gap-1">
           <button onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0}
+            aria-label="Semana anterior"
             className="w-6 h-6 rounded flex items-center justify-center text-slate-400 disabled:text-slate-700 border border-[#232c34]">
             <ChevronLeft size={13} />
           </button>
           <button onClick={() => setIdx(i => Math.min(semanas.length - 1, i + 1))} disabled={idx >= semanas.length - 1}
+            aria-label="Semana siguiente"
             className="w-6 h-6 rounded flex items-center justify-center text-slate-400 disabled:text-slate-700 border border-[#232c34]">
             <ChevronRight size={13} />
           </button>
@@ -1376,8 +1735,106 @@ const VolumenMuscular = ({ calendario, progress, todayISO, rutina = {} }) => {
   );
 };
 
+
+// ═══════════════ GRÁFICA DE PROGRESIÓN ═══════════════
+// SVG a mano: una línea con puntos no justifica añadir una librería al bundle.
+const GraficaProgresion = ({ progress, prMap }) => {
+  const [modo, setModo] = useState('carga');     // carga | volumen
+  // Los compuestos de Parte 1 van primero: son los que llevan progresión lineal
+  const candidatos = useMemo(() => {
+    const vistos = new Map();
+    Object.values(SESIONES).forEach(ses => (ses.ejercicios ?? []).forEach(ex => {
+      if (!vistos.has(ex.id)) vistos.set(ex.id, ex);
+    }));
+    const conDatos = [...vistos.values()].filter(ex => historialEjercicio(progress, ex.id).length >= 2);
+    return conDatos.sort((a, b) => (b.lineal ? 1 : 0) - (a.lineal ? 1 : 0) || a.nombre.localeCompare(b.nombre));
+  }, [progress]);
+
+  const [exId, setExId] = useState(null);
+  const actual = candidatos.find(e => e.id === exId) ?? candidatos[0];
+  const serie = useMemo(() => actual ? historialEjercicio(progress, actual.id) : [], [progress, actual]);
+
+  if (!candidatos.length) {
+    return (
+      <div className="rounded-xl border border-[#232c34] bg-[#151b21] p-3.5 mt-2.5">
+        <div className="text-[10px] uppercase tracking-wide text-slate-500 font-bold mb-2">Progresión por ejercicio</div>
+        <p className="text-[11px] text-slate-600 leading-relaxed">
+          Aún no hay dos sesiones registradas de ningún ejercicio. La curva aparece en cuanto repitas uno.
+        </p>
+      </div>
+    );
+  }
+
+  const valores = serie.map(s => modo === 'carga' ? s.kgMax : s.volumen);
+  const max = Math.max(...valores, 1);
+  const min = Math.min(...valores, 0);
+  const rango = max - min || 1;
+  const W = 300, H = 110, PX = 6, PY = 10;
+  const px = (i) => PX + (i / Math.max(1, serie.length - 1)) * (W - PX * 2);
+  const py = (v) => H - PY - ((v - min) / rango) * (H - PY * 2);
+  const puntos = valores.map((v, i) => `${px(i)},${py(v)}`).join(' ');
+  const prKg = prMap?.[actual.id]?.kg;
+
+  return (
+    <div className="rounded-xl border border-[#232c34] bg-[#151b21] p-3.5 mt-2.5">
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <div className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Progresión por ejercicio</div>
+        <div className="flex gap-1">
+          {[['carga', 'Carga'], ['volumen', 'Volumen']].map(([k, l]) => (
+            <button key={k} onClick={() => setModo(k)}
+              className={`text-[9px] font-bold uppercase px-2 py-1 rounded border ${modo === k ? 'border-emerald-600 bg-emerald-950/30 text-emerald-300' : 'border-[#232c34] text-slate-500'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <select value={actual.id} onChange={e => setExId(e.target.value)} aria-label="Ejercicio a graficar"
+        className="w-full h-8 px-2 mb-2 bg-[#0f1417] border border-[#2a3540] text-slate-200 text-xs rounded">
+        {candidatos.map(e => (
+          <option key={e.id} value={e.id}>{e.lineal ? '★ ' : ''}{e.nombre}</option>
+        ))}
+      </select>
+
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 110 }} role="img"
+        aria-label={`Progresión de ${actual.nombre}`}>
+        <line x1={PX} y1={H - PY} x2={W - PX} y2={H - PY} stroke="#232c34" strokeWidth="1" />
+        <polyline points={puntos} fill="none" stroke="#22c55e" strokeWidth="2"
+          strokeLinejoin="round" strokeLinecap="round" />
+        {serie.map((s, i) => {
+          const v = valores[i];
+          const esPR = modo === 'carga' && prKg != null && s.kgMax >= prKg;
+          // Un reset del 10% se ve como una caída marcada respecto a la anterior
+          const esReset = i > 0 && modo === 'carga' && valores[i] < valores[i - 1] * 0.95;
+          return (
+            <g key={s.fecha}>
+              <circle cx={px(i)} cy={py(v)} r={esPR ? 4.5 : 3}
+                fill={esReset ? '#fb923c' : esPR ? '#fbbf24' : '#22c55e'} />
+              {esPR && <circle cx={px(i)} cy={py(v)} r="7" fill="none" stroke="#fbbf24" strokeWidth="1" opacity="0.5" />}
+            </g>
+          );
+        })}
+      </svg>
+
+      <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
+        <span>{serie[0]?.fecha.slice(5)}</span>
+        <span style={{ fontFamily: 'ui-monospace, monospace' }}>
+          {valores[0]} → <span className="text-slate-300 font-bold">{valores.at(-1)}</span>
+          {modo === 'carga' ? ' kg' : ' kg·rep'}
+        </span>
+        <span>{serie.at(-1)?.fecha.slice(5)}</span>
+      </div>
+      <div className="flex items-center gap-3 mt-2 text-[9px] text-slate-600">
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: '#fbbf24' }} /> PR</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: '#fb923c' }} /> reset del 10%</span>
+        <span>★ = progresión lineal</span>
+      </div>
+    </div>
+  );
+};
+
 const CalendarView = ({ calendario, progress, onOpenDay, onEditDay, editMode, setEditMode,
-  todayISO, saveStatus, mesInfo, onMes, avisos, onExportar, onImportar, mensajeDatos, hayMesAnterior, rutina = {} }) => {
+  todayISO, saveStatus, mesInfo, onMes, avisos, onExportar, onImportar, mensajeDatos, hayMesAnterior, rutina = {}, onBiblioteca, prMap = {} }) => {
   const dayCompletion = useCallback((d) => {
     // Un día puede tener principal + secundaria + complementos: para estar
     // "completo" tienen que estarlo todos. Cada uno se marca por separado.
@@ -1474,6 +1931,10 @@ const CalendarView = ({ calendario, progress, onOpenDay, onEditDay, editMode, se
               )}
             </div>
           </div>
+          <button onClick={onBiblioteca} aria-label="Biblioteca de rutinas"
+            className="w-10 h-10 rounded-lg border border-[#2a3540] text-slate-400 flex items-center justify-center flex-shrink-0">
+            <Activity size={18} />
+          </button>
           <button onClick={() => setEditMode(!editMode)}
             aria-label="Modo edición" aria-pressed={editMode}
             className={`w-10 h-10 rounded-lg border flex items-center justify-center transition-all flex-shrink-0 ${editMode ? 'border-emerald-500 bg-emerald-500/20 text-emerald-400' : 'border-[#2a3540] text-slate-400'}`}>
@@ -1502,7 +1963,7 @@ const CalendarView = ({ calendario, progress, onOpenDay, onEditDay, editMode, se
                 </label>
               </div>
               <p className="text-[9px] text-slate-600 mt-2 leading-relaxed">
-                Exporta un archivo con tu progreso, cargas, PRs y días fijados. Importar <span className="font-bold">reemplaza</span> lo que haya en este dispositivo.
+                Exporta tu progreso, cargas, PRs, días fijados, rutinas editadas, test CSS y complementos. Importar <span className="font-bold">reemplaza</span> todo eso en este dispositivo.
               </p>
               {mensajeDatos && (
                 <p className={`text-[10px] mt-1.5 font-bold ${mensajeDatos.ok ? 'text-emerald-400' : 'text-red-400'}`}>{mensajeDatos.texto}</p>
@@ -1712,6 +2173,7 @@ const CalendarView = ({ calendario, progress, onOpenDay, onEditDay, editMode, se
 
           {/* Volumen por grupo muscular (v6 · 7.2) */}
           <VolumenMuscular calendario={calendario} progress={progress} todayISO={todayISO} rutina={rutina} />
+          <GraficaProgresion progress={progress} prMap={prMap} />
         </div>
 
         {/* Nota inferior */}
@@ -1741,6 +2203,8 @@ export default function App() {
   // Versiones de rutina encima del plan base. El pasado no se reescribe.
   const [rutina, setRutina] = useState(() => estadoGuardado().rutina ?? {});
   const [editandoRutina, setEditandoRutina] = useState(null);   // clave de sesión
+  const [biblioteca, setBiblioteca] = useState(false);
+  const [fichaSesion, setFichaSesion] = useState(null);         // clave de sesión a consultar
   // Año y mes viven en UN SOLO estado. Separados, cruzar el 31 de diciembre obliga
   // a llamar a setAnio dentro del updater de setMes, y React ignora ese setState
   // (los updaters tienen que ser puros): el mes saltaba a enero y el año se quedaba
@@ -1772,8 +2236,10 @@ export default function App() {
 
   const [progress, setProgress] = useState(() => estadoGuardado().prog); // { 'YYYY-MM-DD': { exId: {sets,logs} } }
   const [prMap, setPrMap] = useState(() => estadoGuardado().prs);        // { exId: {kg, flash} }
-  const [view, setView] = useState('calendar'); // calendar | session
-  const [activeFecha, setActiveFecha] = useState(null);
+  // Se arranca en la sesión de HOY: es lo que se usa el 90% del tiempo. El cursor
+  // de mes sigue en el mes actual, así que la navegación no se descoloca.
+  const [view, setView] = useState('session');  // session | calendar
+  const [activeFecha, setActiveFecha] = useState(todayISO);
   const [activeSesion, setActiveSesion] = useState(null);   // null = la principal del día
   // Se calcula aquí arriba porque las mutaciones de progreso lo necesitan para
   // fijar el día automáticamente al registrar la primera serie.
@@ -1881,7 +2347,19 @@ export default function App() {
     if (!dia) return;
     setFijados(prev => prev[dia.fecha]
       ? prev
-      : { ...prev, [dia.fecha]: { turno: dia.turno, sesion: dia.sesion, auto: true } });
+      : {
+          ...prev,
+          [dia.fecha]: {
+            turno: dia.turno,
+            sesion: dia.sesion,
+            // La VARIANTE también se fija: la natación es un tipo que resuelve a
+            // natA1, natB1… Si solo se guardara el tipo, un cambio en la rotación
+            // podría darle otra variante a un día ya entrenado y dejar su registro
+            // (B1-3, B2-2…) apuntando a ejercicios que no están en la nueva.
+            ...(dia.variante ? { variante: dia.variante } : {}),
+            auto: true,
+          },
+        });
   }, []);
 
   const toggleSet = useCallback((exId, i, setCount, ex) => {
@@ -1921,6 +2399,23 @@ export default function App() {
       return { ...prev, [activeFecha]: { ...day, [exId]: { ...p, lastre: kg } } };
     });
     if (kg != null) checkPR(exId, kg);
+  }, [activeFecha, checkPR, fijarPorRegistro, diaActivo]);
+
+  // Rellena la carga sugerida en las series que aún no tienen kg anotados.
+  // Nunca sobrescribe lo que ya registraste: la sugerencia sigue siendo editable.
+  const usarSugerido = useCallback((exId, kg, setCount) => {
+    fijarPorRegistro(diaActivo);
+    setProgress(prev => {
+      const day = prev[activeFecha] || {};
+      const p = day[exId] || { sets: [], logs: [], lastre: null };
+      const logs = [...(p.logs || [])];
+      while (logs.length < setCount) logs.push(null);
+      for (let i = 0; i < setCount; i++) {
+        if (logs[i]?.kg == null) logs[i] = { ...(logs[i] ?? {}), kg };
+      }
+      return { ...prev, [activeFecha]: { ...day, [exId]: { ...p, logs } } };
+    });
+    checkPR(exId, kg);
   }, [activeFecha, checkPR, fijarPorRegistro, diaActivo]);
 
   const onBanda = useCallback((exId, val) => {
@@ -1995,13 +2490,22 @@ export default function App() {
           avisar(false, 'Ese archivo no parece un respaldo de la app.');
           return;
         }
+        // Se restaura TODO lo que exporta snapshot(). Si aquí falta un campo,
+        // importar un respaldo lo borra en silencio en el dispositivo destino.
+        const obj = x => (x && typeof x === 'object' && !Array.isArray(x) ? x : null);
         if (d.ancla) setAncla(d.ancla);
-        setFijados(d.fijados && typeof d.fijados === 'object' ? d.fijados : {});
+        setFijados(obj(d.fijados) ?? {});
         setFestivos(Array.isArray(d.festivos) ? d.festivos : FESTIVOS_DEFAULT);
-        setProgress(d.prog && typeof d.prog === 'object' ? d.prog : {});
-        setPrMap(d.prs && typeof d.prs === 'object' ? d.prs : {});
-        const nDias = Object.keys(d.prog || {}).length;
-        avisar(true, `Importado: ${nDias} ${nDias === 1 ? 'día' : 'días'} con registro.`);
+        setExtras(obj(d.extras) ?? {});
+        setCss(typeof d.css === 'number' && d.css > 0 ? d.css : null);   // seg/100 m
+        setRutina(obj(d.rutina) ?? {});
+        setProgress(obj(d.prog) ?? {});
+        setPrMap(obj(d.prs) ?? {});
+        const nDias = Object.keys(obj(d.prog) ?? {}).length;
+        const nRut = Object.keys(obj(d.rutina) ?? {}).length;
+        avisar(true, `Importado: ${nDias} ${nDias === 1 ? 'día' : 'días'} con registro`
+          + (nRut ? `, ${nRut} ${nRut === 1 ? 'rutina editada' : 'rutinas editadas'}` : '')
+          + (typeof d.css === 'number' && d.css > 0 ? ', CSS incluido' : '') + '.');
       } catch {
         avisar(false, 'El archivo está corrupto o no es JSON válido.');
       }
@@ -2049,6 +2553,41 @@ export default function App() {
     setEditandoRutina(null);
   }, [todayISO]);
 
+  // ─── Variante de la sesión (cuál de la cola toca hoy) ───
+  const fijarVariante = useCallback((fecha, clave, secundaria, borrarRegistro) => {
+    const dia = calendario.find(d => d.fecha === fecha);
+    if (!dia) return;
+    if (borrarRegistro) setProgress(prev => { const n = { ...prev }; delete n[fecha]; return n; });
+    setFijados(prev => {
+      const act = prev[fecha] ?? { turno: dia.turno, sesion: dia.sesion };
+      // Natación: el TIPO no cambia, cambia la variante. Gym: cambia la sesión.
+      const esNat = (secundaria ? dia.sesionSecundaria : dia.sesion) === 'natacion';
+      if (esNat) {
+        return { ...prev, [fecha]: { ...act, turno: dia.turno, sesion: dia.sesion,
+          [secundaria ? 'varianteSecundaria' : 'variante']: clave } };
+      }
+      return { ...prev, [fecha]: { ...act, turno: dia.turno, sesion: clave } };
+    });
+  }, [calendario]);
+
+  const soltarVariante = useCallback((fecha, secundaria) => {
+    setFijados(prev => {
+      const act = prev[fecha];
+      if (!act) return prev;
+      const resto = { ...act };
+      delete resto[secundaria ? 'varianteSecundaria' : 'variante'];
+      const quedaAlguna = !!(resto.variante || resto.varianteSecundaria);
+      const out = { ...prev };
+      if (quedaAlguna) { out[fecha] = resto; return out; }
+      // Ya no queda ninguna variante elegida a mano:
+      //  · si el día tiene registro, se conserva el auto-fijado (protege el historial)
+      //  · si no, se suelta del todo para que vuelva a mandar la rotación
+      if (act.auto) out[fecha] = { turno: act.turno, sesion: act.sesion, auto: true };
+      else delete out[fecha];
+      return out;
+    });
+  }, []);
+
   // ─── Día flexible ───
   const onFlexible = useCallback((fecha, cambio) => {
     setExtras(prev => ({ ...prev, [fecha]: { ...(prev[fecha] ?? {}), flex: { ...(prev[fecha]?.flex ?? {}), ...cambio } } }));
@@ -2091,6 +2630,18 @@ export default function App() {
     : (activeDiaData.sesion === 'natacion' ? (activeDiaData.variante ?? 'natacion') : activeDiaData.sesion));
   const ejerciciosVigentes = claveVista ? resolverRutina(claveVista, activeFecha, rutina) : null;
 
+  if (fichaSesion) {
+    return (
+      <FichaSesion sesionKey={fichaSesion}
+        ejercicios={resolverRutina(fichaSesion, todayISO, rutina)}
+        onCerrar={() => setFichaSesion(null)} />
+    );
+  }
+
+  if (biblioteca) {
+    return <Biblioteca onAbrir={setFichaSesion} onCerrar={() => setBiblioteca(false)} />;
+  }
+
   if (editandoRutina) {
     return (
       <EditorRutina
@@ -2101,6 +2652,29 @@ export default function App() {
         onRestaurar={() => restaurarRutina(editandoRutina)}
         onCerrar={() => setEditandoRutina(null)}
       />
+    );
+  }
+
+  // Si por lo que sea no hay día activo (mes cambiado, fecha fuera de rango),
+  // se cae al calendario en lugar de dejar la pantalla vacía.
+  if (view === 'session' && !activeDiaData) {
+    return (
+      <>
+        <CalendarView
+          calendario={calendario} progress={progress} avisos={avisos}
+          onOpenDay={openDay} onEditDay={setEditingDay}
+          editMode={editMode} setEditMode={setEditMode} todayISO={todayISO}
+          saveStatus={saveStatus} mesInfo={mesInfo} onMes={cambiarMes} hayMesAnterior={hayMesAnterior} rutina={rutina}
+          onExportar={onExportar} onImportar={onImportar} mensajeDatos={mensajeDatos}
+          onBiblioteca={() => setBiblioteca(true)} prMap={prMap}
+        />
+        {editingDay && (
+          <EditModal
+            dia={editingDay} onSave={saveEdit} onLiberar={liberarDia} onClose={() => setEditingDay(null)}
+            ejerciciosRegistrados={Object.keys(progress[editingDay.fecha] || {}).filter(k => !k.startsWith('__')).length}
+          />
+        )}
+      </>
     );
   }
 
@@ -2117,6 +2691,8 @@ export default function App() {
           onSecundaria={onSecundaria} onComplemento={onComplemento} onAbrirSesion={abrirSesionDelDia}
           css={css} onCSS={setCss}
           onFlexible={onFlexible} onConvertirFlexible={onConvertirFlexible}
+          onFijarVariante={fijarVariante} onSoltarVariante={soltarVariante}
+          onVerFicha={setFichaSesion} progresoTotal={progress} onUsarSugerido={usarSugerido}
           progress={progress[activeFecha]} prMap={prMap}
           onBack={backToCalendar} onToggleSet={toggleSet} onLog={onLog} onLastre={onLastre} onBanda={onBanda}
           onReset={resetDay} restTimer={restTimer} onSkipTimer={skipTimer}
@@ -2134,6 +2710,7 @@ export default function App() {
         editMode={editMode} setEditMode={setEditMode} todayISO={todayISO}
         saveStatus={saveStatus} mesInfo={mesInfo} onMes={cambiarMes} hayMesAnterior={hayMesAnterior} rutina={rutina}
         onExportar={onExportar} onImportar={onImportar} mensajeDatos={mensajeDatos}
+        onBiblioteca={() => setBiblioteca(true)} prMap={prMap}
       />
       {editingDay && (
         <EditModal

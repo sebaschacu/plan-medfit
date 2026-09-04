@@ -147,25 +147,36 @@ export const VENTANA_PISCINA = {
   C: null,
 };
 
-// Sesiones: etiquetas cortas para el calendario
+// Sesiones: etiquetas cortas para el calendario.
+//   label → abreviatura, la que se ve en la cuadrícula del mes
+//   tipo  → descripción, para el selector y la biblioteca
+//   grupo → categoría del menú agrupado (de aquí salen las secciones, no del JSX)
+export const GRUPOS_SESION = {
+  gym:        { label: 'Gym', icon: 'dumbbell', color: '#22c55e' },
+  calistenia: { label: 'Calistenia', icon: 'home', color: '#a855f7' },
+  natacion:   { label: 'Natación', icon: 'waves', color: '#06b6d4' },
+  cardio:     { label: 'Cardio', icon: 'run', color: '#0891b2' },
+  descanso:   { label: 'Descanso', icon: 'moon', color: '#64748b' },
+};
+
 export const SESION_INFO = {
-  gymC1: { label: 'Gym C1', color: '#15803d', icon: 'dumbbell', tipo: 'Pierna pesada' },
-  gymC2: { label: 'Gym C2', color: '#65a30d', icon: 'dumbbell', tipo: 'Pierna volumen' },
-  gymA:  { label: 'Gym A',  color: '#22c55e', icon: 'dumbbell', tipo: 'Empuje superior' },
-  gymB:  { label: 'Gym B',  color: '#16a34a', icon: 'dumbbell', tipo: 'Tracción superior' },
-  gymD:  { label: 'Gym D',  color: '#4ade80', icon: 'dumbbell', tipo: 'Torso completo' },
-  calistenia: { label: 'Calistenia', color: '#a855f7', icon: 'home', tipo: 'Full body + gesto' },
-  natacion:   { label: 'Natación', color: '#06b6d4', icon: 'waves', tipo: 'Aeróbico' },
-  natA1: { label: 'Nat A1', color: '#06b6d4', icon: 'waves', tipo: 'Técnica de crawl' },
-  natA2: { label: 'Nat A2', color: '#06b6d4', icon: 'waves', tipo: 'Espalda y pecho' },
-  natA3: { label: 'Nat A3', color: '#06b6d4', icon: 'waves', tipo: 'Estilos combinados' },
-  natB1: { label: 'Nat B1', color: '#0891b2', icon: 'waves', tipo: 'Umbral' },
-  natB2: { label: 'Nat B2', color: '#0891b2', icon: 'waves', tipo: 'Continuo y aguas abiertas' },
-  natB3: { label: 'Nat B3', color: '#0891b2', icon: 'waves', tipo: 'Ritmo variable' },
-  natCSS: { label: 'Test CSS', color: '#0e7490', icon: 'waves', tipo: 'Test de umbral' },
-  running:    { label: 'Running', color: '#0891b2', icon: 'run', tipo: 'Z2' },
-  ciclismo:   { label: 'Bici', color: '#0284c7', icon: 'run', tipo: 'Z2 sin impacto' },
-  descanso:   { label: 'Descanso', color: '#64748b', icon: 'moon', tipo: 'Recuperación' },
+  gymC1: { label: 'Gym C1', color: '#15803d', icon: 'dumbbell', tipo: 'Pierna pesada', grupo: 'gym' },
+  gymC2: { label: 'Gym C2', color: '#65a30d', icon: 'dumbbell', tipo: 'Pierna volumen', grupo: 'gym' },
+  gymA:  { label: 'Gym A',  color: '#22c55e', icon: 'dumbbell', tipo: 'Empuje superior', grupo: 'gym' },
+  gymB:  { label: 'Gym B',  color: '#16a34a', icon: 'dumbbell', tipo: 'Tracción superior', grupo: 'gym' },
+  gymD:  { label: 'Gym D',  color: '#4ade80', icon: 'dumbbell', tipo: 'Torso completo', grupo: 'gym' },
+  calistenia: { label: 'Calistenia', color: '#a855f7', icon: 'home', tipo: 'Full body + gesto', grupo: 'calistenia' },
+  natacion:   { label: 'Natación', color: '#06b6d4', icon: 'waves', tipo: 'Aeróbico', grupo: 'natacion' },
+  natA1: { label: 'Swim A1', color: '#06b6d4', icon: 'waves', tipo: 'Técnica de crawl', grupo: 'natacion' },
+  natA2: { label: 'Swim A2', color: '#06b6d4', icon: 'waves', tipo: 'Espalda y pecho', grupo: 'natacion' },
+  natA3: { label: 'Swim A3', color: '#06b6d4', icon: 'waves', tipo: 'Estilos combinados', grupo: 'natacion' },
+  natB1: { label: 'Swim B1', color: '#0891b2', icon: 'waves', tipo: 'Umbral', grupo: 'natacion' },
+  natB2: { label: 'Swim B2', color: '#0891b2', icon: 'waves', tipo: 'Aguas abiertas', grupo: 'natacion' },
+  natB3: { label: 'Swim B3', color: '#0891b2', icon: 'waves', tipo: 'Ritmo variable', grupo: 'natacion' },
+  natCSS: { label: 'Test CSS', color: '#0e7490', icon: 'waves', tipo: 'Test de umbral', grupo: 'natacion' },
+  running:    { label: 'Running', color: '#0891b2', icon: 'run', tipo: 'Z2', grupo: 'cardio' },
+  ciclismo:   { label: 'Bici', color: '#0284c7', icon: 'run', tipo: 'Z2 sin impacto', grupo: 'cardio' },
+  descanso:   { label: 'Descanso', color: '#64748b', icon: 'moon', tipo: 'Recuperación', grupo: 'descanso' },
 };
 
 // ═══════════════ TAXONOMÍA DE GRUPOS MUSCULARES (v6) ═══════════════
@@ -427,7 +438,7 @@ export const SESIONES = {
 
   // ═══ NATACIÓN · BLOQUE A — técnica y estilos (mantiene el nivel de nadador completo) ═══
   natA1: {
-    nombre: 'Nat A1 — Técnica de crawl', subtitulo: '2.000 m · ~52 min', color: '#06b6d4', duracion: '60 min',
+    nombre: 'Swim A1 — Técnica de crawl', subtitulo: '2.000 m · ~52 min', color: '#06b6d4', duracion: '60 min',
     distancia: '2.000 m',
     chequeo: 'Con tu nivel, el margen de mejora no está en la técnica gruesa sino en el AGARRE del agua: por eso el catch-up y el puño cerrado. Palas: máximo 500 m por sesión — con 29-32 series de gimnasio con mucho press y tirón, tu hombro ya lleva carga alta y las palas multiplican la fuerza sobre el manguito. Si aparece molestia, lo primero que sale son las palas, nunca el face pull del gimnasio.',
     recortada: 'Palas 6×100 → 4×100 · aeróbico 400 → 300 · calma 200 → 100 (1.600 m)',
@@ -446,7 +457,7 @@ export const SESIONES = {
   },
 
   natA2: {
-    nombre: 'Nat A2 — Espalda y pecho', subtitulo: '2.300 m · ~55 min', color: '#06b6d4', duracion: '60 min',
+    nombre: 'Swim A2 — Espalda y pecho', subtitulo: '2.300 m · ~55 min', color: '#06b6d4', duracion: '60 min',
     distancia: '2.300 m',
     chequeo: 'Tu pecho es 6/10 y tu espalda 7/10. Esta es la sesión que evita que se degraden. NO busca convertirlos en 9/10: eso exigiría más frecuencia de la que tienes con 2 sesiones semanales.',
     recortada: 'Un 100 de cada estilo · calentamiento 400 → 300 · aeróbico 300 → 200 (1.700 m)',
@@ -467,7 +478,7 @@ export const SESIONES = {
   },
 
   natA3: {
-    nombre: 'Nat A3 — Estilos combinados', subtitulo: '2.000 m · ~50 min', color: '#06b6d4', duracion: '60 min',
+    nombre: 'Swim A3 — Estilos combinados', subtitulo: '2.000 m · ~50 min', color: '#06b6d4', duracion: '60 min',
     distancia: '2.000 m',
     chequeo: 'La mariposa está aquí como variedad y coordinación, NO como objetivo. Pasar de 4/10 a 7/10 exigiría 3-4 sesiones semanales dedicadas; con 2 sesiones totales sería tirar el tiempo. Disfrútala, no la persigas.',
     recortada: 'IM 4×100 → 3×100 · progresivos 8×50 → 6×50 · calma 200 → 100 (1.600 m)',
@@ -484,7 +495,7 @@ export const SESIONES = {
 
   // ═══ NATACIÓN · BLOQUE B — crawl y umbral (base específica para triatlón) ═══
   natB1: {
-    nombre: 'Nat B1 — Umbral', subtitulo: '2.100 m · ~55 min · La más importante para triatlón', color: '#0891b2', duracion: '60 min',
+    nombre: 'Swim B1 — Umbral', subtitulo: '2.100 m · ~55 min · La más importante para triatlón', color: '#0891b2', duracion: '60 min',
     distancia: '2.100 m',
     chequeo: 'La serie de 10×100 con solo 15s de descanso es lo que la hace umbral. Si los últimos salen 3-4 s más lentos que los primeros, empezaste demasiado rápido: la CONSISTENCIA importa más que la velocidad. Progresión: cuando hagas los 10 al mismo ritmo sin desmoronarte, sube a 12×100 o baja el descanso a 10s. En recortada NUNCA toques la serie de 10×100: es tu métrica de progreso y si un día haces 10 y otro 8 dejas de poder compararlas.',
     recortada: 'FUERA el bloque de velocidad (4×50) · calentamiento 300 → 200. La serie 10×100 se mantiene íntegra (1.700 m)',
@@ -499,7 +510,7 @@ export const SESIONES = {
   },
 
   natB2: {
-    nombre: 'Nat B2 — Continuo y aguas abiertas', subtitulo: '2.400 m · ~58 min', color: '#0891b2', duracion: '60 min',
+    nombre: 'Swim B2 — Continuo y aguas abiertas', subtitulo: '2.400 m · ~58 min', color: '#0891b2', duracion: '60 min',
     distancia: '2.400 m',
     chequeo: 'La sesión que MÁS transfiere al triatlón: distancia continua, sin descanso de pared, con orientación. Sighting = levantar los ojos hacia delante sin parar la brazada, como un cocodrilo. En triatlón no hay líneas en el fondo ni paredes; practicarlo en piscina es la única forma de que no te cueste el día de la prueba. Progresión del bloque largo: 800 → 1.000 → 1.200 m.',
     recortada: 'Bloque largo 800 → 600 · fuera las 4×100 finales (1.700 m)',
@@ -515,7 +526,7 @@ export const SESIONES = {
   },
 
   natB3: {
-    nombre: 'Nat B3 — Ritmo variable', subtitulo: '2.200 m · ~55 min', color: '#0891b2', duracion: '60 min',
+    nombre: 'Swim B3 — Ritmo variable', subtitulo: '2.200 m · ~55 min', color: '#0891b2', duracion: '60 min',
     distancia: '2.200 m',
     chequeo: 'El ritmo variable te enseña a SENTIR ritmos distintos, no solo a nadar rápido. En triatlón vas a necesitar controlar el ritmo desde el primer metro sin dejarte llevar por la salida. Progresión: 3 bloques → 4 bloques.',
     recortada: '3 bloques → 2 bloques · pull 4×100 → 3×100 (1.700 m)',

@@ -99,6 +99,19 @@ function semanasDe(desde, hasta) {
 }
 
 
+// ═══════════════ POLÍTICA DE FIJADO MANUAL ═══════════════
+// Qué pasa con la cola (gym o natación) cuando se fija una sesión a mano.
+//
+//   'no-avanza'    → la que tocaba se hace en la SIGUIENTE. La rotación se
+//                    retrasa, pero nunca se pierde una sesión.
+//   'resincroniza' → la cola salta a la posición de la fijada. Lo que quedaba
+//                    en medio se salta.
+//
+// Se usa 'no-avanza' en las dos colas. Para el gym esto CAMBIA el comportamiento
+// anterior (resincronizaba): saltarse una C1 significaba saltarse un día de
+// pierna, y eso choca con S7. Cambiar aquí revierte las dos a la vez.
+export const POLITICA_FIJADO = 'no-avanza';
+
 // ═══════════════ SESIONES DOBLES ═══════════════
 // Sección 2 de la especificación. La natación combina con todo; el running solo
 // con gym de TORSO. Gym de pierna + running está PROHIBIDO, no avisado: es donde
@@ -184,6 +197,7 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
   let natIdx = ancla.natIdx ?? 0;     // posición en A1 → B1 → A2 → B2 → A3 → B3
   let natHechas = 0;                  // sesiones de natación hechas
   let natUltimoTest = 0;              // cuándo se hizo el último test de CSS
+  let natTestHecho = false;           // ¿se ha llegado a hacer el test alguna vez?
   let gymSeguidos = 0;                // S1 — nunca más de 4 gym consecutivos
   let ultimaPierna = null;            // S7 — separación mínima entre días de pierna
   const avisos = [];
@@ -198,15 +212,19 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
     festivo: festivos.includes(aISO(fecha)),
   });
 
+  const debidaGym = () => SECUENCIA_GYM[((gymIdx % 5) + 5) % 5];
   const ponerGym = (d) => {
+    const debida = debidaGym();
+    d.sugeridaGym = debida;                 // la que tocaba, para marcarla en la UI
     const fijado = fijados[d.fecha]?.sesion;
-    if (fijado && SECUENCIA_GYM.includes(fijado)) {
-      // Un gym fijado a mano RE-SINCRONIZA la cola: lo siguiente continúa desde ahí.
-      d.sesion = fijado;
-      gymIdx = SECUENCIA_GYM.indexOf(fijado) + 1;
-    } else {
-      d.sesion = SECUENCIA_GYM[((gymIdx % 5) + 5) % 5];
-      gymIdx++;
+    const valida = fijado && SECUENCIA_GYM.includes(fijado);
+    d.sesion = valida ? fijado : debida;
+    // Fijar a mano NO avanza la cola (POLITICA_FIJADO): la que tocaba se hace en
+    // la siguiente sesión. Si lo fijado coincide con lo que tocaba, avanza normal
+    // — si no, se repetiría en la siguiente.
+    if (!valida || fijado === debida || POLITICA_FIJADO === 'resincroniza') {
+      if (valida && POLITICA_FIJADO === 'resincroniza') gymIdx = SECUENCIA_GYM.indexOf(fijado) + 1;
+      else gymIdx++;
     }
     if (ES_PIERNA.has(d.sesion)) ultimaPierna = deISO(d.fecha);
     return d;
@@ -244,6 +262,10 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
           d.varianteFijada = fij.variante;
         }
       } else libres.push(d);
+      // La variante fijada de la SECUNDARIA se lee siempre: el día puede tener
+      // gym como principal y natación doblada, y entonces el bloque de arriba
+      // (que solo mira la principal) nunca llegaría a leerla.
+      if (fij?.varianteSecundaria) d.varianteFijadaSecundaria = fij.varianteSecundaria;
     }
 
     // Cupo restante de la semana, descontando lo ya fijado
@@ -290,9 +312,10 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
     // derivado del ancla igual que la cola de gym: nunca se reinicia.
     // Cada 8 semanas (~16 sesiones) una B1 se sustituye por el test de CSS.
     const varianteNatacion = () => {
-      // "Sesión 0": la PRIMERA sesión de todas es el test. Sin ese número, todos
-      // los ritmos del plan son adivinanzas.
-      if (natHechas === 0) return 'natCSS';
+      // "Sesión 0": el test va primero. La condición es "mientras NO se haya
+      // hecho", no "en la sesión 0": si se fija otra variante el primer día, con
+      // la condición vieja el test se perdía para siempre.
+      if (!natTestHecho) return 'natCSS';
       const v = SECUENCIA_NATACION[((natIdx % SECUENCIA_NATACION.length) + SECUENCIA_NATACION.length) % SECUENCIA_NATACION.length];
       // Después se repite cada 6-8 semanas sustituyendo una B1: comparten sistema
       // energético y estructura, así que la rotación no se descuadra.
@@ -328,8 +351,10 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
     const recorrido = [...ds].sort((a, b) => a.fecha.localeCompare(b.fecha));
     for (const d of recorrido) {
       if (d.fijado && d.sesion?.startsWith('gym')) {
-        // Gym fijado a mano: RE-SINCRONIZA la cola desde esa posición.
-        gymIdx = SECUENCIA_GYM.indexOf(d.sesion) + 1;
+        // Gym fijado a mano: la cola NO avanza salvo que coincida con la debida.
+        const debida = debidaGym();
+        if (d.sesion === debida) gymIdx++;
+        else if (POLITICA_FIJADO === 'resincroniza') gymIdx = SECUENCIA_GYM.indexOf(d.sesion) + 1;
         if (ES_PIERNA.has(d.sesion)) ultimaPierna = deISO(d.fecha);
         continue;
       }
@@ -462,13 +487,25 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
     // desordenada en el calendario. Se sella aquí, ya con la semana decidida.
     [...ds].sort((a, b) => a.fecha.localeCompare(b.fecha)).forEach(d => {
       const sellar = (fijada) => {
-        const v = fijada ?? varianteNatacion();
-        if (v === 'natCSS') natUltimoTest = natHechas; else natIdx++;
+        const debida = varianteNatacion();
+        const v = fijada ?? debida;
+        if (v === 'natCSS') { natUltimoTest = natHechas; natTestHecho = true; }
+        // Fijar a mano NO avanza la rotación: la que tocaba se hace en la
+        // siguiente. Si lo fijado ES lo que tocaba, avanza normal — si no, esa
+        // variante se repetiría.
+        else if (!fijada || fijada === debida || POLITICA_FIJADO === 'resincroniza') natIdx++;
         natHechas++;
         return v;
       };
-      if (d.sesion === 'natacion' && !d.variante) d.variante = sellar(d.varianteFijada);
-      if (d.sesionSecundaria === 'natacion' && !d.varianteSecundaria) d.varianteSecundaria = sellar();
+      if (d.sesion === 'natacion' && !d.variante) {
+        d.sugerida = varianteNatacion();      // la que tocaba, para marcarla en la UI
+        d.variante = sellar(d.varianteFijada);
+      }
+      // La secundaria también admite variante fijada, igual que la principal.
+      if (d.sesionSecundaria === 'natacion' && !d.varianteSecundaria) {
+        d.sugeridaSecundaria = varianteNatacion();
+        d.varianteSecundaria = sellar(d.varianteFijadaSecundaria);
+      }
     });
 
     // ── 6. DESCANSO: lo que quede ──

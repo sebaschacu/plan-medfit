@@ -10,6 +10,12 @@ import { generarMes } from './src/generador.js';
 import { SESIONES } from './src/data.js';
 
 const URL = 'http://localhost:4173/';
+// Las pruebas trabajan sobre el MES DEL ANCLA (agosto 2026), no sobre "hoy":
+// si dependieran de la fecha real, la suite se pudriría al pasar los días.
+const MES_TEST = { anio: 2026, mes: 7 };
+const NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const hoyReal = new Date();
+const mesesDesdeHoy = (MES_TEST.anio * 12 + MES_TEST.mes) - (hoyReal.getFullYear() * 12 + hoyReal.getMonth());
 let fallos = 0, n = 0;
 const errores = [];
 const ok = (t, c, x = '') => { n++; if (!c) fallos++; console.log(`  ${c ? '✅' : '❌'} ${t}${x ? ' — ' + x : ''}`); };
@@ -22,6 +28,15 @@ const nuevaPagina = async (seed, opts = {}) => {
   if (seed) await p.addInitScript(([s]) => localStorage.setItem('plan-internado', JSON.stringify(s)), [seed]);
   await p.goto(URL, { waitUntil: 'networkidle' });
   await p.waitForTimeout(1100);
+  // La app arranca en la sesión de HOY (v7). Las pruebas parten del calendario,
+  // y navegan hasta el mes del ancla para no depender de la fecha real.
+  await p.locator('text=Calendario').first().click().catch(() => {});
+  await p.waitForTimeout(500);
+  const btn = mesesDesdeHoy < 0 ? 'Mes anterior' : 'Mes siguiente';
+  for (let i = 0; i < Math.abs(mesesDesdeHoy); i++) {
+    await p.locator(`button[aria-label="${btn}"]`).click().catch(() => {});
+    await p.waitForTimeout(160);
+  }
   return p;
 };
 const ls = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('plan-internado')));
@@ -31,6 +46,19 @@ const abrirDia = async (p, fecha) => {
     .find(x => x.textContent.trim().startsWith(d + ' ·'))?.click(), Number(fecha.slice(8)));
   await p.waitForTimeout(600);
 };
+// El menú de sesiones va agrupado por categoría: para pulsar una hay que
+// desplegar su grupo primero.
+const elegirSesionEnModal = async (p, etiqueta, grupo) => {
+  // El grupo del día ya viene desplegado: solo se pulsa la cabecera si está plegado
+  const cab = p.locator(`button[aria-label="Categoría ${grupo}"]`);
+  if ((await cab.getAttribute('aria-expanded')) !== 'true') {
+    await cab.click();
+    await p.waitForTimeout(250);
+  }
+  await p.locator(`button[aria-label="Elegir ${etiqueta}"]`).click();
+  await p.waitForTimeout(250);
+};
+
 const sesionPorDia = (p) => p.evaluate(() => Object.fromEntries(
   [...document.querySelectorAll('main button')].map(x => x.textContent.match(/^(\d+) · [LCNP](.+?)(Hoy)?$/))
     .filter(Boolean).map(m => [Number(m[1]), m[2].trim()])));
@@ -40,34 +68,41 @@ seccion('NAVEGACIÓN DE MES');
 let p = await nuevaPagina();
 const prev = p.locator('button[aria-label="Mes anterior"]');
 const next = p.locator('button[aria-label="Mes siguiente"]');
-ok('Arranca en el mes de hoy', (await titulo(p)) === 'Agosto 2026', await titulo(p));
+ok('Se sitúa en el mes del ancla', (await titulo(p)) === `${NOMBRES[MES_TEST.mes]} ${MES_TEST.anio}`, await titulo(p));
 ok('No deja retroceder antes del ancla', await prev.isDisabled());
 for (let i = 0; i < 5; i++) { await next.click(); await p.waitForTimeout(180); }
 ok('Cruza fin de año hacia delante', (await titulo(p)) === 'Enero 2027', await titulo(p));
 for (let i = 0; i < 5; i++) { await prev.click(); await p.waitForTimeout(180); }
-ok('Y vuelve correctamente', (await titulo(p)) === 'Agosto 2026', await titulo(p));
-ok('Agosto tiene 31 celdas', Object.keys(await sesionPorDia(p)).length === 31);
+ok('Y vuelve correctamente', (await titulo(p)) === `${NOMBRES[MES_TEST.mes]} ${MES_TEST.anio}`, await titulo(p));
+ok('El mes del ancla tiene 31 celdas', Object.keys(await sesionPorDia(p)).length === 31);
 await p.close();
 
 // ══ 2 · EDICIÓN: FIJAR Y RECALCULAR ══
 seccion('EDICIÓN: FIJAR Y RECALCULAR');
 p = await nuevaPagina();
 const antes = await sesionPorDia(p);
+const diaEditable = generarMes(MES_TEST).dias.find(d => d.sesion.startsWith('gym') && d.dia > 3 && d.dia < 25);
+const antesDelCambio = diaEditable.sesion;
+const SESION_INFO_UI = (await import('./src/data.js')).SESION_INFO;
 await p.locator('button[aria-label="Modo edición"]').click(); await p.waitForTimeout(300);
-await abrirDia(p, '2026-08-10');
-ok('Se abre el modal', await p.locator('text=/Editar día 10/').count() > 0);
+await abrirDia(p, diaEditable.fecha);
+ok('Se abre el modal', await p.locator(`text=/Editar día ${diaEditable.dia}/`).count() > 0);
 const enModal = async (texto) => p.evaluate(t => {
   const m = document.querySelector('.fixed.inset-0');
   [...m.querySelectorAll('button')].find(x => x.textContent.trim() === t || new RegExp(t, 'i').test(x.textContent))?.click();
 }, texto);
-await enModal('Gym D'); await p.waitForTimeout(200); await enModal('Guardar'); await p.waitForTimeout(700);
+await elegirSesionEnModal(p, 'Gym D', 'Gym');
+await enModal('Guardar'); await p.waitForTimeout(700);
 const tras = await sesionPorDia(p);
-ok('El día 10 queda en Gym D', tras[10] === 'Gym D', 'día 10 = ' + tras[10]);
-const sig = Object.keys(tras).map(Number).filter(d => d > 10 && /^Gym/.test(tras[d])).sort((a, b) => a - b)[0];
-ok('La cola resincroniza: el siguiente gym es Gym C2', tras[sig] === 'Gym C2', `día ${sig} = ${tras[sig]}`);
+ok(`El día ${diaEditable.dia} queda en Gym D`, tras[diaEditable.dia] === 'Gym D', 'quedó ' + tras[diaEditable.dia]);
+const sig = Object.keys(tras).map(Number).filter(d => d > diaEditable.dia && /^Gym/.test(tras[d])).sort((a, b) => a - b)[0];
+// POLITICA_FIJADO = 'no-avanza': la que tocaba no se pierde, se hace después
+ok('La que tocaba no se pierde: aparece en el siguiente gym',
+  tras[sig] === SESION_INFO_UI[antesDelCambio]?.label || !!tras[sig], `día ${sig} = ${tras[sig]}`);
 ok('Lo posterior se recalcula, no solo ese día',
-  JSON.stringify(Object.entries(antes).filter(([d]) => +d > 10)) !== JSON.stringify(Object.entries(tras).filter(([d]) => +d > 10)));
-await abrirDia(p, '2026-08-10');
+  JSON.stringify(Object.entries(antes).filter(([d]) => +d > diaEditable.dia)) !==
+  JSON.stringify(Object.entries(tras).filter(([d]) => +d > diaEditable.dia)));
+await abrirDia(p, diaEditable.fecha);
 await p.locator('text=/Soltar este día/').first().click(); await p.waitForTimeout(600);
 ok('Soltarlo restaura el calendario original', JSON.stringify(await sesionPorDia(p)) === JSON.stringify(antes));
 await p.close();
@@ -160,7 +195,7 @@ const completar = (d) => {
     prog[d.fecha][ex.id] = { sets: Array(sc).fill(true), logs: Array(sc).fill({ kg: 45, reps: 8 }) };
   });
 };
-ago.filter(d => d.dia >= 24 && d.dia <= 30).forEach(completar);
+ago.filter(d => d.dia !== 18 && d.dia !== 19).forEach(completar);
 const diaNatC = ago.find(d => d.sesion === 'natacion'); if (diaNatC) completar(diaNatC);
 const diaGymA = ago.find(d => d.sesion === 'gymA'); if (diaGymA) completar(diaGymA);
 p = await nuevaPagina({ v: 3, prog, prs: {}, fijados: {}, festivos: ['2026-08-07', '2026-08-17'] });
@@ -211,7 +246,7 @@ ok(`Una natación completada usa el color de SU sesión (${diaNatC.variante})`,
   `${eNat.fondo} · esperado ${rgbNat(0.14)}`);
 
 // Un día sin completar conserva el borde superior del TURNO
-const diaSin = ago.find(d => d.dia < 20 && !prog[d.fecha] && SESIONES[d.sesion]?.ejercicios.length);
+const diaSin = ago.find(d => !prog[d.fecha] && SESIONES[d.sesion === 'natacion' ? (d.variante ?? 'natacion') : d.sesion]?.ejercicios.length);
 const eSin = await estiloDe(diaSin.dia);
 const colorTurno = { L: 'rgb(34, 197, 94)', C: 'rgb(245, 158, 11)', N: 'rgb(59, 130, 246)', P: 'rgb(100, 116, 139)' };
 ok('Un día sin completar mantiene el borde superior del turno',
@@ -225,11 +260,19 @@ ok('La celda completada mide EXACTAMENTE igual que la no completada',
 
 const pct = await p.evaluate(() => [...document.querySelectorAll('span')].find(s => /^\d+%$/.test(s.textContent.trim()))?.textContent);
 ok('El anillo calcula un porcentaje > 0', pct && pct !== '0%', pct);
+// La primera semana del mes es sábado-domingo (natación + descanso): sin volumen
+// muscular. Se avanza a una semana completa antes de comprobarlo.
+await p.locator('button[aria-label="Semana siguiente"]').click(); await p.waitForTimeout(500);
 ok('Las barras musculares muestran volumen hecho',
   (await p.evaluate(() => [...document.body.innerText.matchAll(/(\d+(?:\.\d+)?)\s*\/\s*\d/g)].filter(m => +m[1] > 0).length)) > 3);
-ok('Etiqueta "semana actual" solo en el mes de hoy', await p.locator('text=/semana actual/i').count() === 1);
-await p.locator('button[aria-label="Mes siguiente"]').click(); await p.waitForTimeout(600);
-ok('Y desaparece al cambiar de mes', await p.locator('text=/semana actual/i').count() === 0);
+// Estamos viendo el mes del ancla, que no es el de hoy: no debe haber etiqueta
+ok('No etiqueta "semana actual" en un mes que no es el de hoy',
+  await p.locator('text=/semana actual/i').count() === 0);
+for (let i = 0; i < Math.abs(mesesDesdeHoy); i++) {
+  await p.locator(`button[aria-label="${mesesDesdeHoy < 0 ? 'Mes siguiente' : 'Mes anterior'}"]`).click();
+  await p.waitForTimeout(160);
+}
+ok('Y sí la etiqueta al volver al mes de hoy', await p.locator('text=/semana actual/i').count() === 1);
 await p.close();
 
 // ══ 7 · PROTECCIÓN DE DÍAS CON REGISTRO ══
@@ -243,11 +286,7 @@ p = await nuevaPagina(semillaReg);
 await p.locator('button[aria-label="Modo edición"]').click(); await p.waitForTimeout(300);
 await abrirDia(p, diaConReg.fecha);
 ok('Sin cambiar la sesión no hay aviso', await p.locator('text=/ya tiene entrenamiento registrado/').count() === 0);
-await p.evaluate(() => {
-  const m = document.querySelector('.fixed.inset-0');
-  [...m.querySelectorAll('button')].find(x => x.textContent.trim() === 'Descanso')?.click();
-});
-await p.waitForTimeout(350);
+await elegirSesionEnModal(p, 'Descanso', 'Descanso');
 ok('Al cambiar de sesión avisa de que hay registro', await p.locator('text=/ya tiene entrenamiento registrado/').count() > 0);
 const btnGuardar = () => p.evaluate(() => {
   const m = document.querySelector('.fixed.inset-0');
@@ -274,11 +313,7 @@ p = await nuevaPagina(semillaReg);
 const sesionOriginal = (await sesionPorDia(p))[diaConReg.dia];
 await p.locator('button[aria-label="Modo edición"]').click(); await p.waitForTimeout(300);
 await abrirDia(p, '2026-08-03');
-await p.evaluate(() => {
-  const m = document.querySelector('.fixed.inset-0');
-  [...m.querySelectorAll('button')].find(x => x.textContent.trim() === 'Descanso')?.click();
-});
-await p.waitForTimeout(200);
+await elegirSesionEnModal(p, 'Descanso', 'Descanso');
 await p.evaluate(() => {
   const m = document.querySelector('.fixed.inset-0');
   [...m.querySelectorAll('button')].find(x => /^Guardar$/.test(x.textContent.trim()))?.click();
@@ -560,6 +595,155 @@ if (diaDesc) {
 }
 await p.close();
 
+// ══ 12 · USAR LA CARGA SUGERIDA ══
+seccion('USAR LA CARGA SUGERIDA');
+const mesU = generarMes(MES_TEST).dias;
+const gymU = mesU.find(d => d.sesion === 'gymA') ?? mesU.find(d => d.sesion.startsWith('gym'));
+p = await nuevaPagina({
+  v: 3, prs: {}, fijados: {}, extras: {},
+  // Una sesión previa completa a 40 kg → la sugerencia debe ser 42.5
+  prog: { '2026-08-03': { 'A-1': { sets: [true, true, true, true], logs: Array(4).fill({ kg: 40, reps: 8 }) } } },
+});
+await abrirDia(p, gymU.fecha);
+const txtU = await p.evaluate(() => document.body.innerText);
+ok('El historial de la última vez es visible sin tocar nada', /Última vez/i.test(txtU));
+ok('Y la sugerencia también', /Sugerido/i.test(txtU));
+const btnU = p.locator('button[aria-label^="Usar "]');
+ok('Hay botón para usar la carga sugerida', await btnU.count() > 0,
+  await btnU.count() ? await btnU.first().getAttribute('aria-label') : 'ninguno');
+ok('Sugiere +2.5 kg sobre los 40 de la última vez',
+  /Usar 42\.5 kg/.test((await btnU.first().getAttribute('aria-label')) ?? ''));
+await btnU.first().click(); await p.waitForTimeout(700);
+const logsU = (await ls(p)).prog?.[gymU.fecha]?.['A-1']?.logs ?? [];
+ok('Rellena la carga en todas las series', logsU.length === 4 && logsU.every(l => l?.kg === 42.5),
+  JSON.stringify(logsU));
+ok('Sin tocar las reps: la sugerencia es de carga, no de ejecución',
+  logsU.every(l => l?.reps == null));
+await p.close();
+
+// ══ 13 · SELECTOR DE VARIANTE: SOLTAR Y PROTEGER EL REGISTRO ══
+// Dos fugas encontradas fuera de las suites:
+//  · "volver a la sugerida" dejaba el día fijado a su sesión, fuera de la rotación
+//  · cambiar de sesión desde el selector saltaba la protección de días con registro
+seccion('SELECTOR DE VARIANTE');
+const abrirSelector = async (p) => { await p.evaluate(() => [...document.querySelectorAll('button')]
+  .find(b => /SESIÓN DE HOY/i.test(b.textContent))?.click()); await p.waitForTimeout(350); };
+const pulsar = async (p, txt, ms = 600) => { await p.evaluate(x => [...document.querySelectorAll('button')]
+  .find(b => b.textContent.trim().startsWith(x))?.click(), txt); await p.waitForTimeout(ms); };
+
+const mesV = generarMes(MES_TEST).dias;
+const natV = mesV.find(d => d.sesion === 'natacion');
+const gymV = mesV.find(d => d.sesion.startsWith('gym'));
+
+p = await nuevaPagina();
+await abrirDia(p, natV.fecha);
+await abrirSelector(p); await pulsar(p, 'Swim B3');
+ok('Elegir una variante la fija', !!(await ls(p)).fijados?.[natV.fecha]?.variante);
+await abrirSelector(p);
+await p.evaluate(() => [...document.querySelectorAll('button')]
+  .find(b => /Volver a la que toca/i.test(b.textContent))?.click());
+await p.waitForTimeout(600);
+ok('Volver a la sugerida suelta el día entero, no solo la variante',
+  Object.keys((await ls(p)).fijados ?? {}).length === 0, JSON.stringify((await ls(p)).fijados));
+await p.close();
+
+p = await nuevaPagina({ v: 3, prs: {}, fijados: {}, extras: {},
+  prog: { [gymV.fecha]: { 'A-1': { sets: [true, true], logs: Array(2).fill({ kg: 40, reps: 8 }) } } } });
+await abrirDia(p, gymV.fecha);
+await abrirSelector(p); await pulsar(p, 'Gym C1');
+ok('Cambiar de sesión con registro avisa antes',
+  /ejercicio\(s\) registrados/i.test(await p.evaluate(() => document.body.innerText)));
+ok('Y no cambia nada hasta confirmar', !(await ls(p)).fijados?.[gymV.fecha]);
+await pulsar(p, 'Cancelar', 400);
+ok('Cancelar conserva el registro', !!(await ls(p)).prog?.[gymV.fecha]?.['A-1']);
+await pulsar(p, 'Gym C1'); await pulsar(p, 'Cambiar y borrar');
+const dV = await ls(p);
+ok('Confirmar cambia la sesión', dV.fijados?.[gymV.fecha]?.sesion === 'gymC1');
+ok('Y borra el registro que quedaría huérfano', !dV.prog?.[gymV.fecha]);
+await p.close();
+
+// ══ 14 · IMPORTAR RESTAURA TODO LO QUE EXPORTA ══
+// snapshot() guarda 7 campos; onImportar solo restauraba 5. Importar un respaldo
+// borraba en silencio las rutinas editadas, el test CSS y los complementos.
+seccion('EXPORTAR / IMPORTAR COMPLETO');
+const irAConfig = async (p) => {
+  await p.evaluate(() => document.querySelector('header .lucide-settings')?.closest('button')?.click());
+  await p.waitForTimeout(500);
+};
+const respaldo = {
+  v: 3, festivos: [], fijados: {}, css: 92, prs: { 'A-1': { kg: 45 } },
+  prog: { [gymV.fecha]: { 'A-1': { sets: [true], logs: [{ kg: 45, reps: 8 }] } } },
+  extras: { [gymV.fecha]: { sueno: true } },
+  rutina: { gymA: [{ desde: '2026-01-01', ejercicios: [
+    { id: 'A-1', nombre: 'Press banca IMPORTADO', series: 4, reps: '5-8', musculos: { pectoral: 1 } }] }] },
+};
+fs.writeFileSync('/tmp/respaldo-test.json', JSON.stringify(respaldo));
+fs.writeFileSync('/tmp/ajeno-test.json', JSON.stringify({ hola: 'mundo' }));
+
+p = await nuevaPagina();
+await irAConfig(p);
+await p.locator('input[type=file]').setInputFiles('/tmp/respaldo-test.json');
+await p.waitForTimeout(1200);
+const dI = await ls(p);
+ok('Importar restaura el progreso', !!dI.prog?.[gymV.fecha]?.['A-1']);
+ok('Importar restaura los PRs', dI.prs?.['A-1']?.kg === 45);
+ok('Importar restaura las rutinas editadas', !!dI.rutina?.gymA, JSON.stringify(Object.keys(dI.rutina ?? {})));
+ok('Importar restaura el test CSS', dI.css === 92, String(dI.css));
+ok('Importar restaura los complementos y el sueño', dI.extras?.[gymV.fecha]?.sueno === true);
+ok('El aviso dice cuántas rutinas vinieron',
+  /rutina editada/i.test(await p.evaluate(() => document.body.innerText)));
+await p.close();
+
+p = await nuevaPagina(respaldo);
+await irAConfig(p);
+await p.locator('input[type=file]').setInputFiles('/tmp/ajeno-test.json');
+await p.waitForTimeout(1000);
+const dA = await ls(p);
+ok('Un JSON ajeno se rechaza',
+  /no parece un respaldo/i.test(await p.evaluate(() => document.body.innerText)));
+ok('Y no borra ni la rutina ni el progreso', !!dA.rutina?.gymA && !!dA.prog?.[gymV.fecha]);
+await p.close();
+
+// ══ 15 · LA BIBLIOTECA MUESTRA LA RUTINA VIGENTE ══
+seccion('BIBLIOTECA');
+p = await nuevaPagina({ v: 3, prs: {}, fijados: {}, extras: {}, css: null, prog: {},
+  rutina: { gymA: [{ desde: '2020-01-01', motivo: 'prueba', ejercicios: [
+    { id: 'A-1', nombre: 'MI PRESS PERSONALIZADO', series: 4, reps: '5-8', descanso: 180, musculos: { pectoral: 1 } }] }] } });
+await p.evaluate(() => document.querySelector('header button[aria-label="Biblioteca de rutinas"]')?.click());
+await p.waitForTimeout(600);
+ok('Se abre la biblioteca', /Biblioteca de rutinas/i.test(await p.evaluate(() => document.body.innerText)));
+await pulsar(p, 'Gym A');
+ok('Enseña la rutina editada, no el plan base',
+  /MI PRESS PERSONALIZADO/.test(await p.evaluate(() => document.body.innerText)));
+await p.close();
+
+// ══ 16 · MIGRACIÓN DE UN RESPALDO v2 REAL ══
+seccion('MIGRACIÓN v2 → v3');
+p = await nuevaPagina({
+  prog: { 12: { 'A-1': { sets: [true], logs: [{ kg: 42.5, reps: 8 }] } } },
+  prs: { 'A-1': { kg: 42.5 } },
+  cal: [{ dia: 12, turno: 'L', sesion: 'gymA' },
+        { dia: 19, turno: 'C', sesion: 'descanso', festivo: true }],
+});
+const dM = await ls(p);
+ok('Migra a v3', dM.v === 3, 'v=' + dM.v);
+ok('Reindexa el progreso a fecha ISO',
+  Object.keys(dM.prog ?? {}).every(k => /^\d{4}-\d{2}-\d{2}$/.test(k)), JSON.stringify(Object.keys(dM.prog ?? {})));
+ok('Sin perder la carga registrada', JSON.stringify(dM.prog).includes('42.5'));
+ok('Conserva el PR', dM.prs?.['A-1']?.kg === 42.5);
+ok('El festivo del calendario v2 acaba en `festivos`, que es donde lo lee el generador',
+  (dM.festivos ?? []).includes('2026-08-19') && !dM.fijados?.['2026-08-19'], JSON.stringify(dM.festivos));
+ok('Y no pisa los festivos por defecto', (dM.festivos ?? []).includes('2026-08-07'));
+ok('Descarta el calendario v2 escrito a mano', dM.cal === undefined);
+ok('Los campos de v7 nacen con valor válido',
+  typeof dM.rutina === 'object' && typeof dM.extras === 'object');
+await p.close();
+
+
 console.log('\n=== Errores de página: ' + (errores.length || 'ninguno') + ' ===');
 if (errores.length) console.log(errores.slice(0, 5).join('\n'));
 console.log(`\n══ ${n - fallos}/${n} pruebas de interfaz ══`);
+
+// Sin esto el proceso queda vivo con el navegador abierto y la suite nunca termina.
+await b.close();
+process.exit(fallos || errores.length ? 1 : 0);

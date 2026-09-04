@@ -1,0 +1,67 @@
+{
+  "ancla": {
+    "fecha": "2026-08-01",
+    "gymIdx": 0,
+    "turno": "L"
+  },
+  "css": 92,
+  "extras": {
+    "2026-08-05": {
+      "complementos": [
+        "movilidad"
+      ],
+      "sueno": 6
+    },
+    "2026-08-12": {
+      "secundaria": "natacion",
+      "separacionH": 6
+    }
+  },
+  "festivos": [
+    "2026-08-07",
+    "2026-08-17"
+  ],
+  "fijados": {
+    "2026-08-04": {
+      "sesion": "gymD",
+      "turno": "C"
+    },
+    "2026-08-11": {
+      "sesion": "natacion",
+      "turno": "C",
+      "variante": "natB2"
+    }
+  },
+  "prog": {
+    "2026-08-04": {
+      "D-1": {
+        "logs": [
+          {
+            "kg": 60,
+            "reps": 8
+          },
+          {
+            "kg": 60,
+            "reps": 7
+          },
+          null
+        ],
+        "sets": [
+          true,
+          true,
+          false
+        ]
+      }
+    },
+    "2026-08-12": {
+      "__sueno": 7
+    }
+  },
+  "prs": {
+    "D-1": {
+      "kg": 60
+    }
+  },
+  "rutina": {},
+  "v": 3
+}

@@ -2,7 +2,7 @@
 // Verifica las reglas del plan contra 6 meses generados, no contra un caso feliz.
 import { generarMes, generarDesdeAncla, FESTIVOS_DEFAULT, franjasCompatibles, deISO, aISO } from './src/generador.js';
 import { SECUENCIA_GYM, SECUENCIA_NATACION, NATACION_CSS, S7_PIERNA, CUPO_SEMANAL, DOBLES, GYM_PIERNA, SESIONES, CARDIO_FLEXIBLE } from './src/data.js';
-import { combinacionValida, ordenDoble, validarSeparacion } from './src/generador.js';
+import { combinacionValida, ordenDoble, validarSeparacion, POLITICA_FIJADO } from './src/generador.js';
 
 const ES_PIERNA = new Set(['gymC1', 'gymC2']);
 const diff = (a, b) => Math.round((deISO(a) - deISO(b)) / 86400000);
@@ -331,12 +331,79 @@ check('Fijar un turno solo pisa ese día, no desplaza la rota',
   conTurno.find(d => d.fecha === '2026-09-10').turno === 'C' &&
   conTurno.find(d => d.fecha === '2026-09-11').turno === base.find(d => d.fecha === '2026-09-11').turno);
 
-// Fijar una sesión de gym re-sincroniza la cola
-const conGym = generarMes({ anio: 2026, mes: 8, fijados: { '2026-09-08': { sesion: 'gymD' } } }).dias;
-const fijado = conGym.find(d => d.fecha === '2026-09-08');
-const siguienteGym = conGym.filter(d => d.fecha > '2026-09-08' && d.sesion.startsWith('gym'))[0];
-check(`Fijar gymD re-sincroniza la cola (siguiente gym = ${siguienteGym?.sesion}, esperado gymC2)`,
-  fijado.sesion === 'gymD' && siguienteGym?.sesion === 'gymC2');
+// Fijar un gym a mano NO avanza la cola (POLITICA_FIJADO = 'no-avanza').
+// CAMBIO DELIBERADO respecto a la v6, donde resincronizaba: saltarse la C1 que
+// tocaba significaba saltarse un día de pierna, y eso choca con S7.
+const gymsSinFijar = generarMes({ anio: 2026, mes: 8 }).dias.filter(d => d.sesion.startsWith('gym'));
+// Se elige un día que YA es de gym, y se fija a una sesión distinta de la que tocaba
+const diaGymReal = gymsSinFijar.find(d => d.sesion !== 'gymD') ?? gymsSinFijar[0];
+const debidaEnEseDia = diaGymReal.sesion;
+const conGym = generarMes({ anio: 2026, mes: 8, fijados: { [diaGymReal.fecha]: { sesion: 'gymD' } } }).dias;
+const gymFijado = conGym.find(d => d.fecha === diaGymReal.fecha);
+const gymsTras = conGym.filter(d => d.fecha > diaGymReal.fecha && d.sesion.startsWith('gym'));
+check(`Fijar gymD lo coloca ese día (política: ${POLITICA_FIJADO})`, gymFijado.sesion === 'gymD');
+check(`Y la que tocaba (${debidaEnEseDia}) NO se pierde: se hace en la siguiente`,
+  gymsTras[0]?.sesion === debidaEnEseDia, `siguiente = ${gymsTras[0]?.sesion}`);
+
+// Fijar lo que YA tocaba no lo duplica
+const yaTocaba = generarMes({ anio: 2026, mes: 8, fijados: { [diaGymReal.fecha]: { sesion: debidaEnEseDia } } }).dias;
+check('Fijar la sesión que ya tocaba no la repite en la siguiente',
+  yaTocaba.filter(d => d.fecha > diaGymReal.fecha && d.sesion.startsWith('gym'))[0]?.sesion !== debidaEnEseDia);
+
+console.log('\n── FIJAR VARIANTE DE NATACIÓN ──');
+const variantesDe = (fijados = {}) => generarDesdeAncla({ hasta: '2026-12-31', fijados }).dias
+  .flatMap(d => [d.variante, d.varianteSecundaria].filter(Boolean));
+const baseVar = variantesDe();
+const reparto = (arr) => { const c = {}; arr.forEach(v => c[v] = (c[v] || 0) + 1); return c; };
+
+// TEST 1 del documento · fijar una variante no hace perder ninguna sesión
+const diaNat = generarDesdeAncla({ hasta: '2026-12-31' }).dias
+  .filter(d => d.sesion === 'natacion' && d.variante !== 'natCSS')[2];
+const conVar = variantesDe({ [diaNat.fecha]: { turno: diaNat.turno, sesion: 'natacion', variante: 'natB3' } });
+check(`Fijar natB3 el ${diaNat.fecha} (tocaba ${diaNat.variante}) respeta la elección`,
+  generarDesdeAncla({ hasta: '2026-12-31', fijados: { [diaNat.fecha]: { turno: diaNat.turno, sesion: 'natacion', variante: 'natB3' } } })
+    .dias.find(d => d.fecha === diaNat.fecha)?.variante === 'natB3');
+const faltan = SECUENCIA_NATACION.filter(k => !reparto(conVar)[k]);
+check('Y NINGUNA variante de la rotación desaparece', faltan.length === 0, 'faltan: ' + faltan.join(', '));
+check(`La que tocaba (${diaNat.variante}) sigue apareciendo`,
+  (reparto(conVar)[diaNat.variante] ?? 0) > 0);
+
+// Caso límite propio · fijar la MISMA que tocaba no la duplica
+const misma = variantesDe({ [diaNat.fecha]: { turno: diaNat.turno, sesion: 'natacion', variante: diaNat.variante } });
+check('Fijar la variante que ya tocaba no la duplica',
+  JSON.stringify(reparto(misma)) === JSON.stringify(reparto(baseVar)),
+  JSON.stringify(reparto(misma)));
+
+// Caso límite propio · saltarse el test de CSS el primer día no lo pierde
+const primera = generarDesdeAncla({ hasta: '2026-12-31' }).dias.find(d => d.sesion === 'natacion');
+const saltandoTest = generarDesdeAncla({ hasta: '2026-12-31',
+  fijados: { [primera.fecha]: { turno: primera.turno, sesion: 'natacion', variante: 'natA1' } } }).dias
+  .filter(d => d.sesion === 'natacion').map(d => d.variante);
+check('Saltarse el test de CSS el primer día NO lo pierde: aparece después',
+  saltandoTest[0] === 'natA1' && saltandoTest.slice(1).includes('natCSS'),
+  saltandoTest.slice(0, 4).join(' → '));
+
+// TEST 2 del documento · la natación SECUNDARIA admite variante fijada.
+// Con el cupo actual la natación nunca se dobla de forma natural (siempre cabe
+// como principal y el que no cabe es el running), así que se fuerza el escenario:
+// se fijan a gym los días con piscina de una semana y la natación tiene que doblarse.
+const forzarDoble = {
+  '2026-08-11': { turno: 'N', sesion: 'gymA' },
+  '2026-08-12': { turno: 'P', sesion: 'gymB' },
+  '2026-08-13': { turno: 'L', sesion: 'gymD' },
+};
+const conDoble = generarDesdeAncla({ hasta: '2026-09-30', fijados: forzarDoble }).dias
+  .find(d => d.sesionSecundaria === 'natacion');
+check('Se puede forzar una natación secundaria (no ocurre sola con este cupo)',
+  !!conDoble, conDoble ? `${conDoble.fecha} → ${conDoble.varianteSecundaria}` : 'no se logró');
+if (conDoble) {
+  const conSec = generarDesdeAncla({ hasta: '2026-09-30', fijados: {
+    ...forzarDoble,
+    [conDoble.fecha]: { ...forzarDoble[conDoble.fecha], varianteSecundaria: 'natA3' },
+  } }).dias.find(d => d.fecha === conDoble.fecha);
+  check('Fijar la variante de la natación SECUNDARIA funciona igual que en la principal',
+    conSec?.varianteSecundaria === 'natA3', 'salió ' + conSec?.varianteSecundaria);
+}
 
 console.log('\n── PROTECCIÓN DE DÍAS CON REGISTRO ──');
 // Un día auto-fijado (porque tiene entrenamiento registrado) NO se mueve aunque

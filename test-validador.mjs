@@ -188,5 +188,70 @@ check('nuevoId no choca con los existentes', !base.some(e => e.id === R.nuevoId(
 check('gruposBS ofrece los existentes más uno nuevo',
   R.gruposBS(base).includes('BS1') && R.gruposBS(base).includes(null) && R.gruposBS(base).includes('BS5'));
 
-console.log(`\n══ TOTAL VERIFICADOR + RUTINA: ${pruebas - fallos}/${pruebas} ══`);
+
+// ══════════ HISTORIAL Y SUGERENCIA DE CARGA ══════════
+const RG = await import('./src/reglas.js');
+console.log('\n── HISTORIAL DEL EJERCICIO ──');
+const banca = SESIONES.gymA.ejercicios.find(e => e.id === 'A-1');
+const sent = SESIONES.gymC1.ejercicios.find(e => e.id === 'C1-1');
+const aisl = SESIONES.gymA.ejercicios.find(e => e.id === 'A-6');
+
+const hist = {
+  '2026-08-01': { 'A-1': { logs: [{ kg: 40, reps: 8 }, { kg: 40, reps: 8 }, { kg: 40, reps: 7 }, { kg: 40, reps: 6 }] } },
+  '2026-08-12': { 'A-1': { logs: [{ kg: 42.5, reps: 8 }, { kg: 42.5, reps: 8 }, { kg: 42.5, reps: 7 }, { kg: 42.5, reps: 6 }] } },
+};
+const h = RG.historialEjercicio(hist, 'A-1');
+check(`Encuentra las ${h.length} sesiones registradas del ejercicio`, h.length === 2);
+check('Ordenadas de más antigua a más reciente', h[0].fecha < h[1].fecha);
+check('Calcula carga máxima y volumen', h[1].kgMax === 42.5 && h[1].volumen === 42.5 * 29);
+check('La última sesión es la correcta', RG.ultimaSesion(hist, 'A-1').fecha === '2026-08-12');
+check('Sin registro devuelve null (primera vez)', RG.ultimaSesion(hist, 'A-99') === null);
+
+// TEST 5 del documento · el histórico sigue al ejercicio aunque cambie de sesión
+const movido = {
+  '2026-08-01': { 'A-1': { logs: [{ kg: 40, reps: 8 }] } },   // estaba en Gym A
+  '2026-09-01': { 'A-1': { logs: [{ kg: 45, reps: 8 }] } },   // ahora en Gym D
+};
+check('El histórico se encuentra aunque el ejercicio cambie de sesión (busca por ID)',
+  RG.historialEjercicio(movido, 'A-1').length === 2);
+
+console.log('\n── SUGERENCIA DE CARGA ──');
+// TEST 3 del documento · +2.5 / +5 / −10%
+const sSup = RG.sugerirCarga(banca, { '2026-08-01': { 'A-1': { logs: Array(4).fill({ kg: 40, reps: 8 }) } } });
+check(`Tren superior completo → +2.5 kg (40 → ${sSup.kg})`, sSup.tipo === 'subir' && sSup.kg === 42.5);
+const sInf = RG.sugerirCarga(sent, { '2026-08-01': { 'C1-1': { logs: Array(4).fill({ kg: 60, reps: 8 }) } } });
+check(`Tren inferior completo → +5 kg (60 → ${sInf.kg})`, sInf.tipo === 'subir' && sInf.kg === 65);
+const sReset = RG.sugerirCarga(banca, {
+  '2026-08-01': { 'A-1': { logs: [{ kg: 50, reps: 4 }] } },
+  '2026-08-05': { 'A-1': { logs: [{ kg: 50, reps: 4 }] } },
+});
+check(`Dos fallos seguidos → reset del 10% (50 → ${sReset.kg})`, sReset.tipo === 'reset' && sReset.kg === 45);
+check('Y el motivo cita la regla P6', /P6/.test(sReset.motivo));
+
+// No sube si no cerró el rango
+const sMant = RG.sugerirCarga(banca, { '2026-08-01': { 'A-1': { logs: [{ kg: 40, reps: 8 }, { kg: 40, reps: 3 }] } } });
+check('Si no completó el rango, mantiene carga', sMant.tipo === 'mantener' && sMant.kg === 40);
+
+// TEST 4 del documento · en descarga no propone subir
+const sDesc = RG.sugerirCarga(banca, { '2026-08-01': { 'A-1': { logs: Array(4).fill({ kg: 40, reps: 8 }) } } }, { descarga: true });
+check('En semana de DESCARGA no sugiere subir', sDesc.tipo === 'mantener' && sDesc.kg === 40);
+check('Y lo explica citando P4', /P4/.test(sDesc.motivo));
+
+// Aislamientos: doble progresión, no lineal
+const sAislTope = RG.sugerirCarga(aisl, { '2026-08-01': { 'A-6': { logs: [{ kg: 10, reps: 20 }] } } });
+check('Aislamiento al tope del rango → sube', sAislTope.tipo === 'subir');
+const sAislNo = RG.sugerirCarga(aisl, { '2026-08-01': { 'A-6': { logs: [{ kg: 10, reps: 13 }] } } });
+check('Aislamiento sin llegar al tope → sube reps, no carga', sAislNo.tipo === 'mantener');
+
+// Acarreos e isométricos tienen su propia regla
+const acarreo = SESIONES.gymD.ejercicios.find(e => e.acarreo);
+check('El acarreo progresa por postura (P2), no por rango de reps',
+  /P2/.test(RG.sugerirCarga(acarreo, { '2026-08-01': { [acarreo.id]: { lastre: 20 } } }).motivo));
+const iso = SESIONES.gymB.ejercicios.find(e => e.iso && !e.lineal);
+check('El isométrico progresa en tiempo hasta 60s (P3)',
+  RG.sugerirCarga(iso, {}).tipo === 'no-aplica');
+
+check('Primera vez lo dice en vez de dejar un hueco', RG.sugerirCarga(banca, {}).tipo === 'primera');
+
+console.log(`\n══ TOTAL VERIFICADOR + RUTINA + PROGRESIÓN: ${pruebas - fallos}/${pruebas} ══`);
 process.exit(fallos ? 1 : 0);
