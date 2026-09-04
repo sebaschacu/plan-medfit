@@ -1,0 +1,9 @@
+# Todo el proyecto se trabaja en LF.
+#
+# Sin esto, git en Windows (core.autocrlf=true por defecto) saca CRLF al clonar
+# mientras las herramientas escriben LF, y cada cambio produce diffs
+# contaminados de saltos de línea que tapan lo que de verdad cambió.
+* text=auto eol=lf
+
+# Binarios: que git no intente normalizarlos.
+*.png binary
