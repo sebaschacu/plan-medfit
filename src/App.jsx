@@ -7,66 +7,13 @@ import {
 } from './rutina.js';
 import { parseRest, hoyISO } from './utiles/formato.js';
 import { playBeep, vibrate } from './utiles/sonido.js';
+import { estadoGuardado, guardar, descargarJSON, leerRespaldo } from './estado/persistencia.js';
 import FichaSesion from './componentes/biblioteca/FichaSesion.jsx';
 import Biblioteca from './componentes/biblioteca/Biblioteca.jsx';
 import EditorRutina from './componentes/biblioteca/EditorRutina.jsx';
 import CalendarView from './componentes/calendario/CalendarView.jsx';
 import EditModal from './componentes/calendario/EditModal.jsx';
 import SessionView from './componentes/sesion/SessionView.jsx';
-
-// ═══════════════ CARGA DEL ESTADO GUARDADO ═══════════════
-// Se lee UNA vez y de forma síncrona, para usarla en inicializadores lazy de
-// useState. Antes esto vivía en un useEffect con seis setState: la app pintaba
-// el estado por defecto, luego saltaba al guardado, y en StrictMode el effect
-// corría dos veces. Leyéndolo aquí, el primer render ya es el bueno.
-let _guardado;
-function estadoGuardado() {
-  if (_guardado) return _guardado;
-  _guardado = { ancla: null, fijados: {}, extras: {}, css: null, rutina: {}, festivos: null, prog: {}, prs: {} };
-  try {
-    const raw = localStorage.getItem('plan-internado');
-    if (!raw) return _guardado;
-    const d = JSON.parse(raw);
-    if (d.v === 3) {
-      _guardado = {
-        ancla: d.ancla ?? null,
-        fijados: d.fijados ?? {},
-        extras: d.extras ?? {},
-        css: d.css ?? null,
-        rutina: d.rutina ?? {},
-        festivos: Array.isArray(d.festivos) ? d.festivos : null,
-        prog: d.prog ?? {},
-        prs: d.prs ?? {},
-      };
-      return _guardado;
-    }
-    // ── MIGRACIÓN v2 → v3 ──
-    // En la v2 el progreso se indexaba por NÚMERO DE DÍA (1..31) y el calendario
-    // era siempre agosto 2026. Con multi-mes ese número es ambiguo, así que las
-    // claves se reindexan a fecha ISO asumiendo agosto 2026, que es lo que eran.
-    const prog = {};
-    for (const [k, v] of Object.entries(d.prog ?? {})) {
-      const n = Number(k);
-      prog[Number.isInteger(n) && n >= 1 && n <= 31
-        ? `2026-08-${String(n).padStart(2, '0')}`
-        : k] = v;
-    }
-    // El calendario v2 escrito a mano se DESCARTA: lo sustituye el generador.
-    // Los festivos que hubiera marcado sí se conservan, y van al ARRAY `festivos`,
-    // que es de donde los lee el generador.
-    const fest = Array.isArray(d.cal)
-      ? d.cal.filter(x => x.festivo && x.dia).map(x => `2026-08-${String(x.dia).padStart(2, '0')}`)
-      : [];
-    _guardado = {
-      ancla: null,
-      fijados: {},
-      festivos: fest.length ? [...new Set([...FESTIVOS_DEFAULT, ...fest])] : null,
-      prog,
-      prs: d.prs ?? {},
-    };
-  } catch { /* localStorage bloqueado o JSON corrupto: se arranca de cero */ }
-  return _guardado;
-}
 
 // ═══════════════ MAIN APP ═══════════════
 export default function App() {
@@ -143,17 +90,15 @@ export default function App() {
   );
 
   const doSave = useCallback((datos) => {
-    try {
-      localStorage.setItem('plan-internado', JSON.stringify(datos));
+    if (guardar(datos)) {
       setSaveStatus('saved');
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 1500);
       return true;
-    } catch {
-      // Cuota llena o almacenamiento bloqueado (modo privado)
-      setSaveStatus('error');
-      return false;
     }
+    // Cuota llena o almacenamiento bloqueado (modo privado)
+    setSaveStatus('error');
+    return false;
   }, []);
 
   // Guardar cada vez que cambian los datos. Ya no hace falta esperar a "la carga":
@@ -163,9 +108,7 @@ export default function App() {
 
   // Guardar también cuando la app se minimiza o se cierra (red de seguridad)
   useEffect(() => {
-    const flush = () => {
-      try { localStorage.setItem('plan-internado', JSON.stringify(snapshot())); } catch { /* cuota llena o modo privado */ }
-    };
+    const flush = () => { guardar(snapshot()); };   // si falla (cuota, privado) no hay nada que hacer aquí
     window.addEventListener('visibilitychange', flush);
     window.addEventListener('pagehide', flush);
     window.addEventListener('beforeunload', flush);
@@ -350,13 +293,7 @@ export default function App() {
 
   const onExportar = useCallback(() => {
     try {
-      const blob = new Blob([JSON.stringify(snapshot(), null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `plan-internado-${todayISO}.json`;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      descargarJSON(snapshot(), `plan-internado-${todayISO}.json`);
       avisar(true, 'Exportado. Pásalo al otro dispositivo e impórtalo allí.');
     } catch {
       avisar(false, 'No se pudo exportar en este navegador.');
@@ -364,37 +301,23 @@ export default function App() {
   }, [snapshot, todayISO, avisar]);
 
   const onImportar = useCallback((file) => {
-    const lector = new FileReader();
-    lector.onload = () => {
-      try {
-        const d = JSON.parse(String(lector.result));
-        // Validación mínima: debe parecer un respaldo de esta app, no un JSON cualquiera.
-        if (!d || typeof d !== 'object' || (!d.prog && !d.fijados && !d.ancla)) {
-          avisar(false, 'Ese archivo no parece un respaldo de la app.');
-          return;
-        }
-        // Se restaura TODO lo que exporta snapshot(). Si aquí falta un campo,
-        // importar un respaldo lo borra en silencio en el dispositivo destino.
-        const obj = x => (x && typeof x === 'object' && !Array.isArray(x) ? x : null);
-        if (d.ancla) setAncla(d.ancla);
-        setFijados(obj(d.fijados) ?? {});
-        setFestivos(Array.isArray(d.festivos) ? d.festivos : FESTIVOS_DEFAULT);
-        setExtras(obj(d.extras) ?? {});
-        setCss(typeof d.css === 'number' && d.css > 0 ? d.css : null);   // seg/100 m
-        setRutina(obj(d.rutina) ?? {});
-        setProgress(obj(d.prog) ?? {});
-        setPrMap(obj(d.prs) ?? {});
-        const nDias = Object.keys(obj(d.prog) ?? {}).length;
-        const nRut = Object.keys(obj(d.rutina) ?? {}).length;
-        avisar(true, `Importado: ${nDias} ${nDias === 1 ? 'día' : 'días'} con registro`
-          + (nRut ? `, ${nRut} ${nRut === 1 ? 'rutina editada' : 'rutinas editadas'}` : '')
-          + (typeof d.css === 'number' && d.css > 0 ? ', CSS incluido' : '') + '.');
-      } catch {
-        avisar(false, 'El archivo está corrupto o no es JSON válido.');
-      }
-    };
-    lector.onerror = () => avisar(false, 'No se pudo leer el archivo.');
-    lector.readAsText(file);
+    leerRespaldo(file).then(r => {
+      if (!r.ok) { avisar(false, r.error); return; }
+      const d = r.datos;
+      if (d.ancla) setAncla(d.ancla);
+      setFijados(d.fijados);
+      setFestivos(d.festivos);
+      setExtras(d.extras);
+      setCss(d.css);
+      setRutina(d.rutina);
+      setProgress(d.prog);
+      setPrMap(d.prs);
+      const nDias = Object.keys(d.prog).length;
+      const nRut = Object.keys(d.rutina).length;
+      avisar(true, `Importado: ${nDias} ${nDias === 1 ? 'día' : 'días'} con registro`
+        + (nRut ? `, ${nRut} ${nRut === 1 ? 'rutina editada' : 'rutinas editadas'}` : '')
+        + (d.css != null ? ', CSS incluido' : '') + '.');
+    });
   }, [avisar]);
 
   // ─── Segunda sesión y complementos ───
