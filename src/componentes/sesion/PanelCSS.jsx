@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { calcularCSS, tablaRitmos, mmss } from '../../reglas.js';
+import { usePlanCtx, useAccionesCtx } from '../../estado/contextos.js';
 
 // ═══════════════ CSS · TEST Y TABLA DE RITMOS ═══════════════
 // Sin este número todos los ritmos del plan son adivinanzas. La tabla se enseña
 // en toda sesión de agua porque en el borde de la piscina no se va calculando.
-const PanelCSS = ({ css, onCSS, esTest }) => {
+const PanelCSS = ({ esTest }) => {
+  const { css } = usePlanCtx();
+  const { setCss: onCSS } = useAccionesCtx();
   const [t400, setT400] = useState('');
   const [t200, setT200] = useState('');
   const calc = (t400 && t200) ? calcularCSS(t400, t200) : null;

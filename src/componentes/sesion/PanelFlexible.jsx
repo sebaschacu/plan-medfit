@@ -1,13 +1,15 @@
 import React from 'react';
 import { Zap } from 'lucide-react';
 import { SESION_INFO, CARDIO_FLEXIBLE } from '../../data.js';
+import { useAccionesCtx } from '../../estado/contextos.js';
 import BotonSiNo from '../comunes/BotonSiNo.jsx';
 
 // ═══════════════ DÍA FLEXIBLE · las tres condiciones ═══════════════
 // Por defecto descanso. Pasa a running solo si se cumplen las TRES. La tercera
 // la calcula el generador (no venir de dos días de gym seguidos); las otras dos
 // dependen de datos que solo sabe el usuario, así que se preguntan.
-const PanelFlexible = ({ dia, respuesta, onResponder, onConvertir }) => {
+const PanelFlexible = ({ dia, respuesta }) => {
+  const { onFlexible: onResponder, onConvertirFlexible: onConvertir } = useAccionesCtx();
   const cond3 = dia.flexibleCond3 !== false;
   const durmio = respuesta?.sueno;
   const peso = respuesta?.peso;

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { SESION_INFO, SECUENCIA_NATACION, SECUENCIA_GYM } from '../../data.js';
+import { useAccionesCtx } from '../../estado/contextos.js';
 
 // ═══════════════ SELECTOR DE VARIANTE DENTRO DEL DÍA ═══════════════
 // El tipo (gym / natación) se elige en configuración; CUÁL de la cola toca se ve
 // y se cambia aquí. Fijar una a mano no adelanta la cola: la que tocaba se hace
 // en la siguiente sesión (ver POLITICA_FIJADO en generador.js).
-const SelectorVariante = ({ dia, secundaria = false, onFijar, onSoltar, registrados = 0 }) => {
+const SelectorVariante = ({ dia, secundaria = false, registrados = 0 }) => {
+  const { fijarVariante: onFijar, soltarVariante: onSoltar } = useAccionesCtx();
   const [abierto, setAbierto] = useState(false);
   const [porConfirmar, setPorConfirmar] = useState(null);   // clave elegida pendiente de confirmar
   const esNat = (secundaria ? dia.sesionSecundaria : dia.sesion) === 'natacion';

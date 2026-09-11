@@ -2,9 +2,11 @@ import React, { useMemo } from 'react';
 import { Moon, Trophy, RotateCcw, ChevronRight, Settings, ArrowLeft, Star, AlertTriangle, Clock } from 'lucide-react';
 import { SESION_INFO, SESIONES, PARTES, PISCINA_DURACION_MIN } from '../../data.js';
 import { S4, ultimaSesion, sugerirCarga } from '../../reglas.js';
+import { estaEditada, huerfanosDelDia } from '../../rutina.js';
 import { VACIO } from '../../utiles/constantes-ui.js';
 import { mesDeISO } from '../../utiles/formato.js';
 import { contarRender } from '../../utiles/medir.js';
+import { usePlanCtx, useProgresoCtx, useAccionesCtx } from '../../estado/contextos.js';
 import IconFor from '../comunes/IconFor.jsx';
 import NumInput from '../comunes/NumInput.jsx';
 import RestTimer from '../comunes/RestTimer.jsx';
@@ -15,9 +17,19 @@ import PanelCSS from './PanelCSS.jsx';
 import PanelDia from './PanelDia.jsx';
 
 // ═══════════════ SESSION VIEW ═══════════════
-const SessionView = ({ diaData, sesionKey, ejerciciosVigentes, huerfanos = [], onEditarRutina, rutinaEditada, progress, prMap, onBack, onToggleSet, onLog, onLastre, onBanda, onReset, restTimer, onSkipTimer, avisosReset = {}, onSueno, onSecundaria, onComplemento, onAbrirSesion, esSecundaria, css, onCSS, onFlexible, onConvertirFlexible,
-  onFijarVariante, onSoltarVariante, onVerFicha, progresoTotal = {}, onUsarSugerido }) => {
+// Lee el día activo y su progreso de los contextos. Las dos props que quedan
+// tocan flags de pantalla que viven en App (el editor y la ficha).
+const SessionView = ({ onEditarRutina, onVerFicha }) => {
   contarRender('SessionView');
+  const { todayISO, rutina, activeFecha, activeSesion, diaActivo: diaData, claveVista: sesionKey, ejerciciosVigentes } = usePlanCtx();
+  const { progress: progresoTotal, prMap, avisosReset, restTimer } = useProgresoCtx();
+  const { backToCalendar: onBack, resetDay: onReset, onSueno, skipTimer: onSkipTimer } = useAccionesCtx();
+
+  const esSecundaria = !!activeSesion;
+  const progress = progresoTotal[activeFecha];
+  const huerfanos = huerfanosDelDia(progress ?? {}, ejerciciosVigentes ?? []);
+  const rutinaEditada = estaEditada(sesionKey, todayISO, rutina);
+
   const ses = SESIONES[sesionKey];
   const color = ses.color;
   // Los ejercicios salen de la rutina VIGENTE en esta fecha, no de la base:
@@ -143,12 +155,12 @@ const SessionView = ({ diaData, sesionKey, ejerciciosVigentes, huerfanos = [], o
         )}
 
         {/* Cuál de la cola toca hoy, y cambiarla sin romper la rotación */}
-        {!esSecundaria && onFijarVariante && (
+        {!esSecundaria && (
           <>
-            <SelectorVariante dia={diaData} onFijar={onFijarVariante} onSoltar={onSoltarVariante}
+            <SelectorVariante dia={diaData}
               registrados={Object.keys(dayProg).filter(k => !k.startsWith('__')).length} />
             {diaData.sesionSecundaria && (
-              <SelectorVariante dia={diaData} secundaria onFijar={onFijarVariante} onSoltar={onSoltarVariante}
+              <SelectorVariante dia={diaData} secundaria
                 registrados={Object.keys(dayProg).filter(k => !k.startsWith('__')).length} />
             )}
           </>
@@ -168,9 +180,8 @@ const SessionView = ({ diaData, sesionKey, ejerciciosVigentes, huerfanos = [], o
         )}
 
         {/* Día flexible · las tres condiciones */}
-        {!esSecundaria && diaData.flexible && onFlexible && (
-          <PanelFlexible dia={diaData} respuesta={diaData.flexRespuesta}
-            onResponder={onFlexible} onConvertir={onConvertirFlexible} />
+        {!esSecundaria && diaData.flexible && (
+          <PanelFlexible dia={diaData} respuesta={diaData.flexRespuesta} />
         )}
 
         {/* D5 · con poco sueño, la segunda sesión del día se propone saltar */}
@@ -185,12 +196,10 @@ const SessionView = ({ diaData, sesionKey, ejerciciosVigentes, huerfanos = [], o
         )}
 
         {/* CSS · calculadora en el test, tabla de ritmos en toda sesión de agua */}
-        {esAgua && <PanelCSS css={css} onCSS={onCSS} esTest={sesionKey === 'natCSS'} />}
+        {esAgua && <PanelCSS esTest={sesionKey === 'natCSS'} />}
 
         {/* Segunda sesión y complementos · solo desde la sesión PRINCIPAL del día */}
-        {!esSecundaria && onSecundaria && (
-          <PanelDia dia={diaData} onSecundaria={onSecundaria} onComplemento={onComplemento} onAbrirSesion={onAbrirSesion} />
-        )}
+        {!esSecundaria && <PanelDia dia={diaData} />}
 
         {/* Chequeo */}
         <div className="mb-4 px-3 py-2.5 rounded-lg border-l-4 bg-[#151b21]" style={{ borderColor: color }}>
@@ -235,10 +244,8 @@ const SessionView = ({ diaData, sesionKey, ejerciciosVigentes, huerfanos = [], o
                   </div>
                 )}
                 {ejs.map(ex => (
-                  <ExerciseCard key={ex.id} ex={ex} prog={dayProg[ex.id]} pr={prMap[ex.id]}
-                    onToggleSet={onToggleSet} onLog={onLog} onLastre={onLastre} onBanda={onBanda} color={color}
+                  <ExerciseCard key={ex.id} ex={ex} prog={dayProg[ex.id]} pr={prMap[ex.id]} color={color}
                     avisoReset={avisosReset[ex.id]}
-                    onUsarSugerido={onUsarSugerido}
                     ultima={ultimaSesion(progresoTotal, ex.id, diaData.fecha)}
                     sugerencia={sugerirCarga(ex, progresoTotal, { hasta: diaData.fecha, descarga: !!diaData.descarga })} />
                 ))}

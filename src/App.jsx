@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { resolverRutina, estaEditada, huerfanosDelDia } from './rutina.js';
+import { resolverRutina, estaEditada } from './rutina.js';
 import { contarRender } from './utiles/medir.js';
 import { usePlanCtx, useProgresoCtx, useAccionesCtx } from './estado/contextos.js';
 import FichaSesion from './componentes/biblioteca/FichaSesion.jsx';
@@ -16,18 +16,15 @@ export default function App() {
   contarRender('App');
 
   const {
-    todayISO, css, rutina, calendario, avisos, mesInfo, hayMesAnterior,
-    view, activeFecha, activeSesion, diaActivo, claveVista, ejerciciosVigentes,
+    todayISO, rutina, calendario, avisos, mesInfo, hayMesAnterior,
+    view, diaActivo,
   } = usePlanCtx();
-  const { progress, prMap, avisosReset, restTimer, saveStatus, mensajeDatos } = useProgresoCtx();
+  const { progress, prMap, saveStatus, mensajeDatos } = useProgresoCtx();
   const {
-    cambiarMes, openDay, abrirSesionDelDia, backToCalendar,
+    cambiarMes, openDay,
     saveEdit: saveEditBase, liberarDia: liberarDiaBase,
-    onSecundaria, onComplemento, fijarVariante, soltarVariante,
-    onFlexible, onConvertirFlexible, setCss,
     guardarRutina: guardarRutinaBase, restaurarRutina: restaurarRutinaBase,
-    toggleSet, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno,
-    skipTimer, onExportar, onImportar,
+    onExportar, onImportar,
   } = useAccionesCtx();
 
   // ─── Flags de pantalla ───
@@ -95,27 +92,7 @@ export default function App() {
   }
 
   if (view === 'session' && activeDiaData) {
-    return (
-      <>
-        <SessionView
-          diaData={activeDiaData} sesionKey={claveVista}
-          ejerciciosVigentes={ejerciciosVigentes}
-          huerfanos={huerfanosDelDia(progress[activeFecha] ?? {}, ejerciciosVigentes ?? [])}
-          onEditarRutina={setEditandoRutina}
-          rutinaEditada={estaEditada(claveVista, todayISO, rutina)}
-          esSecundaria={!!activeSesion}
-          onSecundaria={onSecundaria} onComplemento={onComplemento} onAbrirSesion={abrirSesionDelDia}
-          css={css} onCSS={setCss}
-          onFlexible={onFlexible} onConvertirFlexible={onConvertirFlexible}
-          onFijarVariante={fijarVariante} onSoltarVariante={soltarVariante}
-          onVerFicha={setFichaSesion} progresoTotal={progress} onUsarSugerido={usarSugerido}
-          progress={progress[activeFecha]} prMap={prMap}
-          onBack={backToCalendar} onToggleSet={toggleSet} onLog={onLog} onLastre={onLastre} onBanda={onBanda}
-          onReset={resetDay} restTimer={restTimer} onSkipTimer={skipTimer}
-          avisosReset={avisosReset} onSueno={onSueno}
-        />
-      </>
-    );
+    return <SessionView onEditarRutina={setEditandoRutina} onVerFicha={setFichaSesion} />;
   }
 
   return (

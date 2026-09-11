@@ -4,13 +4,15 @@ import { SESION_INFO, COMPLEMENTOS, DOBLES } from '../../data.js';
 import { combinacionValida, ordenDoble, validarSeparacion } from '../../generador.js';
 import { GYM_PIERNA_UI } from '../../utiles/constantes-ui.js';
 import { contarRender } from '../../utiles/medir.js';
+import { useAccionesCtx } from '../../estado/contextos.js';
 import IconFor from '../comunes/IconFor.jsx';
 import NumInput from '../comunes/NumInput.jsx';
 
 // ═══════════════ SEGUNDA SESIÓN Y COMPLEMENTOS ═══════════════
 // El déficit de días se cubre doblando, no recortando. Aquí se elige y se valida.
-const PanelDia = ({ dia, onSecundaria, onComplemento, onAbrirSesion }) => {
+const PanelDia = ({ dia }) => {
   contarRender('PanelDia');
+  const { onSecundaria, onComplemento, abrirSesionDelDia: onAbrirSesion } = useAccionesCtx();
   const [abierto, setAbierto] = useState(false);
   const [sep, setSep] = useState(dia.separacionH ?? '');
   const puedeDoblar = DOBLES.turnos[dia.turno]?.permite;

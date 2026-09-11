@@ -1,10 +1,12 @@
 import React from 'react';
 import { Check, Trophy, Backpack, Zap, AlertTriangle, Link2, Sparkles, Ruler, Clock } from 'lucide-react';
 import { PALAS_MAX_M } from '../../data.js';
+import { useAccionesCtx } from '../../estado/contextos.js';
 import NumInput from '../comunes/NumInput.jsx';
 
 // ═══════════════ EXERCISE CARD ═══════════════
-const ExerciseCard = ({ ex, prog, pr, onToggleSet, onLog, onLastre, onBanda, color, avisoReset, ultima, sugerencia, onUsarSugerido }) => {
+const ExerciseCard = ({ ex, prog, pr, color, avisoReset, ultima, sugerencia }) => {
+  const { toggleSet: onToggleSet, onLog, onLastre, onBanda, usarSugerido: onUsarSugerido } = useAccionesCtx();
   const setCount = typeof ex.series === 'number' ? ex.series : 1;
   const p = prog || { sets: [], logs: [], lastre: null };
   const allDone = setCount > 0 && p.sets?.length === setCount && p.sets.every(Boolean);
