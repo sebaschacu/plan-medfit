@@ -4,6 +4,7 @@ import { SESION_INFO, SESIONES, PARTES, PISCINA_DURACION_MIN } from '../../data.
 import { S4, ultimaSesion, sugerirCarga } from '../../reglas.js';
 import { VACIO } from '../../utiles/constantes-ui.js';
 import { mesDeISO } from '../../utiles/formato.js';
+import { contarRender } from '../../utiles/medir.js';
 import IconFor from '../comunes/IconFor.jsx';
 import NumInput from '../comunes/NumInput.jsx';
 import RestTimer from '../comunes/RestTimer.jsx';
@@ -16,6 +17,7 @@ import PanelDia from './PanelDia.jsx';
 // ═══════════════ SESSION VIEW ═══════════════
 const SessionView = ({ diaData, sesionKey, ejerciciosVigentes, huerfanos = [], onEditarRutina, rutinaEditada, progress, prMap, onBack, onToggleSet, onLog, onLastre, onBanda, onReset, restTimer, onSkipTimer, avisosReset = {}, onSueno, onSecundaria, onComplemento, onAbrirSesion, esSecundaria, css, onCSS, onFlexible, onConvertirFlexible,
   onFijarVariante, onSoltarVariante, onVerFicha, progresoTotal = {}, onUsarSugerido }) => {
+  contarRender('SessionView');
   const ses = SESIONES[sesionKey];
   const color = ses.color;
   // Los ejercicios salen de la rutina VIGENTE en esta fecha, no de la base:

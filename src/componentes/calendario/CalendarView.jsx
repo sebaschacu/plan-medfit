@@ -4,6 +4,7 @@ import { TURNO_INFO, SESION_INFO, SESIONES, DIAS_SEMANA } from '../../data.js';
 import { resolverRutina } from '../../rutina.js';
 import { COMPLETADO } from '../../utiles/constantes-ui.js';
 import { hexARgba } from '../../utiles/formato.js';
+import { contarRender } from '../../utiles/medir.js';
 import IconFor from '../comunes/IconFor.jsx';
 import BarraCalendario from './BarraCalendario.jsx';
 import PanelEstadisticas from '../estadisticas/PanelEstadisticas.jsx';
@@ -11,6 +12,7 @@ import PanelEstadisticas from '../estadisticas/PanelEstadisticas.jsx';
 // ═══════════════ CALENDAR VIEW ═══════════════
 const CalendarView = ({ calendario, progress, onOpenDay, onEditDay, editMode, setEditMode,
   todayISO, saveStatus, mesInfo, onMes, avisos, onExportar, onImportar, mensajeDatos, hayMesAnterior, rutina = {}, onBiblioteca, prMap = {} }) => {
+  contarRender('CalendarView');
   const dayCompletion = useCallback((d) => {
     // Un día puede tener principal + secundaria + complementos: para estar
     // "completo" tienen que estarlo todos. Cada uno se marca por separado.

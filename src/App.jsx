@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { resolverRutina, estaEditada, huerfanosDelDia } from './rutina.js';
 import { hoyISO } from './utiles/formato.js';
+import { contarRender } from './utiles/medir.js';
 import { guardar, descargarJSON, leerRespaldo } from './estado/persistencia.js';
 import { useTemporizador } from './estado/useTemporizador.js';
 import { useNavegacion } from './estado/useNavegacion.js';
@@ -16,6 +17,7 @@ import SessionView from './componentes/sesion/SessionView.jsx';
 
 // ═══════════════ MAIN APP ═══════════════
 export default function App() {
+  contarRender('App');
   const todayISO = hoyISO();
 
   // ─── Flags de pantalla ───
