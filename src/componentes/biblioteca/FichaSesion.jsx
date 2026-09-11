@@ -1,15 +1,19 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { SESIONES, SESION_INFO } from '../../data.js';
+import { resolverRutina } from '../../rutina.js';
+import { usePlanCtx } from '../../estado/contextos.js';
 import IconFor from '../comunes/IconFor.jsx';
 import FichaEjercicio from '../comunes/FichaEjercicio.jsx';
 
 // ═══════════════ FICHA DE SESIÓN (solo lectura) ═══════════════
-const FichaSesion = ({ sesionKey, ejercicios, onCerrar }) => {
+// Enseña la rutina VIGENTE hoy para esa sesión, resuelta desde el contexto.
+const FichaSesion = ({ sesionKey, onCerrar }) => {
+  const { todayISO, rutina } = usePlanCtx();
   const ses = SESIONES[sesionKey];
   const info = SESION_INFO[sesionKey];
   if (!ses) return null;
-  const lista = ejercicios ?? ses.ejercicios;
+  const lista = resolverRutina(sesionKey, todayISO, rutina) ?? ses.ejercicios;
   const series = lista.filter(e => !e.opcional).reduce((a, e) => a + (typeof e.series === 'number' ? e.series : 0), 0);
   return (
     <div className="min-h-screen bg-[#0f1417]">

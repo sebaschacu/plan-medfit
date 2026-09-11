@@ -2,15 +2,23 @@ import React, { useState, useMemo } from 'react';
 import { ArrowLeft, Check, AlertTriangle, ChevronLeft, ChevronRight, X, RotateCcw } from 'lucide-react';
 import { SESION_INFO } from '../../data.js';
 import { verificarSesion } from '../../validador.js';
-import { catalogoEjercicios, nuevoId, mover, gruposBS } from '../../rutina.js';
+import { catalogoEjercicios, nuevoId, mover, gruposBS, resolverRutina, estaEditada } from '../../rutina.js';
+import { usePlanCtx } from '../../estado/contextos.js';
 import NumInput from '../comunes/NumInput.jsx';
 
 // ═══════════════ EDITOR DE RUTINA ═══════════════
 // Libertad total sobre la sesión, con el verificador informando en vivo.
 // NO bloquea: clasifica en duras y blandas y exige un motivo al guardar, que es
 // lo que hace útil la revisión de las 8 semanas (N3).
-const EditorRutina = ({ sesionKey, ejercicios: iniciales, onGuardar, onRestaurar, onCerrar, editada }) => {
-  const [lista, setLista] = useState(() => JSON.parse(JSON.stringify(iniciales)));
+//
+// Arranca con la rutina VIGENTE hoy, resuelta desde el contexto. onGuardar,
+// onRestaurar y onCerrar vienen de App, que además cierra el editor.
+const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
+  const { todayISO, rutina } = usePlanCtx();
+  const editada = estaEditada(sesionKey, todayISO, rutina);
+  // Copia profunda de la vigente, UNA vez al montar: lo que se edita es local
+  // hasta que se guarda.
+  const [lista, setLista] = useState(() => JSON.parse(JSON.stringify(resolverRutina(sesionKey, todayISO, rutina))));
   const [motivo, setMotivo] = useState('');
   const [anadiendo, setAnadiendo] = useState(false);
   const [busca, setBusca] = useState('');

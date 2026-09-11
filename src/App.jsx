@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from 'react';
-import { resolverRutina, estaEditada } from './rutina.js';
 import { contarRender } from './utiles/medir.js';
 import { usePlanCtx, useAccionesCtx } from './estado/contextos.js';
 import FichaSesion from './componentes/biblioteca/FichaSesion.jsx';
@@ -16,8 +15,8 @@ export default function App() {
   contarRender('App');
 
   // App NO lee ContextoProgreso a propósito: así marcar una serie no lo
-  // re-renderiza. Todo lo que depende del progreso lo leen las pantallas.
-  const { todayISO, rutina, view, diaActivo } = usePlanCtx();
+  // re-renderiza. Del plan solo necesita lo justo para enrutar.
+  const { view, diaActivo } = usePlanCtx();
   const {
     saveEdit: saveEditBase, liberarDia: liberarDiaBase,
     guardarRutina: guardarRutinaBase, restaurarRutina: restaurarRutinaBase,
@@ -40,11 +39,7 @@ export default function App() {
   const activeDiaData = diaActivo;
 
   if (fichaSesion) {
-    return (
-      <FichaSesion sesionKey={fichaSesion}
-        ejercicios={resolverRutina(fichaSesion, todayISO, rutina)}
-        onCerrar={() => setFichaSesion(null)} />
-    );
+    return <FichaSesion sesionKey={fichaSesion} onCerrar={() => setFichaSesion(null)} />;
   }
 
   if (biblioteca) {
@@ -55,8 +50,6 @@ export default function App() {
     return (
       <EditorRutina
         sesionKey={editandoRutina}
-        ejercicios={resolverRutina(editandoRutina, todayISO, rutina)}
-        editada={estaEditada(editandoRutina, todayISO, rutina)}
         onGuardar={(ejs, motivo) => guardarRutina(editandoRutina, ejs, motivo)}
         onRestaurar={() => restaurarRutina(editandoRutina)}
         onCerrar={() => setEditandoRutina(null)}
