@@ -61,30 +61,43 @@ ok('Se abre un día de gym', await p.locator('text=/ejercicios/i').count() > 0, 
 // Se resetea el contador justo antes del toque y se lee 300 ms después:
 // bastante para que React haya hecho commit, y antes del primer tic del
 // temporizador de descanso (1 s), que también re-renderiza.
-await p.evaluate(() => { window.__renders = {}; });
-const serie = p.locator('main button').filter({ hasText: /^1$/ }).first();
-await serie.click();
-await p.waitForTimeout(300);
-const r = await p.evaluate(() => ({ ...window.__renders }));
+//
+// Se miden DOS series. La primera fija el día (fijarPorRegistro cambia
+// `fijados`, el calendario se regenera) y es legítimo que el enrutador se
+// entere. La segunda solo cambia el progreso: es la medida limpia de si el
+// progreso llega a componentes que no lo necesitan.
+const medir = async (n) => {
+  await p.evaluate(() => { window.__renders = {}; });
+  await p.locator('main button').filter({ hasText: new RegExp(`^${n}$`) }).first().click();
+  await p.waitForTimeout(300);
+  const r = await p.evaluate(() => ({ ...window.__renders }));
+  // Saltar el temporizador para que la siguiente medida arranque limpia
+  await p.locator('button', { hasText: 'SALTAR' }).click().catch(() => {});
+  await p.waitForTimeout(200);
+  return r;
+};
+const r1 = await medir(1);
+const r2 = await medir(2);
 
+const fila = (k) => `  ${k.padEnd(13)} ${String(r1[k] ?? 0).padStart(2)}   ${String(r2[k] ?? 0).padStart(2)}`;
 console.log('\n── RENDERS AL MARCAR UNA SERIE ──');
-for (const k of ['App', 'SessionView', 'CalendarView', 'PanelDia']) {
-  console.log(`  ${k.padEnd(13)} ${r[k] ?? 0}`);
-}
+console.log('                1ª   2ª');
+for (const k of ['App', 'SessionView', 'CalendarView', 'PanelDia']) console.log(fila(k));
 console.log();
 
-ok('La serie quedó marcada', await p.locator('main button svg.lucide-check').count() > 0);
-ok('CalendarView no se renderiza (no está montado)', (r.CalendarView ?? 0) === 0, String(r.CalendarView ?? 0));
-ok('SessionView se renderiza (es la pantalla activa)', (r.SessionView ?? 0) >= 1, String(r.SessionView ?? 0));
-// El objetivo del paso 7. Se informa siempre; se exige a partir de 7e.
+ok('Las dos series quedaron marcadas', await p.locator('main button svg.lucide-check').count() >= 2);
+ok('CalendarView no se renderiza (no está montado)', (r1.CalendarView ?? 0) === 0 && (r2.CalendarView ?? 0) === 0);
+ok('SessionView se renderiza (es la pantalla activa)', (r1.SessionView ?? 0) >= 1 && (r2.SessionView ?? 0) >= 1);
+// El objetivo del paso 7, medido en la 2ª serie. Se informa siempre; se exige a partir de 7e.
 const objetivo = process.argv.includes('--exigir-app-0');
-const appCero = (r.App ?? 0) === 0;
-if (objetivo) ok('App NO se renderiza al marcar una serie (objetivo del paso 7)', appCero, String(r.App ?? 0));
-else console.log(`  ${appCero ? '✅' : '·'} App = ${r.App ?? 0}  (objetivo del paso 7: 0 · informativo hasta 7e)`);
+const appCero = (r2.App ?? 0) === 0;
+if (objetivo) ok('App NO se renderiza al marcar la 2ª serie (objetivo del paso 7)', appCero, String(r2.App ?? 0));
+else console.log(`  ${appCero ? '✅' : '·'} App en la 2ª serie = ${r2.App ?? 0}  (objetivo del paso 7: 0 · informativo hasta 7e)`);
 
 if (errores.length) { fallos++; console.log(`\n  ❌ Errores de página: ${errores.join(' | ')}`); }
 else ok('Sin errores de página', true);
 
 await b.close();
-console.log(`\n══ RENDERS: ${fallos ? 'FALLA' : 'ok'} · App=${r.App ?? 0} SessionView=${r.SessionView ?? 0} CalendarView=${r.CalendarView ?? 0} PanelDia=${r.PanelDia ?? 0} ══\n`);
+const res = (r) => `App=${r.App ?? 0} SV=${r.SessionView ?? 0} Cal=${r.CalendarView ?? 0} PanelDia=${r.PanelDia ?? 0}`;
+console.log(`\n══ RENDERS: ${fallos ? 'FALLA' : 'ok'} · 1ª[${res(r1)}] 2ª[${res(r2)}] ══\n`);
 process.exit(fallos ? 1 : 0);
