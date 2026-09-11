@@ -5,7 +5,7 @@ Capturado el 2026-09-03, antes de tocar `src/`.
 Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 "no petar". Si un paso no pasa las cinco puertas, se revierte ese paso entero.
 
-## Las cinco puertas
+## Las seis puertas
 
 | # | Comando | Baseline |
 |---|---|---|
@@ -15,6 +15,39 @@ Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 | 3 · Lint | `npx oxlint` | **0 avisos / 0 errores** |
 | 4 · Build | `npm run build` | compila · 352 kB (gzip 104) |
 | 5 · Snapshot | `npm run test:snapshot` | **2/2** · contrato de localStorage intacto |
+| 6 · Renders | `npm run test:renders` | **App = 0** al marcar la 2ª serie |
+
+### La puerta 6, añadida en el paso 7
+
+Cuenta los renders de cuatro componentes al marcar una serie en la sesión.
+Es la medida de si la separación de contextos hizo su trabajo: el progreso
+cambia en cada toque, y lo que no depende de él no debería enterarse.
+
+Se miden dos series. La primera fija el día (`fijados` cambia, el calendario se
+regenera) y es legítimo que el enrutador se entere. La segunda solo cambia el
+progreso: es la medida limpia.
+
+```
+                     antes del 7    tras el 7
+                     1ª    2ª       1ª    2ª
+  App                 3     3        1     0   ← el objetivo
+  SessionView         2     1        2     1   ← es la pantalla activa
+  CalendarView        0     0        0     0   ← nunca está montado a la vez
+  PanelDia            2     1        2     1   ← ver abajo
+```
+
+`App` pasa de 3 a **0** en la segunda serie: el progreso ya no llega al
+enrutador. El 1 de la primera es correcto: `diaActivo` es otro objeto y App
+tiene que mirar si sigue habiendo día activo.
+
+`PanelDia` no baja. No depende del progreso, pero re-renderiza por arrastre
+de su padre `SessionView`, que sí. Eso **no lo arreglan los contextos**: lo
+arregla `React.memo` en los hijos que solo leen `ContextoAcciones` (estable)
+y datos por props. Es trabajo de la Tarea 4, y la puerta 6 ya lo mide.
+
+Instrumentación: `contarRender(nombre)` en `src/utiles/medir.js`, una línea al
+principio de cada componente medido. Solo cuenta si el test creó
+`window.__renders` antes de cargar; en uso normal es un `if` que falla.
 
 ### Por qué los 158 no bastan
 
@@ -53,7 +86,7 @@ node test-snapshot.mjs --guardar
 
 ## Cómo levantar la red
 
-Las puertas 2a, 2b y 5 necesitan la app construida y servida:
+Las puertas 2a, 2b, 5 y 6 necesitan la app construida y servida:
 
 ```bash
 npm run build
@@ -63,8 +96,45 @@ npx vite preview --port 4173
 Y en otra terminal:
 
 ```bash
-npm run test:ui && npm run audit && npm run test:snapshot
+npm run test:ui && npm run audit && npm run test:snapshot && npm run test:renders
 ```
+
+## Resultado de la Tarea 1
+
+`App.jsx`: **2723 → 78 líneas**. De 69 hooks a 8. Ya no tiene estado de
+dominio ni pasa datos: es un enrutador que lee `view` y `diaActivo`, guarda
+cinco flags de pantalla y decide qué componente se muestra.
+
+```
+src/
+├── App.jsx               78   el enrutador
+├── main.jsx                   <PlanProvider><App/></PlanProvider>
+├── estado/
+│   ├── PlanProvider.jsx 200   compone los seis hooks y publica los contextos
+│   ├── contextos.js      21   ContextoPlan · ContextoProgreso · ContextoAcciones
+│   ├── persistencia.js  132   estadoGuardado (singleton) · guardar · exportar · importar
+│   ├── usePlan.js       170   ancla · fijados · festivos · extras · css · calendario
+│   ├── useProgreso.js   137   progress · prMap · PRs · mutaciones
+│   ├── useNavegacion.js  35   view · activeFecha · activeSesion · mes
+│   ├── useTemporizador.js 37  restTimer
+│   └── useRutinas.js     21   rutina versionada
+├── utiles/                    constantes-ui · formato · sonido · medir
+└── componentes/
+    ├── comunes/          IconFor · NumInput · BotonSiNo · RestTimer · FichaEjercicio
+    ├── biblioteca/       Biblioteca · FichaSesion · EditorRutina
+    ├── calendario/       CalendarView · BarraCalendario · EditModal · MenuSesiones
+    ├── estadisticas/     PanelEstadisticas · VolumenMuscular · GraficaProgresion
+    └── sesion/           SessionView · ExerciseCard · SelectorVariante · PanelDia · PanelCSS · PanelFlexible
+```
+
+Ningún archivo pasa de 270 líneas salvo `data.js` (598) y `generador.js`
+(563), que no eran parte del refactor.
+
+Los tres contextos están separados por **frecuencia de cambio**, no por tema:
+`ContextoPlan` cambia poco, `ContextoProgreso` en cada toque, y
+`ContextoAcciones` nunca (todos los callbacks son estables). Cada componente
+lee solo lo que necesita, y las props que quedan son datos locales del padre
+(`dia`, `ex`, `stats`) o flags de pantalla que viven en App.
 
 ### Windows: la variable CHROMIUM
 
