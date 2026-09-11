@@ -1,9 +1,9 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 // ═══════════════ NAVEGACIÓN ═══════════════
 // Qué mes se mira, qué día está abierto y si se está en la sesión o en el
 // calendario. No sabe nada del plan: solo dónde está el usuario.
-export function useNavegacion({ todayISO, ancla, skipTimer }) {
+export function useNavegacion({ todayISO, skipTimer }) {
   // Se arranca en la sesión de HOY: es lo que se usa el 90% del tiempo. El cursor
   // de mes sigue en el mes actual, así que la navegación no se descoloca.
   const [view, setView] = useState('session');  // session | calendar
@@ -29,14 +29,6 @@ export function useNavegacion({ todayISO, ancla, skipTimer }) {
     });
   }, []);
 
-  // No se puede retroceder más allá del mes del ancla: antes de esa fecha no hay
-  // plan que generar y el calendario saldría vacío.
-  const hayMesAnterior = useMemo(() => {
-    const aAnio = Number(ancla.fecha.slice(0, 4));
-    const aMes = Number(ancla.fecha.slice(5, 7)) - 1;
-    return anio * 12 + mes > aAnio * 12 + aMes;
-  }, [anio, mes, ancla]);
-
   // ─── Navegación entre pantallas ───
   const openDay = useCallback((d) => { setActiveFecha(d.fecha); setActiveSesion(null); setView('session'); window.scrollTo(0, 0); }, []);
   const abrirSesionDelDia = useCallback((sesion) => { setActiveSesion(sesion); window.scrollTo(0, 0); }, []);
@@ -47,6 +39,6 @@ export function useNavegacion({ todayISO, ancla, skipTimer }) {
 
   return {
     view, activeFecha, activeSesion, anio, mes,
-    hayMesAnterior, cambiarMes, openDay, abrirSesionDelDia, backToCalendar,
+    cambiarMes, openDay, abrirSesionDelDia, backToCalendar,
   };
 }

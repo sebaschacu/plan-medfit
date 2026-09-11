@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { SESIONES } from './data.js';
-import { generarMes, infoMes, ANCLA_DEFAULT, FESTIVOS_DEFAULT } from './generador.js';
 import { calcularAvisosReset } from './reglas.js';
-import {
-  resolverRutina, estaEditada, guardarVersion, restaurarPlan, huerfanosDelDia,
-} from './rutina.js';
+import { resolverRutina, estaEditada, huerfanosDelDia } from './rutina.js';
 import { parseRest, hoyISO } from './utiles/formato.js';
 import { vibrate } from './utiles/sonido.js';
 import { estadoGuardado, guardar, descargarJSON, leerRespaldo } from './estado/persistencia.js';
 import { useTemporizador } from './estado/useTemporizador.js';
 import { useNavegacion } from './estado/useNavegacion.js';
+import { usePlan } from './estado/usePlan.js';
+import { useRutinas } from './estado/useRutinas.js';
 import FichaSesion from './componentes/biblioteca/FichaSesion.jsx';
 import Biblioteca from './componentes/biblioteca/Biblioteca.jsx';
 import EditorRutina from './componentes/biblioteca/EditorRutina.jsx';
@@ -21,19 +20,7 @@ import SessionView from './componentes/sesion/SessionView.jsx';
 export default function App() {
   const todayISO = hoyISO();
 
-  // ─── Estado del generador v6 ───
-  // El calendario ya NO es estado: es una función pura de (ancla, fijados, festivos).
-  // Guardar el array generado sería duplicar la verdad y arriesgarse a que se
-  // desincronice del ancla; lo que se persiste son las ENTRADAS.
-  const [ancla, setAncla] = useState(() => estadoGuardado().ancla ?? ANCLA_DEFAULT);
-  const [fijados, setFijados] = useState(() => estadoGuardado().fijados);   // { fecha: { turno, sesion, auto? } }
-  const [festivos, setFestivos] = useState(() => estadoGuardado().festivos ?? FESTIVOS_DEFAULT);
-  // Lo que el usuario añade sobre el día generado: segunda sesión y complementos.
-  // Va aparte de `fijados` porque no cambia la sesión principal ni la cola de gym.
-  const [extras, setExtras] = useState(() => estadoGuardado().extras ?? {});
-  const [css, setCss] = useState(() => estadoGuardado().css ?? null);   // segundos por 100 m
-  // Versiones de rutina encima del plan base. El pasado no se reescribe.
-  const [rutina, setRutina] = useState(() => estadoGuardado().rutina ?? {});
+  // ─── Flags de pantalla ───
   const [editandoRutina, setEditandoRutina] = useState(null);   // clave de sesión
   const [biblioteca, setBiblioteca] = useState(false);
   const [fichaSesion, setFichaSesion] = useState(null);         // clave de sesión a consultar
@@ -41,30 +28,30 @@ export default function App() {
   const { restTimer, timerRef, startTimer, skipTimer } = useTemporizador();
   const {
     view, activeFecha, activeSesion, anio, mes,
-    hayMesAnterior, cambiarMes, openDay, abrirSesionDelDia, backToCalendar,
-  } = useNavegacion({ todayISO, ancla, skipTimer });
-
-  const { dias: generado, avisos } = useMemo(
-    () => generarMes({ anio, mes, ancla, fijados, festivos }),
-    [anio, mes, ancla, fijados, festivos]
-  );
-  // Se fusiona lo que añadió el usuario sobre lo que produjo el generador.
-  const calendario = useMemo(() => generado.map(d => {
-    const ex = extras[d.fecha];
-    if (!ex) return d;
-    return {
-      ...d,
-      sesionSecundaria: ex.secundaria ?? d.sesionSecundaria,
-      secundariaManual: !!ex.secundaria,
-      separacionH: ex.separacionH,
-      complementos: ex.complementos ?? [],
-      flexRespuesta: ex.flex,
-    };
-  }), [generado, extras]);
-  const mesInfo = useMemo(() => infoMes(anio, mes), [anio, mes]);
+    cambiarMes, openDay, abrirSesionDelDia, backToCalendar,
+  } = useNavegacion({ todayISO, skipTimer });
 
   const [progress, setProgress] = useState(() => estadoGuardado().prog); // { 'YYYY-MM-DD': { exId: {sets,logs} } }
   const [prMap, setPrMap] = useState(() => estadoGuardado().prs);        // { exId: {kg, flash} }
+  // Cambiar la sesión de un día con registro deja ese registro apuntando a
+  // ejercicios que ya no existen ahí. El plan lo pide cuando toca borrarlo.
+  const borrarRegistro = useCallback((fecha) => {
+    setProgress(prev => { const n = { ...prev }; delete n[fecha]; return n; });
+  }, []);
+
+  const {
+    ancla, fijados, festivos, extras, css,
+    calendario, avisos, mesInfo, hayMesAnterior,
+    setAncla, setFijados, setFestivos, setExtras, setCss,
+    fijarPorRegistro, saveEdit: saveEditPlan, liberarDia: liberarDiaPlan,
+    onSecundaria, onComplemento, fijarVariante, soltarVariante,
+    onFlexible, onConvertirFlexible,
+  } = usePlan({ anio, mes, borrarRegistro });
+
+  const {
+    rutina, setRutina,
+    guardarRutina: guardarRutinaBase, restaurarRutina: restaurarRutinaBase,
+  } = useRutinas({ todayISO });
   // Se calcula aquí arriba porque las mutaciones de progreso lo necesitan para
   // fijar el día automáticamente al registrar la primera serie.
   const diaActivo = useMemo(() => calendario.find(d => d.fecha === activeFecha), [calendario, activeFecha]);
@@ -137,30 +124,6 @@ export default function App() {
   }, []);
 
   // ─── Mutaciones de progreso ───
-  // En cuanto se registra algo en un día, ese día queda FIJADO automáticamente.
-  // Sin esto, editar otro día recalcularía el calendario y podría cambiarle la
-  // sesión, dejando el registro con IDs de ejercicios que ya no existen ahí.
-  // Fijarlo a su valor actual no altera nada más: la cola de gym se resincroniza
-  // a la misma posición en la que ya estaba.
-  const fijarPorRegistro = useCallback((dia) => {
-    if (!dia) return;
-    setFijados(prev => prev[dia.fecha]
-      ? prev
-      : {
-          ...prev,
-          [dia.fecha]: {
-            turno: dia.turno,
-            sesion: dia.sesion,
-            // La VARIANTE también se fija: la natación es un tipo que resuelve a
-            // natA1, natB1… Si solo se guardara el tipo, un cambio en la rotación
-            // podría darle otra variante a un día ya entrenado y dejar su registro
-            // (B1-3, B2-2…) apuntando a ejercicios que no están en la nueva.
-            ...(dia.variante ? { variante: dia.variante } : {}),
-            auto: true,
-          },
-        });
-  }, []);
-
   const toggleSet = useCallback((exId, i, setCount, ex) => {
     fijarPorRegistro(diaActivo);
     setProgress(prev => {
@@ -232,24 +195,10 @@ export default function App() {
     setProgress(prev => { const n = { ...prev }; delete n[activeFecha]; return n; });
   }, [activeFecha]);
 
-  // ─── Editar día: FIJAR + recalcular lo que viene ───
-  // El calendario se regenera solo, porque es un useMemo sobre `fijados`.
-  const saveEdit = useCallback((fecha, turno, sesion, festivo, borrarRegistro) => {
-    // Al cambiar de sesión un día con registro, ese registro apunta a ejercicios
-    // que ya no existen ahí: se borra (solo tras confirmarlo en el modal).
-    if (borrarRegistro) setProgress(prev => { const n = { ...prev }; delete n[fecha]; return n; });
-    setFijados(prev => ({ ...prev, [fecha]: { turno, sesion } }));
-    setFestivos(prev => festivo
-      ? (prev.includes(fecha) ? prev : [...prev, fecha])
-      : prev.filter(f => f !== fecha));
-    setEditingDay(null);
-  }, []);
-
-  // Soltar un día fijado: vuelve a mandar el generador
-  const liberarDia = useCallback((fecha) => {
-    setFijados(prev => { const n = { ...prev }; delete n[fecha]; return n; });
-    setEditingDay(null);
-  }, []);
+  // ─── Editar día ───
+  // La mutación vive en usePlan; cerrar el modal es cosa del enrutador.
+  const saveEdit = useCallback((...args) => { saveEditPlan(...args); setEditingDay(null); }, [saveEditPlan]);
+  const liberarDia = useCallback((fecha) => { liberarDiaPlan(fecha); setEditingDay(null); }, [liberarDiaPlan]);
 
   // ─── Sueño en posturno (regla S4) ───
   const onSueno = useCallback((h) => {
@@ -293,90 +242,14 @@ export default function App() {
         + (nRut ? `, ${nRut} ${nRut === 1 ? 'rutina editada' : 'rutinas editadas'}` : '')
         + (d.css != null ? ', CSS incluido' : '') + '.');
     });
-  }, [avisar]);
-
-  // ─── Segunda sesión y complementos ───
-  const setExtra = useCallback((fecha, cambio) => {
-    setExtras(prev => {
-      const actual = prev[fecha] ?? {};
-      const nuevo = { ...actual, ...cambio };
-      // Si queda vacío se elimina la entrada, para no guardar basura
-      const vacio = !nuevo.secundaria && !(nuevo.complementos?.length) && nuevo.separacionH == null && !nuevo.flex;
-      const out = { ...prev };
-      if (vacio) delete out[fecha]; else out[fecha] = nuevo;
-      return out;
-    });
-  }, []);
-
-  const onSecundaria = useCallback((fecha, sesion, separacionH) =>
-    setExtra(fecha, { secundaria: sesion || undefined, separacionH }), [setExtra]);
-
-  const onComplemento = useCallback((fecha, comp, activo) => {
-    setExtras(prev => {
-      const actual = prev[fecha] ?? {};
-      const lista = new Set(actual.complementos ?? []);
-      if (activo) lista.add(comp); else lista.delete(comp);
-      const nuevo = { ...actual, complementos: [...lista] };
-      const vacio = !nuevo.secundaria && !nuevo.complementos.length && nuevo.separacionH == null && !nuevo.flex;
-      const out = { ...prev };
-      if (vacio) delete out[fecha]; else out[fecha] = nuevo;
-      return out;
-    });
-  }, []);
+  // Los setters son de useState (identidad estable): van en la lista solo para
+  // el linter, que al venir de hooks propios ya no sabe que lo son.
+  }, [avisar, setAncla, setFijados, setFestivos, setExtras, setCss, setRutina]);
 
   // ─── Editor de rutina ───
-  const guardarRutina = useCallback((sesionKey, ejercicios, motivo) => {
-    setRutina(prev => guardarVersion(prev, sesionKey, ejercicios, todayISO, motivo));
-    setEditandoRutina(null);
-  }, [todayISO]);
-  const restaurarRutina = useCallback((sesionKey) => {
-    setRutina(prev => restaurarPlan(prev, sesionKey, todayISO));
-    setEditandoRutina(null);
-  }, [todayISO]);
-
-  // ─── Variante de la sesión (cuál de la cola toca hoy) ───
-  const fijarVariante = useCallback((fecha, clave, secundaria, borrarRegistro) => {
-    const dia = calendario.find(d => d.fecha === fecha);
-    if (!dia) return;
-    if (borrarRegistro) setProgress(prev => { const n = { ...prev }; delete n[fecha]; return n; });
-    setFijados(prev => {
-      const act = prev[fecha] ?? { turno: dia.turno, sesion: dia.sesion };
-      // Natación: el TIPO no cambia, cambia la variante. Gym: cambia la sesión.
-      const esNat = (secundaria ? dia.sesionSecundaria : dia.sesion) === 'natacion';
-      if (esNat) {
-        return { ...prev, [fecha]: { ...act, turno: dia.turno, sesion: dia.sesion,
-          [secundaria ? 'varianteSecundaria' : 'variante']: clave } };
-      }
-      return { ...prev, [fecha]: { ...act, turno: dia.turno, sesion: clave } };
-    });
-  }, [calendario]);
-
-  const soltarVariante = useCallback((fecha, secundaria) => {
-    setFijados(prev => {
-      const act = prev[fecha];
-      if (!act) return prev;
-      const resto = { ...act };
-      delete resto[secundaria ? 'varianteSecundaria' : 'variante'];
-      const quedaAlguna = !!(resto.variante || resto.varianteSecundaria);
-      const out = { ...prev };
-      if (quedaAlguna) { out[fecha] = resto; return out; }
-      // Ya no queda ninguna variante elegida a mano:
-      //  · si el día tiene registro, se conserva el auto-fijado (protege el historial)
-      //  · si no, se suelta del todo para que vuelva a mandar la rotación
-      if (act.auto) out[fecha] = { turno: act.turno, sesion: act.sesion, auto: true };
-      else delete out[fecha];
-      return out;
-    });
-  }, []);
-
-  // ─── Día flexible ───
-  const onFlexible = useCallback((fecha, cambio) => {
-    setExtras(prev => ({ ...prev, [fecha]: { ...(prev[fecha] ?? {}), flex: { ...(prev[fecha]?.flex ?? {}), ...cambio } } }));
-  }, []);
-  // Convertirlo en running es fijar ese día: el generador lo respetará al recalcular
-  const onConvertirFlexible = useCallback((fecha, sesion) => {
-    setFijados(prev => ({ ...prev, [fecha]: { ...(prev[fecha] ?? {}), turno: 'C', sesion } }));
-  }, []);
+  // La mutación vive en useRutinas; cerrar el editor es cosa del enrutador.
+  const guardarRutina = useCallback((...args) => { guardarRutinaBase(...args); setEditandoRutina(null); }, [guardarRutinaBase]);
+  const restaurarRutina = useCallback((k) => { restaurarRutinaBase(k); setEditandoRutina(null); }, [restaurarRutinaBase]);
 
   const activeDiaData = diaActivo;
 
