@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
-  Dumbbell, Home, Waves, Moon, Check,
-  Timer, Trophy, RotateCcw, ChevronLeft, ChevronRight, X, Backpack,
+  Moon, Check,
+  Trophy, RotateCcw, ChevronLeft, ChevronRight, X, Backpack,
   Settings, ArrowLeft, Zap, Activity, Circle, Star, AlertTriangle, Flame, TrendingUp, Link2, Sparkles, Ruler, Clock
 } from 'lucide-react';
 import {
@@ -22,8 +22,13 @@ import {
   catalogoEjercicios, nuevoId, mover, gruposBS,
 } from './rutina.js';
 import { COMPLETADO, VACIO, GYM_PIERNA_UI } from './utiles/constantes-ui.js';
-import { hexARgba, parseRest, fmtTime, hoyISO, mesDeISO } from './utiles/formato.js';
+import { hexARgba, parseRest, hoyISO, mesDeISO } from './utiles/formato.js';
 import { playBeep, vibrate } from './utiles/sonido.js';
+import IconFor from './componentes/comunes/IconFor.jsx';
+import NumInput from './componentes/comunes/NumInput.jsx';
+import BotonSiNo from './componentes/comunes/BotonSiNo.jsx';
+import RestTimer from './componentes/comunes/RestTimer.jsx';
+import FichaEjercicio from './componentes/comunes/FichaEjercicio.jsx';
 
 // ═══════════════ CARGA DEL ESTADO GUARDADO ═══════════════
 // Se lee UNA vez y de forma síncrona, para usarla en inicializadores lazy de
@@ -78,65 +83,6 @@ function estadoGuardado() {
   } catch { /* localStorage bloqueado o JSON corrupto: se arranca de cero */ }
   return _guardado;
 }
-
-const IconFor = ({ name, size = 20, color, style }) => {
-  const p = { size, color, style, strokeWidth: 2 };
-  switch (name) {
-    case 'dumbbell': return <Dumbbell {...p} />;
-    case 'home': return <Home {...p} />;
-    case 'waves': return <Waves {...p} />;
-    case 'run': return <Activity {...p} />;
-    case 'moon': return <Moon {...p} />;
-    case 'dot': return <Circle {...p} />;
-    default: return <Zap {...p} />;
-  }
-};
-
-// ═══════════════ NUMERIC INPUT ═══════════════
-const NumInput = ({ value, onChange, placeholder, w = 'w-11', etiqueta }) => (
-  <input
-    type="text" inputMode="numeric" pattern="[0-9]*\.?[0-9]*"
-    value={value ?? ''}
-    onChange={(e) => onChange(e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.'))}
-    placeholder={placeholder}
-    aria-label={etiqueta ?? placeholder}
-    className={`${w} h-8 px-1 bg-[#0f1417] border border-[#2a3540] focus:border-[#4a5560] focus:outline-none text-slate-100 text-xs text-center rounded transition-colors`}
-    style={{ fontFamily: 'ui-monospace, monospace' }}
-  />
-);
-
-// ═══════════════ REST TIMER OVERLAY ═══════════════
-const RestTimer = ({ timer, onSkip, color }) => {
-  if (!timer) return null;
-  const { secondsLeft, total, name, done } = timer;
-  const pct = total > 0 ? Math.max(0, (secondsLeft / total) * 100) : 0;
-  const low = secondsLeft <= 5 && secondsLeft > 0;
-  return (
-    <div className="fixed bottom-4 left-3 right-3 sm:left-auto sm:right-6 sm:w-72 z-50 rounded-xl overflow-hidden border-2 shadow-2xl"
-      style={{ borderColor: done ? '#22c55e' : color, background: '#151b21' }}>
-      <div className="px-4 py-3">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Timer size={13} color={done ? '#22c55e' : color} />
-            <span className="text-[10px] uppercase tracking-wide font-bold truncate" style={{ color: done ? '#22c55e' : color }}>
-              {done ? 'Descanso listo' : 'Descansando'}
-            </span>
-          </div>
-          <button onClick={onSkip} className="flex items-center gap-1 px-2 py-0.5 border border-[#2a3540] rounded text-slate-400 text-[10px] font-bold">
-            SALTAR <X size={10} />
-          </button>
-        </div>
-        <div className="text-[10px] text-slate-500 truncate mb-1">{name}</div>
-        <div className={`text-4xl font-bold leading-none ${low ? 'text-red-400' : 'text-slate-100'}`} style={{ fontFamily: 'ui-monospace, monospace' }}>
-          {fmtTime(secondsLeft)}
-        </div>
-        <div className="mt-2 h-1 bg-[#0f1417] rounded-full overflow-hidden">
-          <div className="h-full transition-all duration-1000 ease-linear" style={{ width: `${pct}%`, background: done ? '#22c55e' : color }} />
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // ═══════════════ EXERCISE CARD ═══════════════
 const ExerciseCard = ({ ex, prog, pr, onToggleSet, onLog, onLastre, onBanda, color, avisoReset, ultima, sugerencia, onUsarSugerido }) => {
@@ -520,40 +466,6 @@ const SelectorVariante = ({ dia, secundaria = false, onFijar, onSoltar, registra
 };
 
 // ═══════════════ FICHA DE SESIÓN (solo lectura) ═══════════════
-// Un ejercicio renderizado en modo consulta: sin checkboxes, sin inputs.
-// Se usa en la biblioteca y en la ficha que se abre desde el nombre del día,
-// para no duplicar la lógica de presentación de ExerciseCard.
-const FichaEjercicio = ({ ex }) => (
-  <div className="rounded-lg border border-[#232c34] bg-[#151b21] p-2.5">
-    <div className="flex items-center gap-2 flex-wrap mb-1">
-      {ex.bs && (
-        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border"
-          style={{
-            background: ex.bstipo === 'ant' ? '#7c2d1233' : '#5b21b633',
-            borderColor: ex.bstipo === 'ant' ? '#c2410c88' : '#7c3aed88',
-            color: ex.bstipo === 'ant' ? '#fdba74' : '#c4b5fd',
-          }}>{ex.bs}</span>
-      )}
-      {ex.opcional && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border border-slate-600 text-slate-400">Opcional</span>}
-    </div>
-    <div className="text-sm font-bold text-slate-100 leading-tight">{ex.nombre}</div>
-    {ex.nota && <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{ex.nota}</p>}
-    <div className="grid grid-cols-4 gap-1.5 mt-2">
-      {[
-        ['Series', ex.series],
-        ['Reps', ex.reps],
-        ex.lineal ? ['Lineal', ex.progresion] : ['RIR', ex.rir ?? '—'],
-        ['Desc.', ex.descanso],
-      ].map(([l, v], i) => (
-        <div key={i} className="px-1.5 py-1 rounded text-center border bg-[#0f1417] border-[#232c34]">
-          <div className="text-[8px] uppercase tracking-wide text-slate-600 font-semibold">{l}</div>
-          <div className="text-xs font-bold text-slate-200" style={{ fontFamily: 'ui-monospace, monospace' }}>{v}</div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
 const FichaSesion = ({ sesionKey, ejercicios, onCerrar }) => {
   const ses = SESIONES[sesionKey];
   const info = SESION_INFO[sesionKey];
@@ -826,17 +738,6 @@ const EditorRutina = ({ sesionKey, ejercicios: iniciales, onGuardar, onRestaurar
     </div>
   );
 };
-
-// Declarado a nivel de módulo a propósito: definirlo dentro del render crea un
-// COMPONENTE NUEVO en cada pasada, así que React desmonta y remonta el árbol y
-// se pierde el estado y el foco. Es el aviso static-components del linter.
-const BotonSiNo = ({ activo, onClick, children }) => (
-  <button onClick={onClick}
-    className={`flex-1 py-1.5 rounded-md border text-[11px] font-bold transition-all ${
-      activo ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300' : 'border-[#2a3540] text-slate-400'}`}>
-    {children}
-  </button>
-);
 
 // ═══════════════ DÍA FLEXIBLE · las tres condiciones ═══════════════
 // Por defecto descanso. Pasa a running solo si se cumplen las TRES. La tercera
