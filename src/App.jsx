@@ -6,8 +6,10 @@ import {
   resolverRutina, estaEditada, guardarVersion, restaurarPlan, huerfanosDelDia,
 } from './rutina.js';
 import { parseRest, hoyISO } from './utiles/formato.js';
-import { playBeep, vibrate } from './utiles/sonido.js';
+import { vibrate } from './utiles/sonido.js';
 import { estadoGuardado, guardar, descargarJSON, leerRespaldo } from './estado/persistencia.js';
+import { useTemporizador } from './estado/useTemporizador.js';
+import { useNavegacion } from './estado/useNavegacion.js';
 import FichaSesion from './componentes/biblioteca/FichaSesion.jsx';
 import Biblioteca from './componentes/biblioteca/Biblioteca.jsx';
 import EditorRutina from './componentes/biblioteca/EditorRutina.jsx';
@@ -35,15 +37,12 @@ export default function App() {
   const [editandoRutina, setEditandoRutina] = useState(null);   // clave de sesión
   const [biblioteca, setBiblioteca] = useState(false);
   const [fichaSesion, setFichaSesion] = useState(null);         // clave de sesión a consultar
-  // Año y mes viven en UN SOLO estado. Separados, cruzar el 31 de diciembre obliga
-  // a llamar a setAnio dentro del updater de setMes, y React ignora ese setState
-  // (los updaters tienen que ser puros): el mes saltaba a enero y el año se quedaba
-  // atrás, dejando al usuario en un mes anterior al ancla y rompiendo la pantalla.
-  const [cursor, setCursor] = useState(() => ({
-    anio: Number(todayISO.slice(0, 4)),
-    mes: Number(todayISO.slice(5, 7)) - 1,
-  }));
-  const { anio, mes } = cursor;
+
+  const { restTimer, timerRef, startTimer, skipTimer } = useTemporizador();
+  const {
+    view, activeFecha, activeSesion, anio, mes,
+    hayMesAnterior, cambiarMes, openDay, abrirSesionDelDia, backToCalendar,
+  } = useNavegacion({ todayISO, ancla, skipTimer });
 
   const { dias: generado, avisos } = useMemo(
     () => generarMes({ anio, mes, ancla, fijados, festivos }),
@@ -66,18 +65,11 @@ export default function App() {
 
   const [progress, setProgress] = useState(() => estadoGuardado().prog); // { 'YYYY-MM-DD': { exId: {sets,logs} } }
   const [prMap, setPrMap] = useState(() => estadoGuardado().prs);        // { exId: {kg, flash} }
-  // Se arranca en la sesión de HOY: es lo que se usa el 90% del tiempo. El cursor
-  // de mes sigue en el mes actual, así que la navegación no se descoloca.
-  const [view, setView] = useState('session');  // session | calendar
-  const [activeFecha, setActiveFecha] = useState(todayISO);
-  const [activeSesion, setActiveSesion] = useState(null);   // null = la principal del día
   // Se calcula aquí arriba porque las mutaciones de progreso lo necesitan para
   // fijar el día automáticamente al registrar la primera serie.
   const diaActivo = useMemo(() => calendario.find(d => d.fecha === activeFecha), [calendario, activeFecha]);
   const [editMode, setEditMode] = useState(false);
   const [editingDay, setEditingDay] = useState(null);
-  const [restTimer, setRestTimer] = useState(null);
-  const timerRef = useRef(null);
 
   // ─── Persistencia robusta ───
   const [saveStatus, setSaveStatus] = useState('idle'); // idle | saving | saved
@@ -118,25 +110,6 @@ export default function App() {
       window.removeEventListener('beforeunload', flush);
     };
   }, [snapshot]);
-
-  // ─── Timer ───
-  const startTimer = useCallback((secs, name) => {
-    if (!secs || timerRef.current) return;
-    vibrate(100);
-    let left = secs;
-    setRestTimer({ secondsLeft: left, total: secs, name, done: false });
-    timerRef.current = setInterval(() => {
-      left -= 1;
-      if (left <= 0) {
-        clearInterval(timerRef.current); timerRef.current = null;
-        setRestTimer({ secondsLeft: 0, total: secs, name, done: true });
-        vibrate([200, 100, 200]); playBeep(); setTimeout(playBeep, 500);
-        setTimeout(() => setRestTimer(null), 3000);
-      } else setRestTimer(p => p ? { ...p, secondsLeft: left } : null);
-    }, 1000);
-  }, []);
-  const skipTimer = useCallback(() => { if (timerRef.current) clearInterval(timerRef.current); timerRef.current = null; setRestTimer(null); }, []);
-  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
   // ─── PR detector ───
   // El updater de setPrMap tiene que ser PURO. Antes llamaba a vibrate() y
@@ -202,7 +175,9 @@ export default function App() {
       if (nv && !timerRef.current && ex) { const r = parseRest(ex.descanso); if (r) startTimer(r, ex.nombre); }
       return { ...prev, [activeFecha]: { ...day, [exId]: { ...p, sets, logs } } };
     });
-  }, [activeFecha, startTimer, fijarPorRegistro, diaActivo]);
+  // timerRef es un ref (identidad estable): va en la lista solo para el linter,
+  // que al venir de un hook propio ya no sabe que lo es.
+  }, [activeFecha, startTimer, fijarPorRegistro, diaActivo, timerRef]);
 
   const onLog = useCallback((exId, i, log, setCount) => {
     fijarPorRegistro(diaActivo);
@@ -402,31 +377,6 @@ export default function App() {
   const onConvertirFlexible = useCallback((fecha, sesion) => {
     setFijados(prev => ({ ...prev, [fecha]: { ...(prev[fecha] ?? {}), turno: 'C', sesion } }));
   }, []);
-
-  // ─── Navegación de mes ───
-  // Aritmética en meses absolutos: cruzar diciembre deja de ser un caso especial.
-  const cambiarMes = useCallback((delta) => {
-    setCursor(({ anio, mes }) => {
-      const total = anio * 12 + mes + delta;
-      return { anio: Math.floor(total / 12), mes: ((total % 12) + 12) % 12 };
-    });
-  }, []);
-
-  // No se puede retroceder más allá del mes del ancla: antes de esa fecha no hay
-  // plan que generar y el calendario saldría vacío.
-  const hayMesAnterior = useMemo(() => {
-    const aAnio = Number(ancla.fecha.slice(0, 4));
-    const aMes = Number(ancla.fecha.slice(5, 7)) - 1;
-    return anio * 12 + mes > aAnio * 12 + aMes;
-  }, [anio, mes, ancla]);
-
-  // ─── Navegación ───
-  const openDay = useCallback((d) => { setActiveFecha(d.fecha); setActiveSesion(null); setView('session'); window.scrollTo(0, 0); }, []);
-  const abrirSesionDelDia = useCallback((sesion) => { setActiveSesion(sesion); window.scrollTo(0, 0); }, []);
-  const backToCalendar = useCallback(() => {
-    if (activeSesion) { setActiveSesion(null); return; }   // de la secundaria a la principal
-    setView('calendar'); skipTimer();
-  }, [skipTimer, activeSesion]);
 
   const activeDiaData = diaActivo;
 
