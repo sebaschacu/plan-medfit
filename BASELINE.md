@@ -101,7 +101,8 @@ npm run test:ui && npm run audit && npm run test:snapshot && npm run test:render
 
 ## Resultado de la Tarea 1
 
-`App.jsx`: **2723 → 78 líneas**. De 69 hooks a 8. Ya no tiene estado de
+`App.jsx`: **2723 → 78 líneas**. De 69 hooks a 11 (cinco flags de pantalla,
+cuatro envoltorios de cierre y dos lecturas de contexto). Ya no tiene estado de
 dominio ni pasa datos: es un enrutador que lee `view` y `diaActivo`, guarda
 cinco flags de pantalla y decide qué componente se muestra.
 
@@ -127,8 +128,8 @@ src/
     └── sesion/           SessionView · ExerciseCard · SelectorVariante · PanelDia · PanelCSS · PanelFlexible
 ```
 
-Ningún archivo pasa de 270 líneas salvo `data.js` (598) y `generador.js`
-(563), que no eran parte del refactor.
+El componente más grande es `SessionView` (279 líneas). Solo pasan de 300
+`data.js` (598) y `generador.js` (563), que no eran parte del refactor.
 
 Los tres contextos están separados por **frecuencia de cambio**, no por tema:
 `ContextoPlan` cambia poco, `ContextoProgreso` en cada toque, y
