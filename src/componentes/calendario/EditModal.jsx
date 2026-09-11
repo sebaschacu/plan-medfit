@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
 import { X, Star, AlertTriangle, RotateCcw } from 'lucide-react';
 import { TURNO_INFO, SESION_INFO } from '../../data.js';
+import { useProgresoCtx } from '../../estado/contextos.js';
 import MenuSesiones from './MenuSesiones.jsx';
 
 // ═══════════════ EDIT DAY MODAL ═══════════════
-const EditModal = ({ dia, onSave, onLiberar, onClose, ejerciciosRegistrados = 0 }) => {
+// `dia`, onSave, onLiberar y onClose vienen de App: el modal es un flag de
+// pantalla y cerrarlo es cosa del enrutador. El progreso lo lee de aquí.
+const EditModal = ({ dia, onSave, onLiberar, onClose }) => {
+  const { progress } = useProgresoCtx();
+  // Las horas de sueño (__sueno) no son un ejercicio: no cuentan como registro.
+  const ejerciciosRegistrados = Object.keys(progress[dia.fecha] || {}).filter(k => !k.startsWith('__')).length;
   const [turno, setTurno] = useState(dia.turno);
   const [sesion, setSesion] = useState(dia.sesion);
   const [festivo, setFestivo] = useState(!!dia.festivo);

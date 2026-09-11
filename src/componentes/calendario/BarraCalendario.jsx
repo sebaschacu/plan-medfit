@@ -1,10 +1,14 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight, Check, Activity, Settings, ArrowLeft } from 'lucide-react';
+import { usePlanCtx, useProgresoCtx, useAccionesCtx } from '../../estado/contextos.js';
 
 // Cabecera del calendario: navegación de mes, estado de guardado, acceso a la
 // biblioteca y el modo edición con su panel de exportar/importar.
-const BarraCalendario = ({ mesInfo, onMes, hayMesAnterior, saveStatus, onBiblioteca,
-  editMode, setEditMode, onExportar, onImportar, mensajeDatos }) => (
+const BarraCalendario = ({ onBiblioteca, editMode, setEditMode }) => {
+  const { mesInfo, hayMesAnterior } = usePlanCtx();
+  const { saveStatus, mensajeDatos } = useProgresoCtx();
+  const { cambiarMes: onMes, onExportar, onImportar } = useAccionesCtx();
+  return (
   <header className="sticky top-0 z-30 bg-[#0f1417]/95 backdrop-blur border-b border-[#232c34]">
     <div className="px-4 py-4 flex items-center justify-between gap-2">
       <div className="min-w-0">
@@ -69,6 +73,7 @@ const BarraCalendario = ({ mesInfo, onMes, hayMesAnterior, saveStatus, onBibliot
       </div>
     )}
   </header>
-);
+  );
+};
 
 export default BarraCalendario;

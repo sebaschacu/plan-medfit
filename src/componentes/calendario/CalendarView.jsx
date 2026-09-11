@@ -5,14 +5,20 @@ import { resolverRutina } from '../../rutina.js';
 import { COMPLETADO } from '../../utiles/constantes-ui.js';
 import { hexARgba } from '../../utiles/formato.js';
 import { contarRender } from '../../utiles/medir.js';
+import { usePlanCtx, useProgresoCtx, useAccionesCtx } from '../../estado/contextos.js';
 import IconFor from '../comunes/IconFor.jsx';
 import BarraCalendario from './BarraCalendario.jsx';
 import PanelEstadisticas from '../estadisticas/PanelEstadisticas.jsx';
 
 // ═══════════════ CALENDAR VIEW ═══════════════
-const CalendarView = ({ calendario, progress, onOpenDay, onEditDay, editMode, setEditMode,
-  todayISO, saveStatus, mesInfo, onMes, avisos, onExportar, onImportar, mensajeDatos, hayMesAnterior, rutina = {}, onBiblioteca, prMap = {} }) => {
+// Lee el calendario y el progreso de los contextos. Las cuatro props que
+// quedan tocan flags de pantalla que viven en App (modo edición, biblioteca).
+const CalendarView = ({ onEditDay, editMode, setEditMode, onBiblioteca }) => {
   contarRender('CalendarView');
+  const { calendario, todayISO, mesInfo, avisos, rutina } = usePlanCtx();
+  const { progress, prMap } = useProgresoCtx();
+  const { openDay: onOpenDay } = useAccionesCtx();
+
   const dayCompletion = useCallback((d) => {
     // Un día puede tener principal + secundaria + complementos: para estar
     // "completo" tienen que estarlo todos. Cada uno se marca por separado.
@@ -86,12 +92,7 @@ const CalendarView = ({ calendario, progress, onOpenDay, onEditDay, editMode, se
 
   return (
     <div className="min-h-screen bg-[#0f1417]">
-      <BarraCalendario
-        mesInfo={mesInfo} onMes={onMes} hayMesAnterior={hayMesAnterior}
-        saveStatus={saveStatus} onBiblioteca={onBiblioteca}
-        editMode={editMode} setEditMode={setEditMode}
-        onExportar={onExportar} onImportar={onImportar} mensajeDatos={mensajeDatos}
-      />
+      <BarraCalendario onBiblioteca={onBiblioteca} editMode={editMode} setEditMode={setEditMode} />
 
       <main className="px-2 py-4 max-w-2xl mx-auto pb-24">
         {/* Leyenda de turnos */}

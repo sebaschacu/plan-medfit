@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { resolverRutina, estaEditada } from './rutina.js';
 import { contarRender } from './utiles/medir.js';
-import { usePlanCtx, useProgresoCtx, useAccionesCtx } from './estado/contextos.js';
+import { usePlanCtx, useAccionesCtx } from './estado/contextos.js';
 import FichaSesion from './componentes/biblioteca/FichaSesion.jsx';
 import Biblioteca from './componentes/biblioteca/Biblioteca.jsx';
 import EditorRutina from './componentes/biblioteca/EditorRutina.jsx';
@@ -15,16 +15,12 @@ import SessionView from './componentes/sesion/SessionView.jsx';
 export default function App() {
   contarRender('App');
 
+  // App NO lee ContextoProgreso a propósito: así marcar una serie no lo
+  // re-renderiza. Todo lo que depende del progreso lo leen las pantallas.
+  const { todayISO, rutina, view, diaActivo } = usePlanCtx();
   const {
-    todayISO, rutina, calendario, avisos, mesInfo, hayMesAnterior,
-    view, diaActivo,
-  } = usePlanCtx();
-  const { progress, prMap, saveStatus, mensajeDatos } = useProgresoCtx();
-  const {
-    cambiarMes, openDay,
     saveEdit: saveEditBase, liberarDia: liberarDiaBase,
     guardarRutina: guardarRutinaBase, restaurarRutina: restaurarRutinaBase,
-    onExportar, onImportar,
   } = useAccionesCtx();
 
   // ─── Flags de pantalla ───
@@ -68,29 +64,9 @@ export default function App() {
     );
   }
 
-  // Si por lo que sea no hay día activo (mes cambiado, fecha fuera de rango),
-  // se cae al calendario en lugar de dejar la pantalla vacía.
-  if (view === 'session' && !activeDiaData) {
-    return (
-      <>
-        <CalendarView
-          calendario={calendario} progress={progress} avisos={avisos}
-          onOpenDay={openDay} onEditDay={setEditingDay}
-          editMode={editMode} setEditMode={setEditMode} todayISO={todayISO}
-          saveStatus={saveStatus} mesInfo={mesInfo} onMes={cambiarMes} hayMesAnterior={hayMesAnterior} rutina={rutina}
-          onExportar={onExportar} onImportar={onImportar} mensajeDatos={mensajeDatos}
-          onBiblioteca={() => setBiblioteca(true)} prMap={prMap}
-        />
-        {editingDay && (
-          <EditModal
-            dia={editingDay} onSave={saveEdit} onLiberar={liberarDia} onClose={() => setEditingDay(null)}
-            ejerciciosRegistrados={Object.keys(progress[editingDay.fecha] || {}).filter(k => !k.startsWith('__')).length}
-          />
-        )}
-      </>
-    );
-  }
-
+  // Si hay día activo se enseña su sesión. Si por lo que sea no lo hay (mes
+  // cambiado, fecha fuera de rango), se cae al calendario en lugar de dejar la
+  // pantalla vacía.
   if (view === 'session' && activeDiaData) {
     return <SessionView onEditarRutina={setEditandoRutina} onVerFicha={setFichaSesion} />;
   }
@@ -98,18 +74,11 @@ export default function App() {
   return (
     <>
       <CalendarView
-        calendario={calendario} progress={progress} avisos={avisos}
-        onOpenDay={openDay} onEditDay={setEditingDay}
-        editMode={editMode} setEditMode={setEditMode} todayISO={todayISO}
-        saveStatus={saveStatus} mesInfo={mesInfo} onMes={cambiarMes} hayMesAnterior={hayMesAnterior} rutina={rutina}
-        onExportar={onExportar} onImportar={onImportar} mensajeDatos={mensajeDatos}
-        onBiblioteca={() => setBiblioteca(true)} prMap={prMap}
+        onEditDay={setEditingDay} editMode={editMode} setEditMode={setEditMode}
+        onBiblioteca={() => setBiblioteca(true)}
       />
       {editingDay && (
-        <EditModal
-          dia={editingDay} onSave={saveEdit} onLiberar={liberarDia} onClose={() => setEditingDay(null)}
-          ejerciciosRegistrados={Object.keys(progress[editingDay.fecha] || {}).filter(k => !k.startsWith('__')).length}
-        />
+        <EditModal dia={editingDay} onSave={saveEdit} onLiberar={liberarDia} onClose={() => setEditingDay(null)} />
       )}
     </>
   );
