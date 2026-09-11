@@ -21,70 +21,9 @@ import {
   resolverRutina, estaEditada, guardarVersion, restaurarPlan, huerfanosDelDia,
   catalogoEjercicios, nuevoId, mover, gruposBS,
 } from './rutina.js';
-
-// ═══════════════ HELPERS ═══════════════
-
-// ─── Estado "día completado" (v6 · 7.1) ───
-// INTENCIÓN DE DISEÑO: un día hecho DESTACA, no se atenúa. Esto es un rastreador
-// de hábitos y el acumulado visible es parte de lo que empuja a seguir; apagar lo
-// ya entrenado convertía el mes cumplido en la parte más gris de la pantalla.
-//
-// El tratamiento es un marco encendido del color de la PROPIA sesión: fondo de ese
-// color al 14%, borde de 1.5px en los cuatro lados, y el borde superior pasa del
-// color del turno al de la sesión. El ícono y la etiqueta se quedan en su tono vivo.
-// Al derivarse del color de cada sesión desaparece el problema que tenía el lila
-// fijo: ya no hay un color ajeno que compita con el morado de la calistenia.
-// El turno no se pierde — la letra junto al número del día sigue con su color.
-const COMPLETADO = {
-  alphaFondo: 0.14,
-  borde: '1.5px',
-  bordeSuperior: '3px',
-  // El padding NO se compensa, y es deliberado: Chromium redondea los bordes
-  // sub-píxel hacia abajo, así que ese 1.5px se usa como 1px en el cálculo de
-  // layout — igual que el borde por defecto. Medido en densidades 1, 2 y 3.
-  // Restarle medio píxel al padding "para compensar" encogía la celda 0.5px y
-  // hacía bailar la cuadrícula al marcar un día.
-  padding: '4px',
-};
-
-// #22c55e → rgba(34, 197, 94, alpha). Los colores viven en SESION_INFO; derivarlos
-// aquí evita duplicar la paleta en cada celda.
-const hexARgba = (hex, alpha) => {
-  const h = String(hex || '').replace('#', '');
-  const n = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
-  const v = parseInt(n, 16);
-  if (n.length !== 6 || Number.isNaN(v)) return `rgba(148, 163, 184, ${alpha})`;
-  return `rgba(${(v >> 16) & 255}, ${(v >> 8) & 255}, ${v & 255}, ${alpha})`;
-};
-
-const parseRest = (s) => {
-  if (!s || s === '—' || s.includes('0s')) return null;
-  const n = parseFloat(s.replace(',', '.'));
-  if (isNaN(n)) return null;
-  const range = s.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)/);
-  const v = range ? parseFloat(range[2]) : n;
-  return s.toLowerCase().includes('min') ? Math.round(v * 60) : Math.round(v);
-};
-
-const playBeep = () => {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.connect(g); g.connect(ctx.destination);
-    o.frequency.value = 880; o.type = 'sine';
-    g.gain.setValueAtTime(0.3, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-    o.start(); o.stop(ctx.currentTime + 0.4);
-  } catch { /* sin AudioContext: el pitido es opcional */ }
-};
-const vibrate = (p) => { try { navigator.vibrate?.(p); } catch { /* sin motor de vibración */ } };
-const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-
-// Fecha local de hoy en ISO (no UTC: si no, de noche en Colombia saltaría al día siguiente).
-const hoyISO = () => {
-  const n = new Date();
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
-};
+import { COMPLETADO, VACIO, GYM_PIERNA_UI } from './utiles/constantes-ui.js';
+import { hexARgba, parseRest, fmtTime, hoyISO, mesDeISO } from './utiles/formato.js';
+import { playBeep, vibrate } from './utiles/sonido.js';
 
 // ═══════════════ CARGA DEL ESTADO GUARDADO ═══════════════
 // Se lee UNA vez y de forma síncrona, para usarla en inicializadores lazy de
@@ -139,16 +78,6 @@ function estadoGuardado() {
   } catch { /* localStorage bloqueado o JSON corrupto: se arranca de cero */ }
   return _guardado;
 }
-
-// Objeto vacío compartido: `algo || {}` crea uno nuevo en cada render y hace
-// que los useMemo que dependen de él se recalculen siempre.
-const VACIO = {};
-
-const GYM_PIERNA_UI = ['gymC1', 'gymC2'];
-
-const NOMBRES_MES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-const mesDeISO = (f) => NOMBRES_MES[Number(f.slice(5, 7)) - 1];
 
 const IconFor = ({ name, size = 20, color, style }) => {
   const p = { size, color, style, strokeWidth: 2 };
