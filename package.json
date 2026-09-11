@@ -11,7 +11,7 @@
     "test": "node test-generador.mjs && node test-validador.mjs",
     "test:ui": "node test-ui.mjs",
     "test:snapshot": "node test-snapshot.mjs",
-    "test:renders": "node test-renders.mjs",
+    "test:renders": "node test-renders.mjs --exigir-app-0",
     "audit": "node audit.mjs"
   },
   "dependencies": {

@@ -3,13 +3,16 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { MUSCULOS, CAT_MUSCULO, RANGO_VOLUMEN } from '../../data.js';
 import { resolverRutina } from '../../rutina.js';
 import { mesDeISO } from '../../utiles/formato.js';
+import { usePlanCtx, useProgresoCtx } from '../../estado/contextos.js';
 
 // ═══════════════ VOLUMEN POR GRUPO MUSCULAR (v6 · 7.2) ═══════════════
 // Series efectivas = (series × 1.0 si primario) + (series × 0.5 si secundario).
 // Los secundarios a mitad es la convención de la literatura de volumen: contarlos
 // enteros infla el dorsal y los erectores, que aparecen en casi todo.
 // Ventana SEMANAL, porque la franja objetivo (8-12 series por grupo) es semanal.
-const VolumenMuscular = ({ calendario, progress, todayISO, rutina = {} }) => {
+const VolumenMuscular = () => {
+  const { calendario, todayISO, rutina } = usePlanCtx();
+  const { progress } = useProgresoCtx();
   // Semanas lunes→domingo, derivadas del campo `sem` para respetar las ediciones manuales.
   const semanas = useMemo(() => {
     const out = []; let cur = [];

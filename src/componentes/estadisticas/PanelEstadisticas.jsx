@@ -6,7 +6,8 @@ import GraficaProgresion from './GraficaProgresion.jsx';
 // ═══ PANEL DE ESTADÍSTICAS ═══
 // `stats` lo calcula CalendarView, que es quien tiene dayCompletion: la misma
 // función que decide el check de cada celda decide también estos números.
-const PanelEstadisticas = ({ stats, calendario, progress, todayISO, rutina, prMap }) => (
+// Lo demás lo lee cada panel del contexto.
+const PanelEstadisticas = ({ stats }) => (
   <div className="mt-6">
     <div className="flex items-center gap-2 mb-3 px-1">
       <TrendingUp size={15} className="text-emerald-400" />
@@ -81,8 +82,8 @@ const PanelEstadisticas = ({ stats, calendario, progress, todayISO, rutina, prMa
     </div>
 
     {/* Volumen por grupo muscular (v6 · 7.2) */}
-    <VolumenMuscular calendario={calendario} progress={progress} todayISO={todayISO} rutina={rutina} />
-    <GraficaProgresion progress={progress} prMap={prMap} />
+    <VolumenMuscular />
+    <GraficaProgresion />
   </div>
 );
 

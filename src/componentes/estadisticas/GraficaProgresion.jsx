@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { SESIONES } from '../../data.js';
 import { historialEjercicio } from '../../reglas.js';
+import { useProgresoCtx } from '../../estado/contextos.js';
 
 // ═══════════════ GRÁFICA DE PROGRESIÓN ═══════════════
 // SVG a mano: una línea con puntos no justifica añadir una librería al bundle.
-const GraficaProgresion = ({ progress, prMap }) => {
+const GraficaProgresion = () => {
+  const { progress, prMap } = useProgresoCtx();
   const [modo, setModo] = useState('carga');     // carga | volumen
   // Los compuestos de Parte 1 van primero: son los que llevan progresión lineal
   const candidatos = useMemo(() => {

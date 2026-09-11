@@ -16,7 +16,7 @@ import PanelEstadisticas from '../estadisticas/PanelEstadisticas.jsx';
 const CalendarView = ({ onEditDay, editMode, setEditMode, onBiblioteca }) => {
   contarRender('CalendarView');
   const { calendario, todayISO, mesInfo, avisos, rutina } = usePlanCtx();
-  const { progress, prMap } = useProgresoCtx();
+  const { progress } = useProgresoCtx();
   const { openDay: onOpenDay } = useAccionesCtx();
 
   const dayCompletion = useCallback((d) => {
@@ -218,8 +218,7 @@ const CalendarView = ({ onEditDay, editMode, setEditMode, onBiblioteca }) => {
           </div>
         )}
 
-        <PanelEstadisticas stats={stats} calendario={calendario} progress={progress}
-          todayISO={todayISO} rutina={rutina} prMap={prMap} />
+        <PanelEstadisticas stats={stats} />
 
         {/* Nota inferior */}
         <p className="text-center text-[10px] text-slate-600 mt-4 px-4">
