@@ -8,10 +8,10 @@ import { estadoGuardado } from './persistencia.js';
 // con `extras`. Guardar el array generado sería duplicar la verdad y arriesgarse
 // a que se desincronice del ancla.
 //
-// `borrarRegistro(fecha)` lo aporta quien tenga el progreso: cambiar la sesión
-// de un día con entrenamiento registrado deja ese registro apuntando a
-// ejercicios que ya no existen ahí, y hay que borrarlo (tras confirmarlo).
-export function usePlan({ anio, mes, borrarRegistro }) {
+// Este hook no toca el progreso. Cambiar la sesión de un día con entrenamiento
+// registrado obliga a borrar ese registro (tras confirmarlo), pero eso es
+// orquestación entre plan y progreso: lo hace App, que tiene los dos.
+export function usePlan({ anio, mes }) {
   const [ancla, setAncla] = useState(() => estadoGuardado().ancla ?? ANCLA_DEFAULT);
   const [fijados, setFijados] = useState(() => estadoGuardado().fijados);   // { fecha: { turno, sesion, auto? } }
   const [festivos, setFestivos] = useState(() => estadoGuardado().festivos ?? FESTIVOS_DEFAULT);
@@ -74,15 +74,12 @@ export function usePlan({ anio, mes, borrarRegistro }) {
 
   // ─── Editar día: FIJAR + recalcular lo que viene ───
   // El calendario se regenera solo, porque es un useMemo sobre `fijados`.
-  const saveEdit = useCallback((fecha, turno, sesion, festivo, conRegistro) => {
-    // Al cambiar de sesión un día con registro, ese registro apunta a ejercicios
-    // que ya no existen ahí: se borra (solo tras confirmarlo en el modal).
-    if (conRegistro) borrarRegistro(fecha);
+  const saveEdit = useCallback((fecha, turno, sesion, festivo) => {
     setFijados(prev => ({ ...prev, [fecha]: { turno, sesion } }));
     setFestivos(prev => festivo
       ? (prev.includes(fecha) ? prev : [...prev, fecha])
       : prev.filter(f => f !== fecha));
-  }, [borrarRegistro]);
+  }, []);
 
   // Soltar un día fijado: vuelve a mandar el generador
   const liberarDia = useCallback((fecha) => {
@@ -119,10 +116,9 @@ export function usePlan({ anio, mes, borrarRegistro }) {
   }, []);
 
   // ─── Variante de la sesión (cuál de la cola toca hoy) ───
-  const fijarVariante = useCallback((fecha, clave, secundaria, conRegistro) => {
+  const fijarVariante = useCallback((fecha, clave, secundaria) => {
     const dia = calendario.find(d => d.fecha === fecha);
     if (!dia) return;
-    if (conRegistro) borrarRegistro(fecha);
     setFijados(prev => {
       const act = prev[fecha] ?? { turno: dia.turno, sesion: dia.sesion };
       // Natación: el TIPO no cambia, cambia la variante. Gym: cambia la sesión.
@@ -133,7 +129,7 @@ export function usePlan({ anio, mes, borrarRegistro }) {
       }
       return { ...prev, [fecha]: { ...act, turno: dia.turno, sesion: clave } };
     });
-  }, [calendario, borrarRegistro]);
+  }, [calendario]);
 
   const soltarVariante = useCallback((fecha, secundaria) => {
     setFijados(prev => {
