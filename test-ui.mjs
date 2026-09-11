@@ -32,6 +32,13 @@ const nuevaPagina = async (seed, opts = {}) => {
   // y navegan hasta el mes del ancla para no depender de la fecha real.
   await p.locator('text=Calendario').first().click().catch(() => {});
   await p.waitForTimeout(500);
+  // Si la app revienta al pintar el calendario, el fallo tiene que verse AQUÍ,
+  // no 30 s después como un timeout en un test que no tiene nada que ver.
+  // El botón de ajustes solo existe en la cabecera del calendario.
+  if (await p.locator('header .lucide-settings').count() === 0) {
+    const causa = errores.length ? ` · error de página: ${errores.at(-1)}` : '';
+    throw new Error(`nuevaPagina: no se llegó al calendario${causa}`);
+  }
   const btn = mesesDesdeHoy < 0 ? 'Mes anterior' : 'Mes siguiente';
   for (let i = 0; i < Math.abs(mesesDesdeHoy); i++) {
     await p.locator(`button[aria-label="${btn}"]`).click().catch(() => {});

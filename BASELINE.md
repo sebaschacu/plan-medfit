@@ -111,12 +111,28 @@ Detectado el 2026-09-11 porque dos semillas de `test-ui.mjs` tenían esa forma
 incorrecta y la semana actual incluía un gymA. Las semillas se corrigieron; la
 robustez de la app, no.
 
-### La suite de UI depende de la semana en curso
+### La suite de UI depende de la fecha real (revisada al cerrar el paso 5)
 
-`VolumenMuscular` pinta la semana ACTUAL antes de que `nuevaPagina` navegue al
-mes de prueba. Cualquier semilla que afecte a esa semana cambia el resultado
-según la fecha real. Revisar toda la suite buscando dependencias así al cerrar
-el paso 5 de la Tarea 1.
+**El problema de fondo:** la app siempre aterriza en la sesión de HOY y pinta
+el calendario del mes de HOY una vez, antes de que `nuevaPagina` navegue al
+mes de prueba (agosto 2026). Cualquier semilla con alcance atemporal —una
+`rutina` con `desde` en el pasado, `css`, festivos futuros— toca ese primer
+render. Las dos semillas malformadas fueron el síntoma; esto es la causa.
+
+La solución de fondo sería un gancho de test para fijar "hoy": que `hoyISO()`
+respete una clave como `plan-internado-hoy` en localStorage cuando exista. Es
+un cambio en `src/`, fuera de la Tarea 1.
+
+**Síntoma latente:** el test "semana actual" (`test-ui.mjs` ~268-275) afirma
+que en agosto NO hay etiqueta y que al volver al mes de hoy SÍ. Da por hecho
+que hoy no es agosto de 2026. Si se ejecuta en agosto, `mesesDesdeHoy = 0`, no
+navega, y la segunda aserción falla sea cual sea la semana. Hoy es inofensivo
+porque el ancla está fija en el pasado; si algún día el ancla se mueve al mes
+en curso, este test cae el primer día.
+
+**Ya corregido:** `nuevaPagina` verifica que se llegó al calendario y falla ahí
+con el error de página en el mensaje. Antes, un `.catch(() => {})` se tragaba
+el fallo y aparecía 30 s después como un timeout sin relación.
 
 ## Correcciones a las cifras del ARRANQUE
 
