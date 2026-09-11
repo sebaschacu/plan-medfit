@@ -8,9 +8,11 @@
   "extras": {
     "2026-08-05": {
       "complementos": [
-        "movilidad"
+        "calistenia"
       ],
-      "sueno": 6
+      "flex": {
+        "sueno": true
+      }
     },
     "2026-08-12": {
       "secundaria": "natacion",

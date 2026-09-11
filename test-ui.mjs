@@ -675,7 +675,8 @@ const respaldo = {
   prog: { [gymV.fecha]: { 'A-1': { sets: [true], logs: [{ kg: 45, reps: 8 }] } } },
   extras: { [gymV.fecha]: { sueno: true } },
   rutina: { gymA: [{ desde: '2026-01-01', ejercicios: [
-    { id: 'A-1', nombre: 'Press banca IMPORTADO', series: 4, reps: '5-8', musculos: { pectoral: 1 } }] }] },
+    { id: 'A-1', parte: 1, nombre: 'Press banca IMPORTADO', series: 4, reps: '5-8', descanso: '3 min',
+      musculos: { primario: ['pecho'], secundario: [] } }] }] },
 };
 fs.writeFileSync('/tmp/respaldo-test.json', JSON.stringify(respaldo));
 fs.writeFileSync('/tmp/ajeno-test.json', JSON.stringify({ hola: 'mundo' }));
@@ -708,7 +709,8 @@ await p.close();
 seccion('BIBLIOTECA');
 p = await nuevaPagina({ v: 3, prs: {}, fijados: {}, extras: {}, css: null, prog: {},
   rutina: { gymA: [{ desde: '2020-01-01', motivo: 'prueba', ejercicios: [
-    { id: 'A-1', nombre: 'MI PRESS PERSONALIZADO', series: 4, reps: '5-8', descanso: 180, musculos: { pectoral: 1 } }] }] } });
+    { id: 'A-1', parte: 1, nombre: 'MI PRESS PERSONALIZADO', series: 4, reps: '5-8', descanso: '3 min',
+      musculos: { primario: ['pecho'], secundario: [] } }] }] } });
 await p.evaluate(() => document.querySelector('header button[aria-label="Biblioteca de rutinas"]')?.click());
 await p.waitForTimeout(600);
 ok('Se abre la biblioteca', /Biblioteca de rutinas/i.test(await p.evaluate(() => document.body.innerText)));

@@ -38,8 +38,12 @@ const SEMILLA = {
     '2026-08-04': { turno: 'C', sesion: 'gymD' },
     '2026-08-11': { turno: 'C', sesion: 'natacion', variante: 'natB2' },
   },
+  // Formas reales de `extras`, tal como las escribe la app:
+  //   complementos  → claves de COMPLEMENTOS (data.js)         · onComplemento
+  //   secundaria + separacionH → sesión doble                  · onSecundaria
+  //   flex.sueno    → respuesta "¿dormiste bien?" (booleano)   · onFlexible
   extras: {
-    '2026-08-05': { complementos: ['movilidad'], sueno: 6 },
+    '2026-08-05': { complementos: ['calistenia'], flex: { sueno: true } },
     '2026-08-12': { secundaria: 'natacion', separacionH: 6 },
   },
   css: 92,

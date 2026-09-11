@@ -92,6 +92,32 @@ Requiere `npx playwright install chromium` una vez.
 2. `test-snapshot.mjs` + `baseline-snapshot.json` — la puerta 5, nueva.
 3. `package.json` — el script `test:snapshot`.
 
+## Pendientes detectados durante la Tarea 1 (para la Tarea 2)
+
+Cosas que aparecieron al refactorizar y que NO se tocan aquí, porque la Tarea 1
+es movimiento puro de código.
+
+### `VolumenMuscular` deja el calendario en blanco con un ejercicio malformado
+
+`ex.musculos.primario.forEach(...)` en `VolumenMuscular` revienta si un
+ejercicio de una rutina editada no trae `musculos.primario`. Un respaldo
+editado a mano o de una versión anterior lo provoca, y el resultado es la
+pantalla del calendario vacía sin ningún aviso.
+
+`validador.js:239` ya lo hace bien: `(e.musculos?.primario ?? [])`. Aplicar el
+mismo patrón a las dos líneas de `VolumenMuscular` (primario y secundario).
+
+Detectado el 2026-09-11 porque dos semillas de `test-ui.mjs` tenían esa forma
+incorrecta y la semana actual incluía un gymA. Las semillas se corrigieron; la
+robustez de la app, no.
+
+### La suite de UI depende de la semana en curso
+
+`VolumenMuscular` pinta la semana ACTUAL antes de que `nuevaPagina` navegue al
+mes de prueba. Cualquier semilla que afecte a esa semana cambia el resultado
+según la fecha real. Revisar toda la suite buscando dependencias así al cerrar
+el paso 5 de la Tarea 1.
+
 ## Correcciones a las cifras del ARRANQUE
 
 - La suite de interfaz son **142** pruebas, no 111. Ha crecido desde que se
