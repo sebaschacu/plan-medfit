@@ -10,11 +10,15 @@ import { generarMes } from './src/generador.js';
 import { SESIONES } from './src/data.js';
 
 const URL = 'http://localhost:4173/';
-// Las pruebas trabajan sobre el MES DEL ANCLA (agosto 2026), no sobre "hoy":
-// si dependieran de la fecha real, la suite se pudriría al pasar los días.
+// Las pruebas trabajan sobre el MES DEL ANCLA (agosto 2026), y "hoy" se FIJA
+// dentro de ese mes: la app lee `plan-internado-hoy` de localStorage al
+// arrancar (ver hoyISO en src/utiles/formato.js). Sin esto, la suite cambiaba
+// de resultado según la semana real en que se ejecutara, porque la app pinta
+// la sesión y el calendario de hoy antes de que el test pueda navegar.
 const MES_TEST = { anio: 2026, mes: 7 };
+const HOY = '2026-08-01';   // sábado, día del ancla; cae en la semana 0 del mes
 const NOMBRES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-const hoyReal = new Date();
+const hoyReal = new Date(HOY + 'T12:00:00');
 const mesesDesdeHoy = (MES_TEST.anio * 12 + MES_TEST.mes) - (hoyReal.getFullYear() * 12 + hoyReal.getMonth());
 let fallos = 0, n = 0;
 const errores = [];
@@ -25,6 +29,7 @@ const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/
 const nuevaPagina = async (seed, opts = {}) => {
   const p = await b.newPage({ viewport: { width: 430, height: 1400 }, ...opts });
   p.on('pageerror', e => errores.push(e.message.split('\n')[0]));
+  await p.addInitScript(([h]) => localStorage.setItem('plan-internado-hoy', h), [HOY]);
   if (seed) await p.addInitScript(([s]) => localStorage.setItem('plan-internado', JSON.stringify(s)), [seed]);
   await p.goto(URL, { waitUntil: 'networkidle' });
   await p.waitForTimeout(1100);
@@ -272,13 +277,13 @@ ok('El anillo calcula un porcentaje > 0', pct && pct !== '0%', pct);
 await p.locator('button[aria-label="Semana siguiente"]').click(); await p.waitForTimeout(500);
 ok('Las barras musculares muestran volumen hecho',
   (await p.evaluate(() => [...document.body.innerText.matchAll(/(\d+(?:\.\d+)?)\s*\/\s*\d/g)].filter(m => +m[1] > 0).length)) > 3);
-// Estamos viendo el mes del ancla, que no es el de hoy: no debe haber etiqueta
+// La etiqueta "semana actual" solo aparece en la semana que contiene HOY. Se
+// sale al mes siguiente (no puede estar), y al volver el panel debe recolocarse
+// en la semana de hoy y enseñarla.
+await p.locator('button[aria-label="Mes siguiente"]').click(); await p.waitForTimeout(300);
 ok('No etiqueta "semana actual" en un mes que no es el de hoy',
   await p.locator('text=/semana actual/i').count() === 0);
-for (let i = 0; i < Math.abs(mesesDesdeHoy); i++) {
-  await p.locator(`button[aria-label="${mesesDesdeHoy < 0 ? 'Mes siguiente' : 'Mes anterior'}"]`).click();
-  await p.waitForTimeout(160);
-}
+await p.locator('button[aria-label="Mes anterior"]').click(); await p.waitForTimeout(300);
 ok('Y sí la etiqueta al volver al mes de hoy', await p.locator('text=/semana actual/i').count() === 1);
 await p.close();
 

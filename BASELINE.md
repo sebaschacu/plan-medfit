@@ -182,28 +182,32 @@ Detectado el 2026-09-11 porque dos semillas de `test-ui.mjs` tenían esa forma
 incorrecta y la semana actual incluía un gymA. Las semillas se corrigieron; la
 robustez de la app, no.
 
-### La suite de UI depende de la fecha real (revisada al cerrar el paso 5)
+### ~~La suite de UI depende de la fecha real~~ — RESUELTO (Tarea 2, bloque 0)
 
-**El problema de fondo:** la app siempre aterriza en la sesión de HOY y pinta
+**El problema que había:** la app siempre aterriza en la sesión de HOY y pinta
 el calendario del mes de HOY una vez, antes de que `nuevaPagina` navegue al
-mes de prueba (agosto 2026). Cualquier semilla con alcance atemporal —una
-`rutina` con `desde` en el pasado, `css`, festivos futuros— toca ese primer
-render. Las dos semillas malformadas fueron el síntoma; esto es la causa.
+mes de prueba. Cualquier semilla con alcance atemporal tocaba ese primer render
+y la suite cambiaba de resultado según la semana real. Las dos semillas
+malformadas fueron el síntoma; esto era la causa.
 
-La solución de fondo sería un gancho de test para fijar "hoy": que `hoyISO()`
-respete una clave como `plan-internado-hoy` en localStorage cuando exista. Es
-un cambio en `src/`, fuera de la Tarea 1.
+**La solución:** `hoyISO()` (`src/utiles/formato.js`) lee una vez al cargar la
+clave `plan-internado-hoy` de localStorage; si existe, esa es la fecha de hoy.
+Las tres suites de UI (`test-ui.mjs`, `test-renders.mjs`, `audit.mjs`) la
+siembran con `2026-08-01` —el día del ancla— antes de cargar la app. Ningún
+`new Date()` queda en ellas.
 
-**Síntoma latente:** el test "semana actual" (`test-ui.mjs` ~268-275) afirma
-que en agosto NO hay etiqueta y que al volver al mes de hoy SÍ. Da por hecho
-que hoy no es agosto de 2026. Si se ejecuta en agosto, `mesesDesdeHoy = 0`, no
-navega, y la segunda aserción falla sea cual sea la semana. Hoy es inofensivo
-porque el ancla está fija en el pasado; si algún día el ancla se mueve al mes
-en curso, este test cae el primer día.
+Para un usuario real es inerte: nadie tiene esa clave salvo que la ponga a
+mano. `test-snapshot.mjs` no la siembra a propósito: el snapshot no depende de
+la fecha y su huella de referencia no debe moverse.
 
-**Ya corregido:** `nuevaPagina` verifica que se llegó al calendario y falla ahí
-con el error de página en el mensaje. Antes, un `.catch(() => {})` se tragaba
-el fallo y aparecía 30 s después como un timeout sin relación.
+El test "semana actual" se reescribió: hoy fijado en agosto, sale a septiembre
+(no hay etiqueta) y vuelve (el panel se recoloca en la semana de hoy y la
+enseña). La auditoría comprueba ahora "Agosto 2027" tras 12 meses, no
+"<mes real> 2027".
+
+**También corregido antes:** `nuevaPagina` verifica que se llegó al calendario y
+falla ahí con el error de página en el mensaje. Antes, un `.catch(() => {})` se
+tragaba el fallo y aparecía 30 s después como un timeout sin relación.
 
 ## Correcciones a las cifras del ARRANQUE
 

@@ -23,8 +23,20 @@ export const parseRest = (s) => {
 
 export const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
+// Gancho para las pruebas: si existe `plan-internado-hoy` en localStorage, esa
+// es la fecha de hoy. Se lee UNA vez al cargar el módulo, igual que el estado
+// guardado: la app entera ve el mismo "hoy" durante toda la sesión.
+//
+// Para un usuario real es inerte: nadie tiene esa clave salvo que la ponga a
+// mano. Existe porque la app pinta la sesión de HOY antes de que un test pueda
+// navegar a ningún sitio, y sin fijar la fecha la suite de UI cambiaba de
+// resultado según la semana en que se ejecutara (ver BASELINE.md).
+let _hoyFijado;
+try { _hoyFijado = localStorage.getItem('plan-internado-hoy') || null; } catch { _hoyFijado = null; }
+
 // Fecha local de hoy en ISO (no UTC: si no, de noche en Colombia saltaría al día siguiente).
 export const hoyISO = () => {
+  if (_hoyFijado) return _hoyFijado;
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
 };

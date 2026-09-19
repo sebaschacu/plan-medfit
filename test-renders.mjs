@@ -21,7 +21,8 @@ import { generarMes } from './src/generador.js';
 
 const URL = 'http://localhost:4173/';
 const MES_TEST = { anio: 2026, mes: 7 };
-const hoyReal = new Date();
+const HOY = '2026-08-01';   // fijado, como en test-ui.mjs: la medida no depende del día real
+const hoyReal = new Date(HOY + 'T12:00:00');
 const mesesDesdeHoy = (MES_TEST.anio * 12 + MES_TEST.mes) - (hoyReal.getFullYear() * 12 + hoyReal.getMonth());
 const gymV = generarMes(MES_TEST).dias.find(d => d.sesion.startsWith('gym'));
 
@@ -35,7 +36,7 @@ p.on('pageerror', e => errores.push(e.message.split('\n')[0]));
 
 // Sin semilla: día limpio, sin registro previo. El contador nace ANTES de que
 // cargue la app, para que ningún render se quede sin contar.
-await p.addInitScript(() => { window.__renders = {}; });
+await p.addInitScript(([h]) => { window.__renders = {}; localStorage.setItem('plan-internado-hoy', h); }, [HOY]);
 await p.goto(URL, { waitUntil: 'networkidle' });
 await p.waitForTimeout(1100);
 
