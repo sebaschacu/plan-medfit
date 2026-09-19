@@ -12,7 +12,8 @@
     "test:ui": "node test-ui.mjs",
     "test:snapshot": "node test-snapshot.mjs",
     "test:renders": "node test-renders.mjs --exigir-app-0",
-    "audit": "node audit.mjs"
+    "audit": "node audit.mjs",
+    "audit:plan": "node audit-plan.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.29.0",

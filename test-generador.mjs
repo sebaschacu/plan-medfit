@@ -560,5 +560,59 @@ check('5.5h → sesión reducida', S4(5.5).nivel === 'reducida');
 check('7h → sesión normal', S4(7).nivel === 'normal');
 check('Sin dato → sin veredicto', S4(null) === null && S4('') === null);
 
+// ── RUNNING · cuánto se asigna de verdad (v7.1) ──
+// Cada 7 días hay ~1.75 de cada turno; los C son descanso, así que quedan 5 o 6
+// días útiles para 6 sesiones. El running se coloca el último y era el que se
+// quedaba fuera: 0.71/sem, 23 semanas de 78 sin correr. Dos intercambios que no
+// tocan ninguna regla ni cupo lo suben: el swap-S3 (la pierna cede su día al
+// running y pasa al hueco que S3 bloqueaba) y la natación que se dobla para
+// dejarle su día. Lo que queda son semanas de descarga (D3: no se dobla) y
+// semanas con las dos natación tras pierna: eso ya es una decisión de reglas.
+console.log('\n── RUNNING · ASIGNACIÓN REAL EN 18 MESES ──');
+const largo = generarDesdeAncla({ hasta: '2028-01-31' });
+const semanasDe18 = (() => {
+  const m = new Map();
+  for (const d of largo.dias) {
+    const f = deISO(d.fecha); const lunes = new Date(f); lunes.setUTCDate(f.getUTCDate() - ((f.getUTCDay() + 6) % 7));
+    const k = aISO(lunes); if (!m.has(k)) m.set(k, []); m.get(k).push(d);
+  }
+  return [...m.values()].filter(s => s.length === 7);
+})();
+const nSem = semanasDe18.length;
+const mediaSemanal18 = (pred) => semanasDe18.reduce((a, s) => a + s.filter(d => pred(d.sesion) || pred(d.sesionSecundaria)).length, 0) / nSem;
+const runSem = mediaSemanal18(s => s === 'running'), gymSem = mediaSemanal18(s => s?.startsWith('gym')), natSem = mediaSemanal18(s => s === 'natacion');
+check(`${nSem} semanas completas: gym exactamente 3.00/sem (real ${gymSem.toFixed(2)})`, Math.abs(gymSem - 3) < 0.005);
+check(`Natación exactamente 2.00/sem (real ${natSem.toFixed(2)})`, Math.abs(natSem - 2) < 0.005);
+check(`Running ≥ 0.80/sem (real ${runSem.toFixed(2)} · era 0.71 antes de los intercambios)`, runSem >= 0.80);
+const sinRun = semanasDe18.filter(s => !s.some(d => d.sesion === 'running' || d.sesionSecundaria === 'running'));
+check(`Toda semana sin running tiene motivo (descarga o sin hueco) y lo propone en el flexible (${sinRun.length} semanas)`,
+  sinRun.every(s => {
+    const av = largo.avisos.filter(a => a.semana === s[0].fecha).map(a => a.tipo);
+    return (av.includes('doble_en_descarga') || av.includes('sin_hueco_doblando')) && av.includes('running_al_flexible');
+  }));
+const swapsS3 = largo.avisos.filter(a => a.tipo === 'running_por_swap_s3');
+const cedidas = largo.avisos.filter(a => a.tipo === 'natacion_cede_a_running');
+check(`El swap-S3 actúa (${swapsS3.length} veces) y el running queda ese día`,
+  swapsS3.length > 0 && swapsS3.every(a => largo.dias.find(d => d.fecha === a.fecha)?.sesion === 'running'));
+check(`La natación cede su día al running (${cedidas.length} veces) y la semana conserva sus 2 natación`,
+  cedidas.length > 0 && cedidas.every(a => {
+    const s = semanasDe18.find(s => s[0].fecha === a.semana);
+    return s && s.filter(d => d.sesion === 'natacion' || d.sesionSecundaria === 'natacion').length === 2
+      && largo.dias.find(d => d.fecha === a.fecha)?.sesion === 'running';
+  }));
+// Las reglas de seguridad tienen que aguantar los 18 meses, no solo los 6 de arriba
+const l18 = largo.dias;
+let maxSeg18 = 0, seg18 = 0;
+l18.forEach((d, i) => { const c = i > 0 && diff(d.fecha, l18[i - 1].fecha) === 1; seg18 = d.sesion.startsWith('gym') ? (c ? seg18 + 1 : 1) : 0; maxSeg18 = Math.max(maxSeg18, seg18); });
+check(`S1 aguanta 18 meses con los intercambios (máx ${maxSeg18} gym seguidos)`, maxSeg18 <= 4);
+const s3_18 = l18.filter((d, i) => (d.sesion === 'running' || d.sesionSecundaria === 'running') && i > 0 && diff(d.fecha, l18[i - 1].fecha) === 1 && ES_PIERNA.has(l18[i - 1].sesion));
+check(`S3 aguanta 18 meses: ningún running tras pierna (${s3_18.length})`, s3_18.length === 0);
+const piernas18 = l18.filter(d => ES_PIERNA.has(d.sesion) || ES_PIERNA.has(d.sesionSecundaria));
+const minHueco18 = Math.min(...piernas18.slice(1).map((d, i) => diff(d.fecha, piernas18[i].fecha)));
+check(`S7 aguanta 18 meses: piernas separadas ≥${S7_PIERNA.separacionMinimaDias} (mín ${minHueco18})`, minHueco18 >= S7_PIERNA.separacionMinimaDias);
+const gyms18 = l18.filter(d => d.sesion.startsWith('gym'));
+const saltos18 = gyms18.filter((d, i) => i > 0 && d.sesion !== SECUENCIA_GYM[(SECUENCIA_GYM.indexOf(gyms18[i - 1].sesion) + 1) % 5]);
+check(`La cola de gym no se descoloca con el swap-S3 (${saltos18.length} saltos en ${gyms18.length} gyms)`, saltos18.length === 0);
+
 console.log(`\n══ TOTAL: ${pruebas - fallos}/${pruebas} pruebas pasadas ══`);
 process.exit(fallos ? 1 : 0);

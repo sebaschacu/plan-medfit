@@ -9,7 +9,7 @@ Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 
 | # | Comando | Baseline |
 |---|---|---|
-| 1 · Lógica | `npm test` | 108/108 + 66/66 = **174** (158 al cerrar la Tarea 1; +16 en Tarea 2 · 1.2) |
+| 1 · Lógica | `npm test` | 118/118 + 66/66 = **184** (158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3) |
 | 2a · Interfaz | `npm run test:ui` | **147/147** · 0 errores de página (142 al cerrar la Tarea 1; +5 en Tarea 2 · 1.1) |
 | 2b · Auditoría | `npm run audit` | **21/21** · 0 errores de página |
 | 3 · Lint | `npx oxlint` | **0 avisos / 0 errores** |

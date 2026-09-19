@@ -405,10 +405,55 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
       const dAyer = [...dias, ...ds].find(x => x.fecha === ayer);
       return dAyer && ES_PIERNA.has(dAyer.sesion);
     };
+    // Cuando el ÚNICO hueco libre cae justo después de una pierna, S3 lo bloquea y
+    // el running se pierde aunque la semana tenga sitio para las seis sesiones.
+    // Se intercambian: la pierna pasa al hueco libre (sigue siendo el mismo gym,
+    // en la misma posición de la cola) y el running ocupa el día de la pierna.
+    // Solo si la pierna es de esta semana, no está fijada, y el cambio respeta
+    // S1, S7 y los turnos de los dos días.
+    const ultimaPiernaAntesDe = (fecha) => {
+      const previas = [...dias, ...ds].filter(x => ES_PIERNA.has(x.sesion) && x.fecha < fecha)
+        .sort((a, b) => b.fecha.localeCompare(a.fecha));
+      return previas[0] ? deISO(previas[0].fecha) : null;
+    };
+    const intentarSwapS3 = (libre) => {
+      const ayerISO = aISO(sumarDias(deISO(libre.fecha), -1));
+      const pierna = ds.find(x => x.fecha === ayerISO);
+      if (!pierna || pierna.fijado || !ES_PIERNA.has(pierna.sesion) || pierna.sesionSecundaria) return false;
+      if (!admiteGym(libre.turno) || !admiteCardio(pierna.turno)) return false;
+      // El running iría al día de la pierna: no puede venir él también de otra pierna
+      const anteayer = [...dias, ...ds].find(x => x.fecha === aISO(sumarDias(deISO(pierna.fecha), -1)));
+      if (anteayer && ES_PIERNA.has(anteayer.sesion)) return false;
+      // S7 para la pierna en su día nuevo, contra la pierna anterior a ella
+      const previa = ultimaPiernaAntesDe(pierna.fecha);
+      if (previa && diffDias(deISO(libre.fecha), previa) < S7_PIERNA.separacionMinimaDias) return false;
+      // S1 no peligra: el running en el día de la pierna corta cualquier racha por
+      // detrás, y por delante la racha no puede pasar de los gyms de esta semana
+      // (cupo 3). La semana siguiente coloca los suyos mirando hacia atrás con
+      // gymSeguidosAntes, que es quien hace cumplir S1 en la frontera.
+      const sesionPierna = pierna.sesion;
+      libre.sesion = sesionPierna;
+      libre.sugeridaGym = pierna.sugeridaGym;
+      pierna.sesion = 'running';
+      delete pierna.sugeridaGym;
+      ultimaPierna = deISO(libre.fecha);
+      libres.splice(libres.indexOf(libre), 1);
+      avisos.push({ semana: ds[0].fecha, fecha: pierna.fecha, tipo: 'running_por_swap_s3',
+        texto: `Día ${pierna.dia}: el único hueco libre de la semana caía justo tras la pierna (S3). Se intercambian: ${sesionPierna} pasa al día ${libre.dia} y el running ocupa el ${pierna.dia}.` });
+      return true;
+    };
+
     let runPuestos = 0;
     for (let i = 0; i < cupo.running; i++) {
       const ok = libres.filter(d => !esTrasPierna(d) && admiteCardio(d.turno));
-      if (!ok.length) { if (semanaCompleta) pendientes.push('running'); continue; }
+      if (!ok.length) {
+        // Sin hueco válido. ¿Hay uno libre que solo bloquea S3? Entonces el swap.
+        const bloqueados = libres.filter(d => esTrasPierna(d) && admiteCardio(d.turno))
+          .sort((a, b) => a.fecha.localeCompare(b.fecha));
+        if (bloqueados.some(intentarSwapS3)) { runPuestos++; continue; }
+        if (semanaCompleta) pendientes.push('running');
+        continue;
+      }
       const orden = { N: 0, L: 1, P: 2, C: 3 };
       const elegido = [...ok].sort((a, b) => orden[a.turno] - orden[b.turno] || a.fecha.localeCompare(b.fecha))[0];
       elegido.sesion = 'running';
@@ -428,6 +473,51 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
       const rango = (x) => { const i = DOBLES.prioridad.indexOf(x); return i === -1 ? 99 : i; };
       const noResueltos = [];
       pendientes.sort((a, b) => rango(a) - rango(b));
+
+      // ¿Puede una natación de esta semana pasar a doble y dejarle su día al running?
+      // Candidata: natación principal, no fijada, cuyo día admite running (turno y
+      // S3). Anfitrión para ella: otro día con principal que no sea natación, turno
+      // que permite doblar, franja de piscina compatible, y sin romper D1 ni D2.
+      const natCedeDiaARunning = () => {
+        const dobladosSemana = ds.filter(d => d.sesionSecundaria).length;
+        if (dobladosSemana >= DOBLES.maxPorSemana) return false;                      // D1
+        const sinVecinosDoblados = (d) => {
+          if (!DOBLES.noConsecutivos) return true;                                     // D2
+          const vecino = (n) => [...dias, ...ds].find(x => x.fecha === aISO(sumarDias(deISO(d.fecha), n)));
+          return !vecino(-1)?.sesionSecundaria && !vecino(1)?.sesionSecundaria;
+        };
+        const candidatas = ds
+          .filter(d => d.sesion === 'natacion' && !d.fijado && !d.sesionSecundaria)
+          .filter(d => admiteCardio(d.turno) && !esTrasPierna(d))
+          .sort((a, b) => a.fecha.localeCompare(b.fecha));
+        for (const nat of candidatas) {
+          const host = ds
+            .filter(d => d !== nat && d.sesion && d.sesion !== 'natacion' && !d.sesionSecundaria)
+            .filter(d => DOBLES.turnos[d.turno]?.permite && combinacionValida(d.sesion, 'natacion').ok)
+            .filter(sinVecinosDoblados)
+            .map(d => ({ d, franja: mejorFranja(franjasCompatibles(d.fecha, d.turno, festivos)) }))
+            .filter(x => x.franja)
+            .sort((a, b) => (DOBLES.turnos[a.d.turno].condicional - DOBLES.turnos[b.d.turno].condicional)
+              || a.d.fecha.localeCompare(b.d.fecha))[0];
+          if (!host) continue;
+          // Aplicar: la natación se dobla sobre host; su día pasa a running
+          host.d.sesionSecundaria = 'natacion';
+          host.d.franjaSecundaria = host.franja;
+          host.d.dobleOrden = ordenDoble(host.d.sesion, 'natacion');
+          host.d.dobleCondicional = !!DOBLES.turnos[host.d.turno].condicional;
+          const diaNat = nat.dia;
+          nat.sesion = 'running';
+          delete nat.franja;
+          avisos.push({ semana: ds[0].fecha, fecha: nat.fecha, tipo: 'natacion_cede_a_running',
+            texto: `Día ${diaNat}: el running no tenía dónde doblar. La natación pasa a segunda sesión del día ${host.d.dia} (${host.d.sesion}) y le deja el día.` });
+          if (host.d.dobleCondicional) {
+            avisos.push({ semana: ds[0].fecha, fecha: host.d.fecha, tipo: 'doble_condicional',
+              texto: `Día ${host.d.dia} (posturno): se dobló natacion sobre ${host.d.sesion}. ${DOBLES.turnos.P.condicion}.` });
+          }
+          return true;
+        }
+        return false;
+      };
 
       for (const queFalta of [...pendientes]) {
         if (enDescarga) {
@@ -466,6 +556,12 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
             || a.fecha.localeCompare(b.fecha));
 
         if (!anfitriones.length) {
+          // El running solo dobla sobre gym de torso en L o P, y a menudo no queda
+          // ninguno. La natación, en cambio, combina con todo: si una natación de
+          // esta semana puede pasar a segunda sesión de otro día (con franja de
+          // piscina) y su día admite running, se intercambian. El cupo de natación
+          // no cambia: sigue siendo 2, una como principal y otra doblada.
+          if (queFalta === 'running' && natCedeDiaARunning()) continue;
           noResueltos.push(queFalta);
           avisos.push({ semana: ds[0].fecha, fecha: ds[0].fecha, tipo: 'sin_hueco_doblando',
             texto: `Semana del ${ds[0].dia}: no hay ningún día donde doblar ${sesionPendiente}. Esa sesión se queda sin asignar.` });
