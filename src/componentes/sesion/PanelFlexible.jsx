@@ -15,6 +15,11 @@ const PanelFlexible = ({ dia, respuesta }) => {
   const peso = respuesta?.peso;
   const todas = cond3 && durmio === true && peso === true;
   const contestadas = durmio != null && peso != null;
+  // S3: running nunca el día después de pierna. Fijar el flexible a running lo
+  // saltaría, porque los días fijados no pasan por las reglas del generador: se
+  // quita de las opciones. La bici tras pierna es consejo (el cuádriceps sí
+  // trabaja), no regla: se ofrece con el aviso.
+  const opciones = (dia.sugerencia?.opciones ?? CARDIO_FLEXIBLE).filter(k => !(dia.trasPierna && k === 'running'));
 
   return (
     <div className="mb-3 rounded-lg border-l-4 border-slate-500 bg-slate-800/20 px-3 py-2.5">
@@ -22,8 +27,8 @@ const PanelFlexible = ({ dia, respuesta }) => {
         <Zap size={15} className="text-slate-400 flex-shrink-0 mt-0.5" />
         <div className="text-[11px] text-slate-300 leading-relaxed">
           <span className="font-bold">Día flexible.</span> Es el día negociable de la semana y cae en turno C, que ya son
-          12h de pie. Por defecto descansas; pasa a running solo si se cumplen las tres condiciones.
-          {dia.sugerencia?.sesion === 'running' && (
+          12h de pie. Por defecto descansas; pasa a cardio solo si se cumplen las tres condiciones.
+          {dia.sugerencia && (
             <span className="block mt-1 text-amber-300">{dia.sugerencia.motivo}</span>
           )}
         </div>
@@ -57,7 +62,7 @@ const PanelFlexible = ({ dia, respuesta }) => {
           <div className="mt-2.5 space-y-1.5">
             <p className="text-[11px] text-emerald-300 font-bold">Las tres se cumplen. ¿Qué haces hoy?</p>
             <div className="flex gap-1.5">
-              {CARDIO_FLEXIBLE.map(k => (
+              {opciones.map(k => (
                 <button key={k} onClick={() => onConvertir(dia.fecha, k)}
                   className="flex-1 py-2 rounded-lg text-white text-[11px] font-bold uppercase"
                   style={{ background: SESION_INFO[k].color }}>
@@ -65,10 +70,17 @@ const PanelFlexible = ({ dia, respuesta }) => {
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-slate-500 leading-relaxed">
-              Vienes de 12h de pie: la bici da el mismo Z2 sin castigar pies, tibias ni sóleo, y de paso
-              cubre el ciclismo que te falta para triatlón. Correr solo si los pies vienen bien.
-            </p>
+            {dia.trasPierna ? (
+              <p className="text-[10px] text-amber-300/90 leading-relaxed">
+                Ayer fue pierna: correr hoy viola S3, así que no se ofrece. La bici no tiene impacto pero el
+                cuádriceps sí trabaja — si vas a hacerla, suave.
+              </p>
+            ) : (
+              <p className="text-[10px] text-slate-500 leading-relaxed">
+                Vienes de 12h de pie: la bici da el mismo Z2 sin castigar pies, tibias ni sóleo, y de paso
+                cubre el ciclismo que te falta para triatlón. Correr solo si los pies vienen bien.
+              </p>
+            )}
           </div>
         ) : (
           <p className="text-[11px] text-slate-400 mt-2.5 leading-relaxed">

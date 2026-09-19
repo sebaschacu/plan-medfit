@@ -20,7 +20,7 @@
 // dos filas de la tabla y reproduce el ejemplo del plan.
 
 import { SECUENCIA_GYM, SECUENCIA_NATACION, NATACION_CSS, PISCINA, VENTANA_PISCINA, CUPO_SEMANAL,
-  PRIORIDAD_TURNO, S7_PIERNA, DOBLES, GYM_PIERNA, GYM_TORSO, GYM_SOLAPAN, ORDEN_DOBLE } from './data.js';
+  PRIORIDAD_TURNO, S7_PIERNA, DOBLES, GYM_PIERNA, GYM_TORSO, GYM_SOLAPAN, ORDEN_DOBLE, CARDIO_FLEXIBLE } from './data.js';
 
 // El cupo y las prioridades se LEEN de data.js: si se hardcodearan aquí, esas
 // constantes volverían a ser decoración y cambiar el plan obligaría a tocar dos
@@ -461,6 +461,11 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
       runPuestos++;
     }
 
+    // El flexible ya sabe qué hubo el día anterior (las principales están puestas).
+    // Si fue pierna, S3 prohíbe el running ahí y la bici tampoco conviene: la UI
+    // lo lee para no ofrecer lo que rompería la regla.
+    if (flexible) flexible.trasPierna = !!esTrasPierna(flexible);
+
     // ── 5. SESIONES DOBLES · cubrir lo que no cupo como principal ──
     // El déficit es de ~3 sesiones cada 28 días, no un problema semanal.
     // Se dobla en días aptos (L sin restricción, P condicional) respetando D1-D4.
@@ -601,14 +606,18 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
       // Si el running no encontró sitio, el día flexible es su casa: para eso está.
       // No se impone —sigue siendo descanso por defecto— sino que se propone, y la
       // app pregunta las dos condiciones que no puede saber (sueño y peso).
+      // `sesion` es lo que no cupo (running); `opciones`, lo que puedes hacer con
+      // ese hueco: running o bici, a elegir. La bici existe para este día
+      // precisamente —turno C, 12h de pie— y cubre el ciclismo del triatlón.
       if (noResueltos.includes('running') && flexible && !flexible.sesionSecundaria) {
         flexible.sugerencia = {
           sesion: 'running',
-          motivo: 'Esta semana el running no cupo en ningún otro día. Si dormiste bien, el peso va subiendo y no vienes de dos días de gym seguidos, hazlo hoy.',
+          opciones: [...CARDIO_FLEXIBLE],
+          motivo: 'Esta semana el running no cupo en ningún otro día. Si dormiste bien, el peso va subiendo y no vienes de dos días de gym seguidos, haz cardio hoy: running, o bici si los pies vienen castigados de las 12h.',
           cond3Cumplida: flexible.flexibleCond3,
         };
         avisos.push({ semana: ds[0].fecha, fecha: flexible.fecha, tipo: 'running_al_flexible',
-          texto: `Día ${flexible.dia}: el running no cupo en ningún día no-C, así que se propone en el día flexible. La app te preguntará por el sueño y el peso.` });
+          texto: `Día ${flexible.dia}: el running no cupo en ningún día no-C, así que se propone cardio en el día flexible —running o bici, a elegir. La app te preguntará por el sueño y el peso.` });
       }
     }
 

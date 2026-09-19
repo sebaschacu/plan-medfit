@@ -575,6 +575,26 @@ ok('La sesión de bici tiene sus tres bloques Z2', await p.locator('text=/Z2 con
 ok('Y avisa de que el cuádriceps sí trabaja', await p.locator('text=/cuádriceps SÍ trabaja/i').count() > 0);
 await p.close();
 
+// Un flexible que viene de pierna: S3 prohíbe correr al día siguiente, y fijar el
+// flexible a running se saltaría la regla (los fijados no pasan por el generador).
+// Se ofrece solo la bici, con su aviso.
+const flexTrasPierna = agoB.find(d => d.flexible && d.trasPierna && d.flexibleCond3 !== false);
+ok('Hay un flexible tras pierna en agosto para probarlo', !!flexTrasPierna, flexTrasPierna?.fecha);
+if (flexTrasPierna) {
+  p = await nuevaPagina();
+  await abrirDia(p, flexTrasPierna.fecha);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].filter(x => x.textContent.trim() === 'Sí'); b[0]?.click(); });
+  await p.waitForTimeout(250);
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].filter(x => x.textContent.trim() === 'Sí'); b[1]?.click(); });
+  await p.waitForTimeout(500);
+  const opcionesTP = await p.evaluate(() => [...document.querySelectorAll('button')]
+    .map(b => b.textContent.trim()).filter(t => t === 'Running' || t === 'Bici'));
+  ok('Tras pierna NO ofrece running (S3)', !opcionesTP.includes('Running'), opcionesTP.join(', ') || 'ninguna');
+  ok('Pero sí la bici', opcionesTP.includes('Bici'));
+  ok('Y explica que ayer fue pierna', await p.locator('text=/Ayer fue pierna/i').count() > 0);
+  await p.close();
+}
+
 seccion('BOTÓN SÍ/NO ESTABLE ENTRE RENDERS');
 // Si el componente se recreara en cada render, el foco se perdería al pulsar
 p = await nuevaPagina();

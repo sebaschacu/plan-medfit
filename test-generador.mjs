@@ -614,5 +614,24 @@ const gyms18 = l18.filter(d => d.sesion.startsWith('gym'));
 const saltos18 = gyms18.filter((d, i) => i > 0 && d.sesion !== SECUENCIA_GYM[(SECUENCIA_GYM.indexOf(gyms18[i - 1].sesion) + 1) % 5]);
 check(`La cola de gym no se descoloca con el swap-S3 (${saltos18.length} saltos en ${gyms18.length} gyms)`, saltos18.length === 0);
 
+// ── BICI EN EL FLEXIBLE (v7.1) ──
+// El flexible cae en turno C: 12h de pie. La bici es el cardio que no castiga
+// pies ni tibias, y cubre el ciclismo del triatlón. La sugerencia del generador
+// decía solo "running"; ahora dice qué no cupo (running) y qué opciones hay
+// (running o bici). Y anota si el día anterior fue pierna: ahí S3 prohíbe el
+// running y la UI no debe ofrecerlo.
+console.log('\n── BICI EN EL FLEXIBLE ──');
+const flex18 = l18.filter(d => d.flexible);
+check(`Todo flexible sabe si viene de pierna (${flex18.length} flexibles)`, flex18.every(d => typeof d.trasPierna === 'boolean'));
+const flexTrasP = flex18.filter(d => d.trasPierna);
+check(`Los que vienen de pierna lo son de verdad (${flexTrasP.length})`,
+  flexTrasP.length > 0 && flexTrasP.every(d => ES_PIERNA.has(l18[l18.indexOf(d) - 1]?.sesion)));
+check('Y los que no, no', flex18.filter(d => !d.trasPierna).every(d => !ES_PIERNA.has(l18[l18.indexOf(d) - 1]?.sesion)));
+const conSug = flex18.filter(d => d.sugerencia);
+check(`Toda sugerencia del flexible ofrece running Y bici (${conSug.length} sugerencias)`,
+  conSug.length > 0 && conSug.every(d => d.sugerencia.opciones?.includes('running') && d.sugerencia.opciones?.includes('ciclismo')));
+check('La sugerencia sigue diciendo qué no cupo: running', conSug.every(d => d.sugerencia.sesion === 'running'));
+check('Ninguna sugerencia cae en un flexible tras pierna (sería proponer romper S3)', conSug.every(d => !d.trasPierna));
+
 console.log(`\n══ TOTAL: ${pruebas - fallos}/${pruebas} pruebas pasadas ══`);
 process.exit(fallos ? 1 : 0);
