@@ -2,7 +2,7 @@
 // Verifica las reglas del plan contra 6 meses generados, no contra un caso feliz.
 import { generarMes, generarDesdeAncla, FESTIVOS_DEFAULT, franjasCompatibles, deISO, aISO } from './src/generador.js';
 import { SECUENCIA_GYM, SECUENCIA_NATACION, NATACION_CSS, S7_PIERNA, CUPO_SEMANAL, DOBLES, GYM_PIERNA, SESIONES, CARDIO_FLEXIBLE } from './src/data.js';
-import { combinacionValida, ordenDoble, validarSeparacion, POLITICA_FIJADO } from './src/generador.js';
+import { combinacionValida, ordenDoble, validarSeparacion, POLITICA_FIJADO, solapanGym } from './src/generador.js';
 
 const ES_PIERNA = new Set(['gymC1', 'gymC2']);
 const diff = (a, b) => Math.round((deISO(a) - deISO(b)) / 86400000);
@@ -336,7 +336,9 @@ check('Fijar un turno solo pisa ese día, no desplaza la rota',
 // tocaba significaba saltarse un día de pierna, y eso choca con S7.
 const gymsSinFijar = generarMes({ anio: 2026, mes: 8 }).dias.filter(d => d.sesion.startsWith('gym'));
 // Se elige un día que YA es de gym, y se fija a una sesión distinta de la que tocaba
-const diaGymReal = gymsSinFijar.find(d => d.sesion !== 'gymD') ?? gymsSinFijar[0];
+// y que NO solape con ella: así la que tocaba sigue siendo la siguiente. (Si
+// solapara, el guardarraíl la saltaría: ese caso se prueba más abajo.)
+const diaGymReal = gymsSinFijar.find(d => d.sesion !== 'gymD' && !solapanGym(d.sesion, 'gymD')) ?? gymsSinFijar[0];
 const debidaEnEseDia = diaGymReal.sesion;
 const conGym = generarMes({ anio: 2026, mes: 8, fijados: { [diaGymReal.fecha]: { sesion: 'gymD' } } }).dias;
 const gymFijado = conGym.find(d => d.fecha === diaGymReal.fecha);
@@ -349,6 +351,76 @@ check(`Y la que tocaba (${debidaEnEseDia}) NO se pierde: se hace en la siguiente
 const yaTocaba = generarMes({ anio: 2026, mes: 8, fijados: { [diaGymReal.fecha]: { sesion: debidaEnEseDia } } }).dias;
 check('Fijar la sesión que ya tocaba no la repite en la siguiente',
   yaTocaba.filter(d => d.fecha > diaGymReal.fecha && d.sesion.startsWith('gym'))[0]?.sesion !== debidaEnEseDia);
+
+// ── GUARDARRAÍL DE SOLAPES (v7.1) ──
+// 'no-avanza' dejaba la que tocaba justo DESPUÉS del fijado: fijar una D donde
+// tocaba una A es banca dos sesiones seguidas. Medido: 14 solapes en 60
+// combinaciones de un solo día fijado, 0 sin fijar. El guardarraíl salta las que
+// solaparían con la última hecha, avisa, y las saltadas vuelven en la siguiente
+// vuelta de la cola.
+console.log('\n── GUARDARRAÍL DE SOLAPES TRAS FIJAR UN GYM ──');
+check('A y D solapan (banca), en los dos sentidos', solapanGym('gymA', 'gymD') && solapanGym('gymD', 'gymA'));
+check('B y D solapan (dominada)', solapanGym('gymB', 'gymD'));
+check('C1 y C2 solapan (pierna)', solapanGym('gymC1', 'gymC2'));
+check('La misma sesión repetida solapa', solapanGym('gymA', 'gymA') && solapanGym('gymC1', 'gymC1'));
+check('A y B NO solapan: son antagonistas', !solapanGym('gymA', 'gymB') && !solapanGym('gymB', 'gymA'));
+check('La rotación A→C1→D→C2→B→A no tiene ningún par consecutivo que solape',
+  SECUENCIA_GYM.every((s, i) => !solapanGym(s, SECUENCIA_GYM[(i + 1) % SECUENCIA_GYM.length])));
+
+// Caso concreto: fijar D en un día donde tocaba A
+const diaTocaA = gymsSinFijar.find(d => d.sesion === 'gymA');
+const conDsobreA = generarDesdeAncla({ hasta: '2026-12-31', fijados: { [diaTocaA.fecha]: { sesion: 'gymD' } } });
+const trasD = conDsobreA.dias.filter(d => d.fecha > diaTocaA.fecha && d.sesion?.startsWith('gym'));
+check(`Fijar D donde tocaba A (${diaTocaA.fecha.slice(5)}): la siguiente NO es A`,
+  trasD[0]?.sesion !== 'gymA' && !solapanGym('gymD', trasD[0]?.sesion), `siguiente = ${trasD[0]?.sesion}`);
+check('Y deja un aviso solape_evitado en ese día',
+  conDsobreA.avisos.some(a => a.tipo === 'solape_evitado' && a.fecha === trasD[0]?.fecha));
+check('A no se pierde: vuelve dentro de la siguiente vuelta de la cola',
+  trasD.slice(0, SECUENCIA_GYM.length).some(g => g.sesion === 'gymA'));
+
+// El barrido del documento: cada gym fijado en cada día de gym de agosto, y se
+// cuentan los solapes entre gyms CONSECUTIVOS (en orden de sesiones, ignorando
+// los días de otra cosa entre medias) en los 12 meses siguientes.
+const HASTA_BARRIDO = '2027-07-31';
+const ES_P = new Set(['gymC1', 'gymC2']);
+const diasEntre = (a, b) => Math.round((deISO(b) - deISO(a)) / 86400000);
+const medirSolapes = (fijados) => {
+  const { dias, avisos } = generarDesdeAncla({ hasta: HASTA_BARRIDO, fijados });
+  const gyms = dias.filter(d => d.sesion?.startsWith('gym'));
+  let trasFijado = 0, anteFijado = 0, otros = 0;
+  for (let i = 1; i < gyms.length; i++) {
+    const a = gyms[i - 1], b = gyms[i];
+    if (!solapanGym(a.sesion, b.sesion)) continue;
+    if (a.fijado && !a.fijadoAuto) trasFijado++;       // fijado → siguiente generado: lo que arregla el guardarraíl
+    else if (b.fijado && !b.fijadoAuto) anteFijado++;  // generado anterior → fijado: decisión del usuario
+    else otros++;
+  }
+  const piernas = gyms.filter(g => ES_P.has(g.sesion));
+  const s7Generador = piernas.slice(1).filter((p, i) =>
+    diasEntre(piernas[i].fecha, p.fecha) < S7_PIERNA.separacionMinimaDias && !(p.fijado && !p.fijadoAuto)).length;
+  return { transiciones: gyms.length - 1, trasFijado, anteFijado, otros, s7Generador,
+    avisosGuard: avisos.filter(a => a.tipo === 'solape_evitado').length };
+};
+const barridoBase = medirSolapes({});
+check(`Sin fijar: 0 solapes en las ${barridoBase.transiciones} transiciones de 12 meses`,
+  barridoBase.trasFijado + barridoBase.anteFijado + barridoBase.otros === 0 && barridoBase.transiciones >= 150);
+check('Sin fijar el guardarraíl no salta nunca (0 avisos)', barridoBase.avisosGuard === 0);
+
+const gymsAgosto = generarDesdeAncla({ hasta: '2026-08-31' }).dias.filter(d => d.sesion?.startsWith('gym'));
+const combos = gymsAgosto.length * SECUENCIA_GYM.length;
+let bTras = 0, bAnte = 0, bOtros = 0, bS7 = 0, bGuard = 0;
+for (const d of gymsAgosto) for (const g of SECUENCIA_GYM) {
+  const r = medirSolapes({ [d.fecha]: { turno: d.turno, sesion: g } });
+  bTras += r.trasFijado; bAnte += r.anteFijado; bOtros += r.otros; bS7 += r.s7Generador; bGuard += r.avisosGuard;
+}
+check(`Barrido: ${gymsAgosto.length} días de gym × ${SECUENCIA_GYM.length} sesiones = ${combos} combinaciones`, combos === 60);
+check('Con un día fijado: 0 solapes fijado → siguiente generado (eran 14)', bTras === 0, `${bTras}`);
+check('Ningún solape entre dos días generados', bOtros === 0, `${bOtros}`);
+check('El guardarraíl actuó (hay avisos solape_evitado) y solo con fijados', bGuard > 0, `${bGuard} avisos`);
+check('El guardarraíl NO crea violaciones de S7: las que hay son piernas fijadas a mano', bS7 === 0, `${bS7}`);
+// Los que quedan son decisión del usuario: fijar una A justo después de la A que
+// el generador ya había puesto. El guardarraíl no reescribe días anteriores.
+console.log(`  · quedan ${bAnte} solapes "generado anterior → fijado": los provoca el propio fijado, no la cola`);
 
 console.log('\n── FIJAR VARIANTE DE NATACIÓN ──');
 const variantesDe = (fijados = {}) => generarDesdeAncla({ hasta: '2026-12-31', fijados }).dias

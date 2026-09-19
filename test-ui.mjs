@@ -93,7 +93,9 @@ await p.close();
 seccion('EDICIÓN: FIJAR Y RECALCULAR');
 p = await nuevaPagina();
 const antes = await sesionPorDia(p);
-const diaEditable = generarMes(MES_TEST).dias.find(d => d.sesion.startsWith('gym') && d.dia > 3 && d.dia < 25);
+// Un día donde toca gymA: se le va a fijar gymD, que SOLAPA con A (banca). Así se
+// prueba también el guardarraíl, que es lo que decide qué viene después.
+const diaEditable = generarMes(MES_TEST).dias.find(d => d.sesion === 'gymA' && d.dia > 3 && d.dia < 25);
 const antesDelCambio = diaEditable.sesion;
 const SESION_INFO_UI = (await import('./src/data.js')).SESION_INFO;
 await p.locator('button[aria-label="Modo edición"]').click(); await p.waitForTimeout(300);
@@ -108,12 +110,12 @@ await enModal('Guardar'); await p.waitForTimeout(700);
 const tras = await sesionPorDia(p);
 ok(`El día ${diaEditable.dia} queda en Gym D`, tras[diaEditable.dia] === 'Gym D', 'quedó ' + tras[diaEditable.dia]);
 const sig = Object.keys(tras).map(Number).filter(d => d > diaEditable.dia && /^Gym/.test(tras[d])).sort((a, b) => a - b)[0];
-// POLITICA_FIJADO = 'no-avanza': la que tocaba no se pierde, se hace después
-ok('La que tocaba no se pierde: aparece en el siguiente gym',
-  tras[sig] === SESION_INFO_UI[antesDelCambio]?.label || !!tras[sig], `día ${sig} = ${tras[sig]}`);
-ok('Lo posterior se recalcula, no solo ese día',
-  JSON.stringify(Object.entries(antes).filter(([d]) => +d > diaEditable.dia)) !==
-  JSON.stringify(Object.entries(tras).filter(([d]) => +d > diaEditable.dia)));
+// Tocaba A y se fijó D: con 'no-avanza' a secas, A caería justo después (banca dos
+// veces seguidas). El guardarraíl la salta: el siguiente gym no es A ni solapa con D.
+ok('El siguiente gym NO repite el patrón de lo fijado (guardarraíl de solapes)',
+  tras[sig] && tras[sig] !== SESION_INFO_UI[antesDelCambio]?.label && tras[sig] !== 'Gym D', `día ${sig} = ${tras[sig]}`);
+ok('Y el calendario enseña el aviso de por qué se saltó',
+  await p.locator('text=/se repetiría el mismo patrón/i').count() > 0);
 await abrirDia(p, diaEditable.fecha);
 await p.locator('text=/Soltar este día/').first().click(); await p.waitForTimeout(600);
 ok('Soltarlo restaura el calendario original', JSON.stringify(await sesionPorDia(p)) === JSON.stringify(antes));

@@ -30,6 +30,19 @@ export const CUPO_SEMANAL = {
 export const GYM_PIERNA = ['gymC1', 'gymC2'];
 export const GYM_TORSO = ['gymA', 'gymB', 'gymD'];
 
+// ─── v7.1 · Pares de gym que SOLAPAN si van seguidos ───
+// Dos sesiones consecutivas con el mismo patrón principal castigan dos veces la
+// misma zona sin recuperar: banca (A y D), dominada (B y D), pierna (C1 y C2).
+// La misma sesión repetida solapa siempre. A y B NO solapan: son antagonistas,
+// empuje contra tracción. La rotación A→C1→D→C2→B no tiene ningún par
+// consecutivo que solape; solo un gym fijado a mano puede provocarlo, y para
+// eso está el guardarraíl del generador.
+export const GYM_SOLAPAN = [
+  ['gymA', 'gymD'],     // banca
+  ['gymB', 'gymD'],     // dominada
+  ['gymC1', 'gymC2'],   // pierna
+];
+
 export const DOBLES = {
   turnos: {
     L: { permite: true,  condicional: false },

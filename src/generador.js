@@ -20,7 +20,7 @@
 // dos filas de la tabla y reproduce el ejemplo del plan.
 
 import { SECUENCIA_GYM, SECUENCIA_NATACION, NATACION_CSS, PISCINA, VENTANA_PISCINA, CUPO_SEMANAL,
-  PRIORIDAD_TURNO, S7_PIERNA, DOBLES, GYM_PIERNA, GYM_TORSO, ORDEN_DOBLE } from './data.js';
+  PRIORIDAD_TURNO, S7_PIERNA, DOBLES, GYM_PIERNA, GYM_TORSO, GYM_SOLAPAN, ORDEN_DOBLE } from './data.js';
 
 // El cupo y las prioridades se LEEN de data.js: si se hardcodearan aquí, esas
 // constantes volverían a ser decoración y cambiar el plan obligaría a tocar dos
@@ -112,6 +112,18 @@ function semanasDe(desde, hasta) {
 // pierna, y eso choca con S7. Cambiar aquí revierte las dos a la vez.
 export const POLITICA_FIJADO = 'no-avanza';
 
+// ─── Guardarraíl de solapes ───
+// 'no-avanza' tiene un efecto secundario: la que tocaba cae en el hueco JUSTO
+// DESPUÉS del fijado. Si el usuario fija una D y tocaba una A, hace banca dos
+// sesiones seguidas. Medido: 14 solapes en 60 combinaciones de un solo día
+// fijado; 0 sin fijar. El guardarraíl salta las de la cola que solaparían con la
+// última hecha y deja un aviso. Las saltadas vuelven en la siguiente vuelta.
+export function solapanGym(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return GYM_SOLAPAN.some(([x, y]) => (a === x && b === y) || (a === y && b === x));
+}
+
 // ═══════════════ SESIONES DOBLES ═══════════════
 // Sección 2 de la especificación. La natación combina con todo; el running solo
 // con gym de TORSO. Gym de pierna + running está PROHIBIDO, no avisado: es donde
@@ -200,6 +212,7 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
   let natTestHecho = false;           // ¿se ha llegado a hacer el test alguna vez?
   let gymSeguidos = 0;                // S1 — nunca más de 4 gym consecutivos
   let ultimaPierna = null;            // S7 — separación mínima entre días de pierna
+  let ultimoGym = null;               // clave del último gym colocado — guardarraíl de solapes
   const avisos = [];
 
   const nuevoDia = (fecha, turno) => ({
@@ -212,21 +225,36 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
     festivo: festivos.includes(aISO(fecha)),
   });
 
-  const debidaGym = () => SECUENCIA_GYM[((gymIdx % 5) + 5) % 5];
-  const ponerGym = (d) => {
-    const debida = debidaGym();
-    d.sugeridaGym = debida;                 // la que tocaba, para marcarla en la UI
-    const fijado = fijados[d.fecha]?.sesion;
-    const valida = fijado && SECUENCIA_GYM.includes(fijado);
-    d.sesion = valida ? fijado : debida;
-    // Fijar a mano NO avanza la cola (POLITICA_FIJADO): la que tocaba se hace en
-    // la siguiente sesión. Si lo fijado coincide con lo que tocaba, avanza normal
-    // — si no, se repetiría en la siguiente.
-    if (!valida || fijado === debida || POLITICA_FIJADO === 'resincroniza') {
-      if (valida && POLITICA_FIJADO === 'resincroniza') gymIdx = SECUENCIA_GYM.indexOf(fijado) + 1;
-      else gymIdx++;
+  const enCola = (i) => SECUENCIA_GYM[((i % 5) + 5) % 5];
+  const debidaGym = () => enCola(gymIdx);
+
+  // La que toca de verdad: la debida, salvo que solape con el último gym hecho.
+  // Entonces se avanza en la cola hasta la primera que no solape. Cada sesión
+  // solapa como mucho con otras dos (D con A y B), así que siempre se encuentra
+  // una en ≤3 saltos. Sin gyms fijados a mano esto no salta jamás: la rotación
+  // A→C1→D→C2→B no tiene pares consecutivos que solapen.
+  const proximaGym = () => {
+    for (let k = 0; k < SECUENCIA_GYM.length; k++) {
+      const cand = enCola(gymIdx + k);
+      if (!solapanGym(ultimoGym, cand)) return { sesion: cand, saltadas: k };
     }
-    if (ES_PIERNA.has(d.sesion)) ultimaPierna = deISO(d.fecha);
+    return { sesion: debidaGym(), saltadas: 0 };
+  };
+
+  // Coloca en un día LIBRE la que toca y avanza la cola. Los días fijados no
+  // pasan por aquí: los trata el recorrido directamente.
+  const ponerGym = (d, semanaISO) => {
+    const { sesion, saltadas } = proximaGym();
+    d.sugeridaGym = sesion;                 // la que toca, para marcarla en la UI
+    d.sesion = sesion;
+    if (saltadas > 0) {
+      const saltada = debidaGym();
+      avisos.push({ semana: semanaISO, fecha: d.fecha, tipo: 'solape_evitado',
+        texto: `Día ${d.dia}: tocaba ${saltada} pero venías de ${ultimoGym} y se repetiría el mismo patrón dos sesiones seguidas. Se hace ${sesion}; ${saltada} vuelve en la siguiente vuelta de la cola.` });
+    }
+    gymIdx += saltadas + 1;                 // las saltadas se pierden esta vuelta, no se pierden para siempre
+    ultimoGym = sesion;
+    if (ES_PIERNA.has(sesion)) ultimaPierna = deISO(d.fecha);
     return d;
   };
 
@@ -234,7 +262,8 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
   const gymPermitido = (d, seguidosPrevios) => {
     if (!admiteGym(d.turno)) return false;              // PRIORIDAD_TURNO decide (C nunca)
     if (seguidosPrevios >= 4) return false;             // S1
-    const siguiente = SECUENCIA_GYM[((gymIdx % 5) + 5) % 5];
+    // S7 se comprueba sobre la que REALMENTE se pondría, guardarraíl incluido
+    const siguiente = proximaGym().sesion;
     if (ES_PIERNA.has(siguiente) && ultimaPierna) {
       // S7: separación mínima entre días de pierna, leída de data.js
       if (diffDias(deISO(d.fecha), ultimaPierna) < S7_PIERNA.separacionMinimaDias) return false;
@@ -355,6 +384,7 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
         const debida = debidaGym();
         if (d.sesion === debida) gymIdx++;
         else if (POLITICA_FIJADO === 'resincroniza') gymIdx = SECUENCIA_GYM.indexOf(d.sesion) + 1;
+        ultimoGym = d.sesion;                 // el guardarraíl compara contra lo fijado
         if (ES_PIERNA.has(d.sesion)) ultimaPierna = deISO(d.fecha);
         continue;
       }
@@ -362,7 +392,7 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
       if (puestos >= cupo.gym) continue;
       if (!admiteGym(d.turno)) continue;      // PRIORIDAD_TURNO decide (C nunca)
       if (!gymPermitido(d, gymSeguidosAntes(d))) continue;
-      ponerGym(d);
+      ponerGym(d, ds[0].fecha);
       libres.splice(libres.indexOf(d), 1);
       puestos++;
     }
@@ -418,9 +448,9 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
         // combinación válida, y sin romper D2 (dos doblados seguidos)
         // Un 'gym' pendiente se materializa en la sesión que toque de la cola:
         // guardar el token genérico dejaba días con sesionSecundaria: 'gym'.
-        const sesionPendiente = queFalta === 'gym'
-          ? SECUENCIA_GYM[((gymIdx % 5) + 5) % 5]
-          : queFalta;
+        // Con guardarraíl: un gym doblado también es un gym consecutivo.
+        const gymDoble = queFalta === 'gym' ? proximaGym() : null;
+        const sesionPendiente = gymDoble ? gymDoble.sesion : queFalta;
 
         const anfitriones = ds
           .filter(d => d.sesion && !d.sesionSecundaria && DOBLES.turnos[d.turno]?.permite)
@@ -455,8 +485,13 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
 
         }
         host.sesionSecundaria = sesionPendiente;
-        if (queFalta === 'gym') {
-          gymIdx++;
+        if (gymDoble) {
+          if (gymDoble.saltadas > 0) {
+            avisos.push({ semana: ds[0].fecha, fecha: host.fecha, tipo: 'solape_evitado',
+              texto: `Día ${host.dia}: al doblar tocaba ${debidaGym()} pero venías de ${ultimoGym} y se repetiría el patrón. Se dobla ${sesionPendiente}; ${debidaGym()} vuelve en la siguiente vuelta.` });
+          }
+          gymIdx += gymDoble.saltadas + 1;
+          ultimoGym = sesionPendiente;
           if (ES_PIERNA.has(sesionPendiente)) ultimaPierna = deISO(host.fecha);
         }
         host.dobleOrden = ordenDoble(host.sesion, sesionPendiente);
