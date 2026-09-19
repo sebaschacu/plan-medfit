@@ -753,6 +753,42 @@ ok('Los campos de v7 nacen con valor válido',
   typeof dM.rutina === 'object' && typeof dM.extras === 'object');
 await p.close();
 
+// ══ 17 · UN RESPALDO CON EJERCICIOS MALFORMADOS NO DEJA EL CALENDARIO EN BLANCO ══
+// `musculos` es metadata que llegó en la v6. Un respaldo anterior, o uno editado
+// a mano, puede traerlo con otra forma o sin `primario`. VolumenMuscular hacía
+// `ex.musculos.primario.forEach` y reventaba la pantalla del calendario entera
+// —sin mensaje— en cuanto la semana visible contenía esa sesión. Se probaron
+// dos formas rotas distintas, más un ejercicio bien formado que sí debe contar.
+seccion('RESPALDO CON EJERCICIOS MALFORMADOS');
+const gymA4 = ago.find(d => d.fecha === '2026-08-04');   // gymA, semana 1 (lun 3 – dom 9)
+p = await nuevaPagina({
+  v: 3, prs: {}, fijados: {}, extras: {}, css: null,
+  prog: { '2026-08-04': { 'A-1': { sets: [true, true], logs: [{ kg: 40, reps: 8 }, { kg: 40, reps: 8 }] } } },
+  rutina: { gymA: [{ desde: '2026-01-01', motivo: 'prueba', ejercicios: [
+    { id: 'A-1', parte: 1, nombre: 'Press bien formado', series: 4, reps: '5-8', descanso: '3 min',
+      musculos: { primario: ['pecho'], secundario: ['triceps'] } },
+    { id: 'A-2', parte: 1, nombre: 'Press forma v5', series: 3, reps: '6-8', descanso: '2 min',
+      musculos: { pectoral: 1 } },                           // sin primario/secundario
+    { id: 'A-3', parte: 2, nombre: 'Press primario string', series: 3, reps: '8-12', descanso: '60s',
+      musculos: { primario: 'pecho', secundario: null } },   // string en vez de array
+  ] }] },
+});
+// nuevaPagina ya lanza si no se llega al calendario. Hoy (1 ago) cae en la
+// semana 0, sin gymA: el panel arranca ahí. Se pasa a la semana 1, que sí lo tiene.
+ok('El calendario pinta con la rutina malformada cargada', await p.locator('header .lucide-settings').count() === 1);
+await p.locator('button[aria-label="Semana siguiente"]').click(); await p.waitForTimeout(500);
+ok('El panel de volumen sigue en pie en la semana del gym malformado',
+  await p.locator('text=/Volumen por grupo muscular/i').count() === 1
+  && /3 – 9 de Agosto/.test(await p.evaluate(() => document.body.innerText)));
+// innerText separa etiqueta y cifra con un salto de línea: "Pecho\n2 / 11".
+// Las 2 series hechas de A-1 son las que cuentan; A-2 y A-3 aportan 0.
+const pecho = await p.evaluate(() => document.body.innerText.match(/Pecho\s+(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/));
+ok('El ejercicio bien formado sí cuenta (pecho hecho 2, planificado > 0)',
+  pecho && +pecho[1] === 2 && +pecho[2] > 0, pecho ? `${pecho[1]} / ${pecho[2]}` : 'sin fila de pecho');
+ok('Y los malformados no reventaron la página', errores.length === 0, errores.slice(-2).join(' | '));
+ok('Un día de la semana rota se puede abrir', gymA4 && (await abrirDia(p, gymA4.fecha), await p.locator('text=/ejercicios/i').count() > 0));
+await p.close();
+
 
 console.log('\n=== Errores de página: ' + (errores.length || 'ninguno') + ' ===');
 if (errores.length) console.log(errores.slice(0, 5).join('\n'));

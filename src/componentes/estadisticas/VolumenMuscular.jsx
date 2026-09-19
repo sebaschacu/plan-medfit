@@ -66,8 +66,14 @@ const VolumenMuscular = () => {
         // así que son suelo comprometido, no promesa.
         const sPlan = ex.opcional ? 0 : ex.series;
         const sHecho = pDia[ex.id]?.sets?.filter(Boolean).length || 0;
-        ex.musculos.primario.forEach(m => { add(plan, m, sPlan); add(hecho, m, sHecho); });
-        ex.musculos.secundario.forEach(m => { add(plan, m, sPlan * 0.5); add(hecho, m, sHecho * 0.5); });
+        // `musculos` viene de la rutina, que puede ser IMPORTADA: un respaldo
+        // anterior a la v6, o editado a mano, puede traerlo con otra forma
+        // ({ pectoral: 1 }) o sin `primario`. Mismo patrón que validador.js:
+        // lo que no sea un array cuenta como vacío, no revienta el calendario.
+        const prim = Array.isArray(ex.musculos.primario) ? ex.musculos.primario : [];
+        const sec = Array.isArray(ex.musculos.secundario) ? ex.musculos.secundario : [];
+        prim.forEach(m => { add(plan, m, sPlan); add(hecho, m, sHecho); });
+        sec.forEach(m => { add(plan, m, sPlan * 0.5); add(hecho, m, sHecho * 0.5); });
       });
     });
 

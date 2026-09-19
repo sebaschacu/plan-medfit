@@ -10,7 +10,7 @@ Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 | # | Comando | Baseline |
 |---|---|---|
 | 1 · Lógica | `npm test` | 92/92 + 66/66 = **158** |
-| 2a · Interfaz | `npm run test:ui` | **142/142** · 0 errores de página |
+| 2a · Interfaz | `npm run test:ui` | **147/147** · 0 errores de página (142 al cerrar la Tarea 1; +5 en Tarea 2 · 1.1) |
 | 2b · Auditoría | `npm run audit` | **21/21** · 0 errores de página |
 | 3 · Lint | `npx oxlint` | **0 avisos / 0 errores** |
 | 4 · Build | `npm run build` | compila · 352 kB (gzip 104) |
@@ -168,19 +168,32 @@ Requiere `npx playwright install chromium` una vez.
 Cosas que aparecieron al refactorizar y que NO se tocan aquí, porque la Tarea 1
 es movimiento puro de código.
 
-### `VolumenMuscular` deja el calendario en blanco con un ejercicio malformado
+### ~~`VolumenMuscular` deja el calendario en blanco con un ejercicio malformado~~ — RESUELTO (Tarea 2 · 1.1)
 
-`ex.musculos.primario.forEach(...)` en `VolumenMuscular` revienta si un
-ejercicio de una rutina editada no trae `musculos.primario`. Un respaldo
-editado a mano o de una versión anterior lo provoca, y el resultado es la
-pantalla del calendario vacía sin ningún aviso.
+`ex.musculos.primario.forEach(...)` reventaba si un ejercicio de una rutina
+importada no traía `musculos.primario` como array. `musculos` es metadata de
+la v6: un respaldo anterior, o editado a mano, no lo tiene o lo tiene con otra
+forma. El resultado era el calendario en blanco sin ningún aviso, en cuanto la
+semana visible contenía esa sesión.
 
-`validador.js:239` ya lo hace bien: `(e.musculos?.primario ?? [])`. Aplicar el
-mismo patrón a las dos líneas de `VolumenMuscular` (primario y secundario).
+**Arreglo:** `Array.isArray(ex.musculos.primario) ? ... : []` para primario y
+secundario. Más estricto que el `?? []` de `validador.js`: cubre también
+`primario: 'pecho'` (string) o `primario: 1`, que harían reventar el
+`.forEach` igualmente.
 
-Detectado el 2026-09-11 porque dos semillas de `test-ui.mjs` tenían esa forma
-incorrecta y la semana actual incluía un gymA. Las semillas se corrigieron; la
-robustez de la app, no.
+**Test:** sección "RESPALDO CON EJERCICIOS MALFORMADOS" en `test-ui.mjs`.
+Siembra tres ejercicios en gymA —uno bien formado, uno con `{ pectoral: 1 }`
+(la forma que causó el fallo real) y uno con `primario: 'pecho'`— y comprueba
+que el calendario pinta, que el panel de volumen sobrevive al pasar a la
+semana del gym, que el bien formado cuenta (Pecho 2 / 11) y que no hay errores
+de página. Verificado en las dos direcciones: contra el código sin arreglo
+fallan 4 de las 5 aserciones con el error original.
+
+**Revisión del resto de `src/`:** era el único acceso de dos niveles sin guarda
+sobre datos importados. `validador.js` normaliza en `cargaDe()`, `reglas.js`
+usa `p?.logs || []` y filtra `l && l.reps != null`, y los componentes leen
+campos de ejercicio a un nivel (`ex.bs`, `ex.rir`), donde `undefined` es
+inocuo.
 
 ### ~~La suite de UI depende de la fecha real~~ — RESUELTO (Tarea 2, bloque 0)
 
