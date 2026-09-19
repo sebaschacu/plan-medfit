@@ -136,7 +136,11 @@ export function historialEjercicio(progress = {}, exId, hasta = null) {
     .filter(([fecha]) => !hasta || fecha < hasta)
     .map(([fecha, dia]) => {
       const p = dia?.[exId];
-      const logs = (p?.logs ?? []).filter(l => l && (l.kg != null || l.reps != null));
+      // Una serie cuenta como HECHA si tiene reps anotadas o está marcada. Solo
+      // kg, sin marcar, es un plan: el botón "usar sugerido" escribe la carga en
+      // las series antes de hacerlas, y si ese día no se entrena no puede quedar
+      // como sesión fantasma en el historial ("42.5 kg × –, –, –, –").
+      const logs = (p?.logs ?? []).filter((l, i) => l && (l.reps != null || p?.sets?.[i]));
       if (!logs.length && p?.lastre == null) return null;
       return {
         fecha,

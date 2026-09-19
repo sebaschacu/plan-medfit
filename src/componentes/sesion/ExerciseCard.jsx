@@ -11,6 +11,9 @@ const ExerciseCard = ({ ex, prog, pr, color, avisoReset, ultima, sugerencia }) =
   const p = prog || { sets: [], logs: [], lastre: null };
   const allDone = setCount > 0 && p.sets?.length === setCount && p.sets.every(Boolean);
   const isPR = pr?.flash;
+  // ¿La carga sugerida ya está en todas las series? Entonces "Usar" no haría nada.
+  const yaUsado = sugerencia?.kg != null && setCount > 0
+    && Array.from({ length: setCount }).every((_, i) => p.logs?.[i]?.kg === sugerencia.kg);
 
   return (
     <div className={`rounded-lg border transition-all ${allDone ? 'border-emerald-600/50 bg-emerald-950/10' : 'border-[#232c34] bg-[#151b21]'}`}>
@@ -74,13 +77,22 @@ const ExerciseCard = ({ ex, prog, pr, color, avisoReset, ultima, sugerencia }) =
                     Sugerido: {sugerencia.kg != null ? `${sugerencia.kg} kg` : '—'}
                   </span>
                   {/* Un toque en vez de teclear la misma cifra en cada serie.
-                      Solo rellena las que aún no tienen carga: nunca pisa lo anotado. */}
+                      Solo rellena las que aún no tienen carga: nunca pisa lo anotado.
+                      Los campos de kg no se ven hasta marcar la serie, así que el
+                      botón tiene que decir por sí mismo que ya está hecho. */}
                   {sugerencia.kg != null && onUsarSugerido && (
-                    <button onClick={() => onUsarSugerido(ex.id, sugerencia.kg, setCount)}
-                      aria-label={`Usar ${sugerencia.kg} kg en ${ex.nombre}`}
-                      className="text-[9px] font-bold uppercase px-2 py-0.5 rounded border border-current opacity-90">
-                      Usar
-                    </button>
+                    yaUsado ? (
+                      <span aria-label={`${sugerencia.kg} kg puestos en las ${setCount} series de ${ex.nombre}`}
+                        className="text-[9px] font-bold uppercase px-2 py-0.5 rounded border border-current/40 opacity-70 flex items-center gap-1">
+                        <Check size={9} strokeWidth={3} /> Puesto
+                      </span>
+                    ) : (
+                      <button onClick={() => onUsarSugerido(ex.id, sugerencia.kg, setCount)}
+                        aria-label={`Usar ${sugerencia.kg} kg en ${ex.nombre}`}
+                        className="text-[9px] font-bold uppercase px-2 py-0.5 rounded border border-current opacity-90">
+                        Usar
+                      </button>
+                    )
                   )}
                 </div>
                 <span className="text-slate-500">{sugerencia.motivo}</span>

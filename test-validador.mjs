@@ -253,5 +253,28 @@ check('El isométrico progresa en tiempo hasta 60s (P3)',
 
 check('Primera vez lo dice en vez de dejar un hueco', RG.sugerirCarga(banca, {}).tipo === 'primera');
 
+// ── Sesión fantasma · "usar sugerido" sin entrenar (v7.1) ──
+// El botón escribe la carga en las series ANTES de hacerlas. Si ese día no se
+// entrena, unos kg sin reps ni serie marcada no son una sesión: no cuentan en
+// el historial ni cambian la sugerencia siguiente.
+console.log('\n── SESIÓN FANTASMA ──');
+const hecha = { 'A-1': { sets: [true, true, true, true], logs: Array(4).fill({ kg: 40, reps: 8 }) } };
+const fantasma = { 'A-1': { sets: [], logs: Array(4).fill({ kg: 42.5 }) } };   // "usar" y no entrenar
+const conFantasma = { '2026-08-01': hecha, '2026-08-04': fantasma };
+check('Solo kg sin marcar ni reps NO cuenta como sesión',
+  RG.historialEjercicio(conFantasma, 'A-1').length === 1);
+check('La última sesión sigue siendo la real', RG.ultimaSesion(conFantasma, 'A-1')?.fecha === '2026-08-01');
+const sTras = RG.sugerirCarga(banca, conFantasma);
+check('Y la sugerencia sigue siendo subir a 42.5, no "0 reps máx"',
+  sTras.tipo === 'subir' && sTras.kg === 42.5, `${sTras.tipo} ${sTras.kg}`);
+// Lo que SÍ cuenta: serie marcada aunque no se anoten reps, y reps aunque no se marque
+const marcadaSinReps = { '2026-08-01': { 'A-1': { sets: [true, true], logs: [{ kg: 40 }, { kg: 40 }] } } };
+check('Serie marcada sin reps sí cuenta (hiciste la serie, olvidaste las reps)',
+  RG.historialEjercicio(marcadaSinReps, 'A-1').length === 1 && RG.ultimaSesion(marcadaSinReps, 'A-1').kgMax === 40);
+const repsSinMarcar = { '2026-08-01': { 'A-1': { sets: [], logs: [{ kg: 40, reps: 8 }] } } };
+check('Reps anotadas sin marcar sí cuentan', RG.historialEjercicio(repsSinMarcar, 'A-1').length === 1);
+check('Dos fantasmas seguidos no disparan un reset (P6)',
+  RG.sugerirCarga(banca, { '2026-08-01': hecha, '2026-08-04': fantasma, '2026-08-08': fantasma }).tipo !== 'reset');
+
 console.log(`\n══ TOTAL VERIFICADOR + RUTINA + PROGRESIÓN: ${pruebas - fallos}/${pruebas} ══`);
 process.exit(fallos ? 1 : 0);

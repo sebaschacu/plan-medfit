@@ -653,6 +653,22 @@ ok('Rellena la carga en todas las series', logsU.length === 4 && logsU.every(l =
   JSON.stringify(logsU));
 ok('Sin tocar las reps: la sugerencia es de carga, no de ejecución',
   logsU.every(l => l?.reps == null));
+// Los campos de kg no se ven hasta marcar la serie: el botón tiene que confirmar por sí solo
+ok('El botón pasa a "Puesto": se ve que ya está hecho',
+  await p.locator('span[aria-label*="42.5 kg puestos en las 4 series"]').count() === 1 && await btnU.count() === 0);
+// Y si no se entrena ese día, esos kg no son una sesión. Desde el SIGUIENTE gymA,
+// la "Última vez" tiene que seguir siendo la real (3 de agosto), no el fantasma.
+const gymU2 = mesU.find(d => d.sesion === 'gymA' && d.fecha > gymU.fecha);
+ok('Hay otro gymA en agosto para comprobarlo', !!gymU2, gymU2?.fecha);
+if (gymU2) {
+  await p.locator('text=Calendario').first().click(); await p.waitForTimeout(400);
+  await abrirDia(p, gymU2.fecha);
+  const txtU2 = await p.evaluate(() => document.body.innerText);
+  ok('Sin marcar ninguna serie, "Última vez" sigue siendo el 3 de agosto: no hay sesión fantasma',
+    /Última vez \(03\/08\)/.test(txtU2), (txtU2.match(/Última vez \([^)]+\)/) ?? ['sin última vez'])[0]);
+  ok('Y la sugerencia sigue siendo subir a 42.5, no "0 reps máx"',
+    /Sugerido: 42\.5 kg/.test(txtU2) && !/0 reps máx/.test(txtU2));
+}
 await p.close();
 
 // ══ 13 · SELECTOR DE VARIANTE: SOLTAR Y PROTEGER EL REGISTRO ══
