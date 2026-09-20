@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight, Check, Activity, Settings, ArrowLeft } from 'lucide-react';
 import { usePlanCtx, useProgresoCtx, useAccionesCtx } from '../../estado/contextos.js';
+import { COLUMNA } from '../../utiles/constantes-ui.js';
 
 // Cabecera del calendario: navegación de mes, estado de guardado, acceso a la
 // biblioteca y el modo edición con su panel de exportar/importar.
@@ -10,7 +11,7 @@ const BarraCalendario = ({ onBiblioteca, editMode, setEditMode }) => {
   const { cambiarMes: onMes, onExportar, onImportar } = useAccionesCtx();
   return (
   <header className="sticky top-0 z-30 bg-[#0f1417]/95 backdrop-blur border-b border-[#232c34]">
-    <div className="px-4 py-4 flex items-center justify-between gap-2">
+    <div className={`px-4 py-4 flex items-center justify-between gap-2 ${COLUMNA}`}>
       <div className="min-w-0">
         <div className="flex items-center gap-1.5">
           <button onClick={() => onMes(-1)} aria-label="Mes anterior" disabled={!hayMesAnterior}
@@ -43,7 +44,7 @@ const BarraCalendario = ({ onBiblioteca, editMode, setEditMode }) => {
       </button>
     </div>
     {editMode && (
-      <div className="px-4 pb-3 space-y-2">
+      <div className={`px-4 pb-3 space-y-2 ${COLUMNA}`}>
         <div className="px-3 py-2 rounded-lg bg-emerald-950/30 border border-emerald-800/40">
           <p className="text-[11px] text-emerald-300">
             Modo edición: toca un día para cambiar su turno o su sesión. El día queda <span className="font-bold">fijado</span> y el resto del calendario se recalcula respetándolo — la cola de gym se resincroniza sola.

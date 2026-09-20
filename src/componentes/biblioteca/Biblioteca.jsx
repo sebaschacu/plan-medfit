@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { SESION_INFO, GRUPOS_SESION } from '../../data.js';
+import { COLUMNA } from '../../utiles/constantes-ui.js';
 import IconFor from '../comunes/IconFor.jsx';
 
 // ═══════════════ BIBLIOTECA DE RUTINAS ═══════════════
@@ -16,14 +17,16 @@ const Biblioteca = ({ onAbrir, onCerrar }) => {
   }, []);
   return (
     <div className="min-h-screen bg-[#0f1417]">
-      <header className="sticky top-0 z-30 bg-[#0f1417]/95 backdrop-blur border-b border-[#232c34] px-4 py-3">
-        <button onClick={onCerrar} className="flex items-center gap-1.5 text-slate-400 text-xs font-bold uppercase tracking-wide mb-2">
-          <ArrowLeft size={14} /> Calendario
-        </button>
-        <h1 className="text-xl font-bold text-slate-50 leading-none">Biblioteca de rutinas</h1>
-        <p className="text-[11px] text-slate-500 mt-1">Qué trae cada sesión. Solo consulta.</p>
+      <header className="sticky top-0 z-30 bg-[#0f1417]/95 backdrop-blur border-b border-[#232c34]">
+        <div className={`px-4 py-3 ${COLUMNA}`}>
+          <button onClick={onCerrar} className="flex items-center gap-1.5 text-slate-400 text-xs font-bold uppercase tracking-wide mb-2">
+            <ArrowLeft size={14} /> Calendario
+          </button>
+          <h1 className="text-xl font-bold text-slate-50 leading-none">Biblioteca de rutinas</h1>
+          <p className="text-[11px] text-slate-500 mt-1">Qué trae cada sesión. Solo consulta.</p>
+        </div>
       </header>
-      <main className="px-3 py-3 max-w-2xl mx-auto pb-16 space-y-4">
+      <main className={`px-3 py-3 ${COLUMNA} pb-16 space-y-4`}>
         {Object.entries(GRUPOS_SESION).map(([gk, gv]) => {
           const items = porGrupo[gk] ?? [];
           if (!items.length) return null;

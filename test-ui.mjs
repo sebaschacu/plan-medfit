@@ -838,6 +838,36 @@ ok('Los campos de v7 nacen con valor válido',
   typeof dM.rutina === 'object' && typeof dM.extras === 'object');
 await p.close();
 
+// ══ 15b · ANCHO MÁXIMO EN ESCRITORIO ══
+// La app es de móvil. En pantalla ancha el contenido ya iba centrado, pero las
+// cabeceras no: sus botones acababan uno en cada extremo del monitor. Ahora
+// cabecera y contenido son una columna de 768 px. En móvil no cambia nada.
+seccion('ANCHO MÁXIMO EN ESCRITORIO');
+const medidas = () => p.evaluate(() => {
+  const r = (el) => { const b = el?.getBoundingClientRect(); return b ? { x: Math.round(b.left), w: Math.round(b.width), dcha: Math.round(b.right) } : null; };
+  const header = document.querySelector('header');
+  const barra = header?.querySelector(':scope > div');
+  const ajustes = header?.querySelector('button[aria-label="Modo edición"]');
+  return { pantalla: window.innerWidth, header: r(header), barra: r(barra), main: r(document.querySelector('main')), ajustes: r(ajustes) };
+});
+p = await nuevaPagina(undefined, { viewport: { width: 1280, height: 900 } });
+const mPC = await medidas();
+ok('En PC (1280) el fondo de la cabecera sigue a todo el ancho', mPC.header.w === 1280, `${mPC.header.w}px`);
+ok('Pero su contenido es una columna de como mucho 768 px', mPC.barra.w <= 768 && mPC.barra.w >= 700, `${mPC.barra.w}px`);
+ok('Centrada', Math.abs(mPC.barra.x - (1280 - mPC.barra.w) / 2) <= 1, `x=${mPC.barra.x}`);
+ok('El contenido mide lo mismo que la cabecera', Math.abs(mPC.main.w - mPC.barra.w) <= 1, `main ${mPC.main.w} · cabecera ${mPC.barra.w}`);
+ok('El botón de ajustes ya no está en el borde del monitor', mPC.ajustes.dcha <= mPC.barra.dcha && mPC.ajustes.dcha < 1280 - 200, `borde dcho a ${mPC.ajustes.dcha}px de 1280`);
+// La sesión también
+await abrirDia(p, ago.find(d => d.sesion === 'gymA').fecha);
+const mSes = await medidas();
+ok('La cabecera de la sesión también va en columna', mSes.barra.w <= 768 && Math.abs(mSes.barra.w - mSes.main.w) <= 1, `${mSes.barra.w} / ${mSes.main.w}`);
+await p.close();
+// Y en móvil, todo a pantalla completa como siempre
+p = await nuevaPagina();
+const mMov = await medidas();
+ok('En móvil (430) la columna es la pantalla entera', mMov.barra.w === 430 && mMov.main.w === 430, `${mMov.barra.w} / ${mMov.main.w}`);
+await p.close();
+
 // ══ 16a · LOS MÚSCULOS DE CADA EJERCICIO, VISIBLES SIN TOCAR NADA ══
 // El dato ya estaba en data.js para las estadísticas; ahora se enseña bajo el
 // nombre: primarios delante y marcados, secundarios detrás y apagados.

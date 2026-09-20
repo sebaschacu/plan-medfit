@@ -3,7 +3,7 @@ import { Moon, Trophy, RotateCcw, ChevronRight, Settings, ArrowLeft, Star, Alert
 import { SESION_INFO, SESIONES, PARTES, PISCINA_DURACION_MIN } from '../../data.js';
 import { S4, ultimaSesion, sugerirCarga } from '../../reglas.js';
 import { estaEditada, huerfanosDelDia } from '../../rutina.js';
-import { VACIO } from '../../utiles/constantes-ui.js';
+import { VACIO, COLUMNA } from '../../utiles/constantes-ui.js';
 import { mesDeISO } from '../../utiles/formato.js';
 import { contarRender } from '../../utiles/medir.js';
 import { usePlanCtx, useProgresoCtx, useAccionesCtx } from '../../estado/contextos.js';
@@ -70,7 +70,7 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
   return (
     <div className="min-h-screen bg-[#0f1417]">
       <header className="sticky top-0 z-30 bg-[#0f1417]/95 backdrop-blur border-b border-[#232c34]">
-        <div className="px-4 py-3">
+        <div className={`px-4 py-3 ${COLUMNA}`}>
           <button onClick={onBack} className="flex items-center gap-1.5 text-slate-400 text-xs font-bold uppercase tracking-wide mb-2">
             <ArrowLeft size={14} /> Calendario
           </button>
@@ -112,7 +112,7 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
         </div>
       </header>
 
-      <main className="px-4 py-4 max-w-2xl mx-auto pb-32">
+      <main className={`px-4 py-4 ${COLUMNA} pb-32`}>
         {/* Aviso de festivo */}
         {diaData.festivo && (
           <div className="mb-3 px-3 py-2.5 rounded-lg border-l-4 border-rose-500 bg-rose-950/20 flex items-start gap-2">

@@ -2,7 +2,7 @@ import React, { useMemo, useCallback } from 'react';
 import { Check, Circle, Settings, Star, AlertTriangle } from 'lucide-react';
 import { TURNO_INFO, SESION_INFO, SESIONES, DIAS_SEMANA } from '../../data.js';
 import { resolverRutina } from '../../rutina.js';
-import { COMPLETADO } from '../../utiles/constantes-ui.js';
+import { COMPLETADO, COLUMNA } from '../../utiles/constantes-ui.js';
 import { hexARgba } from '../../utiles/formato.js';
 import { contarRender } from '../../utiles/medir.js';
 import { usePlanCtx, useProgresoCtx, useAccionesCtx } from '../../estado/contextos.js';
@@ -94,7 +94,7 @@ const CalendarView = ({ onEditDay, editMode, setEditMode, onBiblioteca }) => {
     <div className="min-h-screen bg-[#0f1417]">
       <BarraCalendario onBiblioteca={onBiblioteca} editMode={editMode} setEditMode={setEditMode} />
 
-      <main className="px-2 py-4 max-w-2xl mx-auto pb-24">
+      <main className={`px-2 py-4 ${COLUMNA} pb-24`}>
         {/* Leyenda de turnos */}
         <div className="flex items-center gap-3 justify-center mb-4 flex-wrap px-2">
           {Object.entries(TURNO_INFO).map(([k, v]) => (

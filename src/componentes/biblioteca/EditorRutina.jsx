@@ -4,6 +4,7 @@ import { SESION_INFO, MUSCULOS } from '../../data.js';
 import { verificarSesion } from '../../validador.js';
 import { catalogoEjercicios, nuevoId, mover, gruposBS, resolverRutina, estaEditada } from '../../rutina.js';
 import { usePlanCtx } from '../../estado/contextos.js';
+import { COLUMNA } from '../../utiles/constantes-ui.js';
 import NumInput from '../comunes/NumInput.jsx';
 
 // ═══════════════ EDITOR DE RUTINA ═══════════════
@@ -67,7 +68,7 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
   return (
     <div className="min-h-screen bg-[#0f1417]">
       <header className="sticky top-0 z-30 bg-[#0f1417]/95 backdrop-blur border-b border-[#232c34]">
-        <div className="px-4 py-3">
+        <div className={`px-4 py-3 ${COLUMNA}`}>
           <button onClick={onCerrar} className="flex items-center gap-1.5 text-slate-400 text-xs font-bold uppercase tracking-wide mb-2">
             <ArrowLeft size={14} /> Salir sin guardar
           </button>
@@ -79,7 +80,7 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
         </div>
 
         {/* Verificador en vivo */}
-        <div className="px-4 pb-3">
+        <div className={`px-4 pb-3 ${COLUMNA}`}>
           {res.duras.length === 0 && res.blandas.length === 0 ? (
             <div className="px-3 py-2 rounded-lg bg-emerald-950/30 border border-emerald-800/40 flex items-center gap-2">
               <Check size={14} className="text-emerald-400" strokeWidth={3} />
@@ -108,7 +109,7 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
         </div>
       </header>
 
-      <main className="px-3 py-3 max-w-2xl mx-auto pb-32 space-y-2">
+      <main className={`px-3 py-3 ${COLUMNA} pb-32 space-y-2`}>
         {lista.map((ex, i) => {
           const senalado = [...res.duras, ...res.blandas].some(h => h.ejercicios?.includes(ex.id));
           return (
@@ -209,7 +210,7 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
 
       {/* Guardar */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#0f1417]/95 backdrop-blur border-t border-[#232c34] p-3">
-        <div className="max-w-2xl mx-auto space-y-2">
+        <div className={`${COLUMNA} space-y-2`}>
           <input value={motivo} onChange={e => setMotivo(e.target.value)} aria-label="Motivo del cambio"
             placeholder="¿Por qué lo cambias? Opcional: si lo dejas vacío queda «Sin motivo»"
             className="w-full h-9 px-2 bg-[#151b21] border border-[#2a3540] focus:border-emerald-600 focus:outline-none text-slate-100 text-xs rounded" />
