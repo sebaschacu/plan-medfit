@@ -549,6 +549,34 @@ await p.waitForTimeout(400);
 ok('La sesión se marca como editada', await p.locator('text=/· editada/').count() > 0);
 await p.close();
 
+// ══ 10b · AÑADIR EJERCICIO: AGRUPADO POR MÚSCULO ══
+// La lista de candidatos salía plana (y cortada a 40). Ahora se agrupa por el
+// músculo primario, con cabecera desplegable como el menú de sesiones. Cerrados
+// al abrir; al buscar se abren todos.
+seccion('EDITOR · AÑADIR AGRUPADO POR MÚSCULO');
+p = await nuevaPagina();
+await abrirDia(p, diaGymE.fecha);
+await p.locator('text=/Editar esta rutina/').first().click(); await p.waitForTimeout(600);
+await p.locator('button', { hasText: 'Añadir ejercicio' }).click(); await p.waitForTimeout(400);
+const grupos = () => p.evaluate(() => [...document.querySelectorAll('button[aria-label^="Músculo "]')]
+  .map(b => ({ label: b.getAttribute('aria-label').replace('Músculo ', ''), abierto: b.getAttribute('aria-expanded') === 'true' })));
+const g0 = await grupos();
+ok('Los candidatos vienen agrupados por músculo (cabeceras)', g0.length >= 8, `${g0.length} grupos: ${g0.slice(0, 6).map(g => g.label).join(', ')}…`);
+ok('Todos los grupos empiezan cerrados', g0.every(g => !g.abierto));
+ok('Sin abrir nada no se ve ningún ejercicio', await p.locator('button:has-text("Jalón pesado")').count() === 0);
+ok('Empuje antes que tracción (el orden de MUSCULOS)', g0.findIndex(g => g.label === 'Pecho') < g0.findIndex(g => g.label === 'Dorsal'));
+await p.locator('button[aria-label="Músculo Dorsal"]').click(); await p.waitForTimeout(300);
+ok('Abrir "Dorsal" enseña sus ejercicios', await p.locator('button:has-text("Jalón pesado")').count() > 0);
+ok('Y solo los suyos: los de pecho siguen ocultos', await p.locator('button:has-text("Fondos en paralelas")').count() === 0);
+await p.locator('input[aria-label="Buscar ejercicio"]').fill('flexiones'); await p.waitForTimeout(400);
+const gBusca = await grupos();
+ok('Al buscar, los grupos que quedan se abren solos', gBusca.length > 0 && gBusca.every(g => g.abierto), gBusca.map(g => g.label).join(', '));
+ok('Y solo aparecen las coincidencias', await p.locator('button:has-text("Flexiones")').count() > 0 && await p.locator('button:has-text("Jalón pesado")').count() === 0);
+await p.locator('button:has-text("Flexiones")').first().click(); await p.waitForTimeout(400);
+ok('Añadir desde el grupo funciona', await p.locator('main').locator('text=/Flexiones/').count() > 0
+  && await p.locator('input[aria-label="Buscar ejercicio"]').count() === 0);
+await p.close();
+
 // ══ 11 · BICI, BOTÓN ESTABLE Y DESCARGA ══
 seccion('BICI EN EL DÍA FLEXIBLE');
 const agoB = generarMes({ anio: 2026, mes: 7 }).dias;

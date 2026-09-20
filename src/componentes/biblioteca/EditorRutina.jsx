@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ArrowLeft, Check, AlertTriangle, ChevronLeft, ChevronRight, X, RotateCcw } from 'lucide-react';
-import { SESION_INFO } from '../../data.js';
+import { SESION_INFO, MUSCULOS } from '../../data.js';
 import { verificarSesion } from '../../validador.js';
 import { catalogoEjercicios, nuevoId, mover, gruposBS, resolverRutina, estaEditada } from '../../rutina.js';
 import { usePlanCtx } from '../../estado/contextos.js';
@@ -29,8 +29,26 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
   const yaEstan = new Set(lista.map(e => e.id));
   const candidatos = catalogo
     .filter(e => !yaEstan.has(e.id))
-    .filter(e => !busca || e.nombre.toLowerCase().includes(busca.toLowerCase()))
-    .slice(0, 40);
+    .filter(e => !busca || e.nombre.toLowerCase().includes(busca.toLowerCase()));
+
+  // Agrupados por su músculo PRIMARIO principal (el primero de la lista), en el
+  // orden en que MUSCULOS los declara: empuje, tracción, pierna, core. Un
+  // ejercicio sin músculos va a "Otros". Mismo patrón que el menú de sesiones:
+  // cabecera por grupo, desplegable. Cerrados al abrir; al buscar se abren
+  // todos, porque lo que quieres ver es la coincidencia.
+  const porMusculo = useMemo(() => {
+    const g = new Map();
+    for (const e of candidatos) {
+      const k = Array.isArray(e.musculos?.primario) && e.musculos.primario[0] ? e.musculos.primario[0] : 'otros';
+      if (!g.has(k)) g.set(k, []);
+      g.get(k).push(e);
+    }
+    const orden = [...Object.keys(MUSCULOS), 'otros'];
+    return [...g.entries()].sort((a, b) => orden.indexOf(a[0]) - orden.indexOf(b[0]));
+  }, [candidatos]);
+  const [abiertos, setAbiertos] = useState(() => new Set());
+  const alternar = (k) => setAbiertos(s => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const desplegado = (k) => !!busca || abiertos.has(k);
 
   const editar = (i, cambio) => setLista(l => l.map((e, j) => j === i ? { ...e, ...cambio } : e));
   const quitar = (i) => setLista(l => l.filter((_, j) => j !== i));
@@ -140,14 +158,36 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
           <div className="rounded-lg border border-[#232c34] bg-[#151b21] p-2.5">
             <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar ejercicio…" aria-label="Buscar ejercicio"
               className="w-full h-9 px-2 mb-2 bg-[#0f1417] border border-[#2a3540] focus:border-emerald-600 focus:outline-none text-slate-100 text-xs rounded" />
-            <div className="max-h-64 overflow-y-auto space-y-1">
-              {candidatos.map(e => (
-                <button key={e.origen + e.id} onClick={() => anadir(e)}
-                  className="w-full text-left px-2 py-1.5 rounded border border-[#232c34] hover:border-emerald-700">
-                  <div className="text-[12px] text-slate-200">{e.nombre}</div>
-                  <div className="text-[9px] text-slate-600">{SESION_INFO[e.origen]?.label ?? e.origen}</div>
-                </button>
-              ))}
+            <div className="max-h-72 overflow-y-auto space-y-1">
+              {porMusculo.map(([k, ejs]) => {
+                const m = MUSCULOS[k];
+                const label = m?.label ?? 'Otros';
+                const color = m?.color ?? '#94a3b8';
+                const abierto = desplegado(k);
+                return (
+                  <div key={k} className="rounded-lg border border-[#2a3540] overflow-hidden">
+                    <button onClick={() => alternar(k)}
+                      aria-label={`Músculo ${label}`} aria-expanded={abierto}
+                      className="w-full px-2.5 py-2 flex items-center gap-2 text-left">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+                      <span className="text-xs font-bold flex-1" style={{ color }}>{label}</span>
+                      <span className="text-[10px] text-slate-500">{ejs.length}</span>
+                      <ChevronRight size={14} className={`text-slate-500 transition-transform ${abierto ? 'rotate-90' : ''}`} />
+                    </button>
+                    {abierto && (
+                      <div className="space-y-1 p-2 pt-0">
+                        {ejs.map(e => (
+                          <button key={e.origen + e.id} onClick={() => anadir(e)}
+                            className="w-full text-left px-2 py-1.5 rounded border border-[#232c34] hover:border-emerald-700">
+                            <div className="text-[12px] text-slate-200">{e.nombre}</div>
+                            <div className="text-[9px] text-slate-600">{SESION_INFO[e.origen]?.label ?? e.origen}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {!candidatos.length && <p className="text-[11px] text-slate-600 py-2 text-center">Nada que coincida.</p>}
             </div>
             <button onClick={() => { setAnadiendo(false); setBusca(''); }}
