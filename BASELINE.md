@@ -163,6 +163,37 @@ Requiere `npx playwright install chromium` una vez.
 2. `test-snapshot.mjs` + `baseline-snapshot.json` — la puerta 5, nueva.
 3. `package.json` — el script `test:snapshot`.
 
+## Tarea 2 · lo hecho y lo que queda por decidir
+
+Doce puntos en tres bloques, un commit cada uno (`4a02914..0c79e60`). Los
+números del plan salen de `npm run audit:plan`; al cerrar el bloque 1:
+
+```
+  gym 3.00 · natación 2.00 · running 0.81 (era 0.71) · bici 0.00 (ofrecida en 15)
+  semanas sin correr 15/78 (eran 23) · dobles 43 · solapes fijado→siguiente 0 (eran 14)
+```
+
+Tres de los puntos (1.4, 1.5 y la mitad de 1.2) describían el estado anterior
+a la v7; el código ya los tenía. Lo que se hizo en cada caso fue verificar y
+arreglar lo que quedaba detrás. Y aparecieron cosas que ningún punto pedía:
+38 ejercicios sin temporizador por un `includes('0s')`, sesiones fantasma al
+usar la carga sugerida sin entrenar, y un agujero de S3 en el flexible.
+
+### Decisiones abiertas (bloque 1)
+
+**Los 24 solapes `anterior → fijado`.** El guardarraíl da 0 en su clase. Los
+otros 24 los provoca el usuario al fijar un gym que solapa con el anterior ya
+generado. Opciones: (a) aviso al fijar, en `SelectorVariante` y `EditModal`
+— recomendada —; (b) mirar hacia delante en el generador, que reescribe días
+no editados y no garantiza 0.
+
+**El running al 1.00.** Quedan 15 semanas: 9 de descarga (D3 no deja doblar;
+5 huecos para 6 sesiones) y 6 con las dos natación tras pierna. Ninguna se
+resuelve sin tocar algo: (a) permitir una doble suave en descarga → ~0.92;
+(b) que la natación prefiera P a L cuando los dos L caen tras pierna → +0.05;
+(c) running por defecto en el flexible cuando no cupo → 1.00, pero es correr
+tras 12h de pie; (d) dejarlo en 0.81 asignado + 0.19 ofrecido con bici.
+
 ## Pendientes detectados durante la Tarea 1 (para la Tarea 2)
 
 Cosas que aparecieron al refactorizar y que NO se tocan aquí, porque la Tarea 1
