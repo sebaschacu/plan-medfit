@@ -13,7 +13,7 @@ import { estadoGuardado } from './persistencia.js';
 // Toda mutación sobre el día activo lo FIJA primero (fijarPorRegistro): sin
 // eso, editar otro día recalcularía el calendario y podría cambiarle la sesión,
 // dejando el registro con IDs de ejercicios que ya no existen ahí.
-export function useProgreso({ activeFecha, diaActivo, fijarPorRegistro, timerRef, startTimer }) {
+export function useProgreso({ activeFecha, diaActivo, fijarPorRegistro, startTimer }) {
   const [progress, setProgress] = useState(() => estadoGuardado().prog); // { 'YYYY-MM-DD': { exId: {sets,logs} } }
   const [prMap, setPrMap] = useState(() => estadoGuardado().prs);        // { exId: {kg, flash} }
 
@@ -25,6 +25,11 @@ export function useProgreso({ activeFecha, diaActivo, fijarPorRegistro, timerRef
   // hace contra un ref y los efectos ocurren fuera del updater.
   const prMapRef = useRef(prMap);
   useEffect(() => { prMapRef.current = prMap; }, [prMap]);
+  // Mismo patrón para el progreso: toggleSet necesita saber si la serie estaba
+  // marcada ANTES de decidir si arranca el temporizador, y esa decisión no puede
+  // vivir dentro del updater (vibraría dos veces en StrictMode).
+  const progressRef = useRef(progress);
+  useEffect(() => { progressRef.current = progress; }, [progress]);
   const flashRef = useRef(new Map());
   useEffect(() => () => { flashRef.current.forEach(clearTimeout); flashRef.current.clear(); }, []);
 
@@ -45,6 +50,9 @@ export function useProgreso({ activeFecha, diaActivo, fijarPorRegistro, timerRef
   // ─── Mutaciones sobre el día activo ───
   const toggleSet = useCallback((exId, i, setCount, ex) => {
     fijarPorRegistro(diaActivo);
+    // ¿Se está MARCANDO (no desmarcando)? Se decide fuera del updater, contra el
+    // ref, para que el efecto (arrancar el temporizador) no se ejecute dos veces.
+    const marcando = !progressRef.current[activeFecha]?.[exId]?.sets?.[i];
     setProgress(prev => {
       const day = prev[activeFecha] || {};
       const p = day[exId] || { sets: [], logs: [], lastre: null };
@@ -52,14 +60,12 @@ export function useProgreso({ activeFecha, diaActivo, fijarPorRegistro, timerRef
       const logs = [...(p.logs || [])];
       while (sets.length < setCount) sets.push(false);
       while (logs.length < setCount) logs.push(null);
-      const nv = !sets[i];
-      sets[i] = nv;
-      if (nv && !timerRef.current && ex) { const r = parseRest(ex.descanso); if (r) startTimer(r, ex.nombre); }
+      sets[i] = !sets[i];
       return { ...prev, [activeFecha]: { ...day, [exId]: { ...p, sets, logs } } };
     });
-  // timerRef es un ref (identidad estable): va en la lista solo para el linter,
-  // que al venir de un hook propio ya no sabe que lo es.
-  }, [activeFecha, startTimer, fijarPorRegistro, diaActivo, timerRef]);
+    // Cada serie marcada reinicia el descanso con el del ejercicio recién marcado.
+    if (marcando && ex) { const r = parseRest(ex.descanso); if (r) startTimer(r, ex.nombre); }
+  }, [activeFecha, startTimer, fijarPorRegistro, diaActivo]);
 
   const onLog = useCallback((exId, i, log, setCount) => {
     fijarPorRegistro(diaActivo);

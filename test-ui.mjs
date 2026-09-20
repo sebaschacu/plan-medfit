@@ -791,6 +791,48 @@ ok('Los campos de v7 nacen con valor válido',
   typeof dM.rutina === 'object' && typeof dM.extras === 'object');
 await p.close();
 
+// ══ 16b · EL TEMPORIZADOR SE REINICIA CON CADA SERIE ══
+// Antes, si marcabas la siguiente serie antes de que sonara, el temporizador
+// seguía con la cuenta anterior. Cada serie marcada debe reiniciarlo con el
+// descanso del ejercicio que acabas de marcar — también en una bi-serie con
+// descansos distintos.
+seccion('TEMPORIZADOR · SE REINICIA CON CADA SERIE');
+const gymT = ago.find(d => d.sesion === 'gymA');
+p = await nuevaPagina();
+await abrirDia(p, gymT.fecha);
+// Botón "n" de la serie n dentro de la tarjeta cuyo título empieza por `nombre`
+const marcarSerie = (nombre, n) => p.evaluate(([nom, num]) => {
+  const h3 = [...document.querySelectorAll('main h3')].find(h => h.textContent.trim().startsWith(nom));
+  const card = h3?.closest('.rounded-lg');
+  [...(card?.querySelectorAll('button') ?? [])].find(b => b.textContent.trim() === String(num))?.click();
+}, [nombre, n]);
+const segundosTimer = () => p.evaluate(() => {
+  const t = [...document.querySelectorAll('div')].map(d => d.textContent.trim()).find(x => /^\d\d:\d\d$/.test(x));
+  if (!t) return null; const [m, s] = t.split(':').map(Number); return m * 60 + s;
+});
+const nombreTimer = () => p.evaluate(() => document.querySelector('.fixed.bottom-4')?.innerText.replace(/\n+/g, ' | ') ?? null);
+
+await marcarSerie('Press banca', 1); await p.waitForTimeout(400);
+const t1 = await segundosTimer();
+ok('Marcar la serie 1 de banca arranca 3 min', t1 != null && t1 >= 178 && t1 <= 180, `${t1}s`);
+await p.waitForTimeout(2500);
+const t2 = await segundosTimer();
+ok('El temporizador va bajando', t2 != null && t2 < t1, `${t1}s → ${t2}s`);
+await marcarSerie('Press banca', 2); await p.waitForTimeout(400);
+const t3 = await segundosTimer();
+ok('Marcar la serie 2 REINICIA a 3 min, no sigue la cuenta anterior', t3 != null && t3 > t2 && t3 >= 178, `${t2}s → ${t3}s`);
+// Bi-serie: el press inclinado descansa 60 s. Marcar su serie manda su descanso, no el de banca.
+await marcarSerie('Press inclinado', 1); await p.waitForTimeout(400);
+const t4 = await segundosTimer();
+ok('Marcar un ejercicio de 60 s pone el temporizador a 60 s (el del ejercicio recién marcado)',
+  t4 != null && t4 >= 58 && t4 <= 60, `${t4}s`);
+ok('Y el nombre del overlay es el del ejercicio recién marcado', /Press inclinado/.test(await nombreTimer() ?? ''), await nombreTimer());
+// Desmarcar NO arranca nada nuevo
+await p.locator('button', { hasText: 'SALTAR' }).click(); await p.waitForTimeout(300);
+await marcarSerie('Press inclinado', 1); await p.waitForTimeout(400);
+ok('Desmarcar una serie no arranca el temporizador', (await segundosTimer()) == null);
+await p.close();
+
 // ══ 17 · UN RESPALDO CON EJERCICIOS MALFORMADOS NO DEJA EL CALENDARIO EN BLANCO ══
 // `musculos` es metadata que llegó en la v6. Un respaldo anterior, o uno editado
 // a mano, puede traerlo con otra forma o sin `primario`. VolumenMuscular hacía

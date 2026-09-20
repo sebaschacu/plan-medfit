@@ -16,7 +16,7 @@ import { useProgreso } from './useProgreso.js';
 export function PlanProvider({ children }) {
   const todayISO = hoyISO();
 
-  const { restTimer, timerRef, startTimer, skipTimer } = useTemporizador();
+  const { restTimer, startTimer, skipTimer } = useTemporizador();
   const {
     view, activeFecha, activeSesion, anio, mes,
     cambiarMes, openDay, abrirSesionDelDia, backToCalendar,
@@ -40,7 +40,7 @@ export function PlanProvider({ children }) {
   const {
     progress, prMap, avisosReset, setProgress, setPrMap,
     toggleSet, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, borrarRegistro,
-  } = useProgreso({ activeFecha, diaActivo, fijarPorRegistro, timerRef, startTimer });
+  } = useProgreso({ activeFecha, diaActivo, fijarPorRegistro, startTimer });
 
   // ─── Persistencia robusta ───
   const [saveStatus, setSaveStatus] = useState('idle'); // idle | saving | saved

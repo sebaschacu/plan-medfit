@@ -276,5 +276,24 @@ check('Reps anotadas sin marcar sí cuentan', RG.historialEjercicio(repsSinMarca
 check('Dos fantasmas seguidos no disparan un reset (P6)',
   RG.sugerirCarga(banca, { '2026-08-01': hecha, '2026-08-04': fantasma, '2026-08-08': fantasma }).tipo !== 'reset');
 
+// ── parseRest · el descanso de cada ejercicio, en segundos (v7.1) ──
+// Descartaba con `includes('0s')`, que se llevaba "60s", "90s", "30s", "20s" y
+// "40s": 38 ejercicios sin temporizador nunca. Se prueba contra TODOS los
+// formatos de descanso que hay en data.js, no contra una lista escrita aquí.
+console.log('\n── parseRest · DESCANSOS DE data.js ──');
+const { parseRest } = await import('./src/utiles/formato.js');
+check('"60s" → 60 (era null)', parseRest('60s') === 60);
+check('"90s" → 90 · "30s" → 30 · "20s" → 20 · "40s" → 40',
+  parseRest('90s') === 90 && parseRest('30s') === 30 && parseRest('20s') === 20 && parseRest('40s') === 40);
+check('"45s" → 45 · "3 min" → 180 · "2.5 min" → 150', parseRest('45s') === 45 && parseRest('3 min') === 180 && parseRest('2.5 min') === 150);
+check('Un rango toma el tope: "2-3 min" → 180', parseRest('2-3 min') === 180);
+check('Sin descanso: "—", "0s", vacío y null → null',
+  parseRest('—') === null && parseRest('0s') === null && parseRest('') === null && parseRest(null) === null);
+const descansosReales = [...new Set(Object.values(SESIONES).flatMap(s => (s.ejercicios ?? []).map(e => e.descanso)).filter(Boolean))];
+const sinParsear = descansosReales.filter(d => d !== '—' && parseRest(d) === null);
+check(`Todo descanso definido en data.js se convierte a segundos (${descansosReales.length} formatos distintos)`,
+  sinParsear.length === 0, sinParsear.join(' · '));
+check('Y ninguno da 0 o negativo', descansosReales.filter(d => d !== '—').every(d => parseRest(d) > 0));
+
 console.log(`\n══ TOTAL VERIFICADOR + RUTINA + PROGRESIÓN: ${pruebas - fallos}/${pruebas} ══`);
 process.exit(fallos ? 1 : 0);

@@ -12,8 +12,11 @@ export const hexARgba = (hex, alpha) => {
   return `rgba(${(v >> 16) & 255}, ${(v >> 8) & 255}, ${v & 255}, ${alpha})`;
 };
 
+// "3 min" → 180 · "45s" → 45 · "2-3 min" → 180 (el tope) · "—" o "0s" → null.
+// OJO: antes descartaba con `s.includes('0s')`, que además de "0s" se llevaba
+// "60s", "90s", "30s", "20s" y "40s": 38 ejercicios sin temporizador nunca.
 export const parseRest = (s) => {
-  if (!s || s === '—' || s.includes('0s')) return null;
+  if (!s || s === '—' || /^\s*0\s*s?\s*$/.test(s)) return null;
   const n = parseFloat(s.replace(',', '.'));
   if (isNaN(n)) return null;
   const range = s.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)/);
