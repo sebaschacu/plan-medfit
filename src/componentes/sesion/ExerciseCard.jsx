@@ -3,6 +3,7 @@ import { Check, Trophy, Backpack, Zap, AlertTriangle, Link2, Sparkles, Ruler, Cl
 import { PALAS_MAX_M } from '../../data.js';
 import { useAccionesCtx } from '../../estado/contextos.js';
 import NumInput from '../comunes/NumInput.jsx';
+import Musculos from '../comunes/Musculos.jsx';
 
 // ═══════════════ EXERCISE CARD ═══════════════
 const ExerciseCard = ({ ex, prog, pr, color, avisoReset, ultima, sugerencia }) => {
@@ -49,6 +50,7 @@ const ExerciseCard = ({ ex, prog, pr, color, avisoReset, ultima, sugerencia }) =
               )}
             </div>
             <h3 className="text-base font-bold text-slate-100 leading-tight">{ex.nombre}</h3>
+            <Musculos musculos={ex.musculos} className="mt-0.5" />
             {ex.nota && <p className="text-[11px] text-slate-500 mt-0.5">{ex.nota}</p>}
           </div>
         </div>

@@ -791,6 +791,39 @@ ok('Los campos de v7 nacen con valor válido',
   typeof dM.rutina === 'object' && typeof dM.extras === 'object');
 await p.close();
 
+// ══ 16a · LOS MÚSCULOS DE CADA EJERCICIO, VISIBLES SIN TOCAR NADA ══
+// El dato ya estaba en data.js para las estadísticas; ahora se enseña bajo el
+// nombre: primarios delante y marcados, secundarios detrás y apagados.
+seccion('MÚSCULOS VISIBLES EN LA SESIÓN');
+const gymM = ago.find(d => d.sesion === 'gymA');
+p = await nuevaPagina();
+await abrirDia(p, gymM.fecha);
+const musculosDe = (nombre) => p.evaluate((nom) => {
+  const h3 = [...document.querySelectorAll('main h3')].find(h => h.textContent.trim().startsWith(nom));
+  const el = h3?.parentElement.querySelector('[aria-label="Músculos que trabaja"]');
+  if (!el) return null;
+  const prim = [...el.querySelectorAll('.text-slate-300')].map(s => s.textContent.replace(/·/g, '').trim());
+  const sec = el.querySelector('.text-slate-500')?.textContent.replace(/·/g, '').trim() ?? '';
+  return { texto: el.textContent.trim(), prim, sec };
+}, nombre);
+const mBanca = await musculosDe('Press banca');
+ok('La banca enseña sus músculos bajo el nombre, sin tocar nada', !!mBanca, mBanca?.texto);
+ok('Primarios delante y marcados: Pecho y Tríceps', mBanca?.prim.includes('Pecho') && mBanca?.prim.includes('Tríceps'), mBanca?.prim.join(', '));
+ok('Secundario detrás y apagado: Deltoides ant.', /Deltoides ant\./.test(mBanca?.sec ?? ''), mBanca?.sec);
+ok('En el orden primarios · secundarios', mBanca && mBanca.texto.indexOf('Pecho') < mBanca.texto.indexOf('Deltoides ant.'));
+const mFacePull = await musculosDe('Face pull');
+ok('El face pull también (Deltoides post. primario)', mFacePull?.prim.includes('Deltoides post.'), mFacePull?.texto);
+await p.close();
+// Un ejercicio con `musculos` malformado no enseña nada, pero tampoco revienta la tarjeta
+p = await nuevaPagina({ v: 3, prs: {}, fijados: {}, extras: {}, css: null, prog: {},
+  rutina: { gymA: [{ desde: '2026-01-01', ejercicios: [
+    { id: 'A-1', parte: 1, nombre: 'Press malformado', series: 4, reps: '5-8', descanso: '3 min', musculos: { pectoral: 1 } }] }] } });
+await abrirDia(p, gymM.fecha);
+ok('Con músculos malformados la tarjeta se pinta igual', await p.locator('main h3', { hasText: 'Press malformado' }).count() === 1);
+ok('Y no enseña una línea de músculos vacía', (await musculosDe('Press malformado')) === null);
+ok('Sin errores de página', errores.length === 0, errores.slice(-1).join(''));
+await p.close();
+
 // ══ 16b · EL TEMPORIZADOR SE REINICIA CON CADA SERIE ══
 // Antes, si marcabas la siguiente serie antes de que sonara, el temporizador
 // seguía con la cuenta anterior. Cada serie marcada debe reiniciarlo con el

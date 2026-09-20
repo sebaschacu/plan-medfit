@@ -1,4 +1,5 @@
 import React from 'react';
+import Musculos from './Musculos.jsx';
 
 // Un ejercicio renderizado en modo consulta: sin checkboxes, sin inputs.
 // Se usa en la biblioteca y en la ficha que se abre desde el nombre del día,
@@ -17,6 +18,7 @@ const FichaEjercicio = ({ ex }) => (
       {ex.opcional && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border border-slate-600 text-slate-400">Opcional</span>}
     </div>
     <div className="text-sm font-bold text-slate-100 leading-tight">{ex.nombre}</div>
+    <Musculos musculos={ex.musculos} className="mt-0.5" />
     {ex.nota && <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{ex.nota}</p>}
     <div className="grid grid-cols-4 gap-1.5 mt-2">
       {[
