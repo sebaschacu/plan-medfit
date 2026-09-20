@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { SESIONES } from '../data.js';
+import { SESIONES, E11 } from '../data.js';
 import { calcularAvisosReset } from '../reglas.js';
 import { parseRest } from '../utiles/formato.js';
 import { vibrate } from '../utiles/sonido.js';
@@ -125,6 +125,21 @@ export function useProgreso({ activeFecha, diaActivo, fijarPorRegistro, startTim
     setProgress(prev => ({ ...prev, [activeFecha]: { ...(prev[activeFecha] || {}), __sueno: h } }));
   }, [activeFecha]);
 
+  // ─── E11 · deshacer una bi-serie solo por hoy ───
+  // Se guarda en el día, bajo `__bsSueltas`, como lista de bi-series. Como el
+  // sueño, no fija el día ni cuenta como ejercicio registrado: es una nota de
+  // cómo se hizo la sesión, no un registro de carga.
+  const toggleBiserieSuelta = useCallback((bs) => {
+    setProgress(prev => {
+      const day = prev[activeFecha] || {};
+      const actuales = Array.isArray(day[E11.clave]) ? day[E11.clave] : [];
+      const nuevas = actuales.includes(bs) ? actuales.filter(x => x !== bs) : [...actuales, bs];
+      const nd = { ...day };
+      if (nuevas.length) nd[E11.clave] = nuevas; else delete nd[E11.clave];   // sin basura si se deshace
+      return { ...prev, [activeFecha]: nd };
+    });
+  }, [activeFecha]);
+
   // ─── Borrar el registro de un día cualquiera ───
   // Lo pide App al cambiar la sesión de un día con entrenamiento registrado
   // (tras confirmarlo): ese registro apuntaría a ejercicios que ya no existen.
@@ -138,6 +153,6 @@ export function useProgreso({ activeFecha, diaActivo, fijarPorRegistro, startTim
   return {
     progress, prMap, avisosReset,
     setProgress, setPrMap,   // los usa importar
-    toggleSet, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, borrarRegistro,
+    toggleSet, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta, borrarRegistro,
   };
 }

@@ -39,7 +39,7 @@ export function PlanProvider({ children }) {
 
   const {
     progress, prMap, avisosReset, setProgress, setPrMap,
-    toggleSet, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, borrarRegistro,
+    toggleSet, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta, borrarRegistro,
   } = useProgreso({ activeFecha, diaActivo, fijarPorRegistro, startTimer });
 
   // ─── Persistencia robusta ───
@@ -176,7 +176,7 @@ export function PlanProvider({ children }) {
     // rutinas
     guardarRutina, restaurarRutina,
     // progreso
-    toggleSet, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno,
+    toggleSet, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta,
     // temporizador
     skipTimer,
     // datos
@@ -185,7 +185,7 @@ export function PlanProvider({ children }) {
     saveEdit, liberarDia, onSecundaria, onComplemento, fijarVariante, soltarVariante,
     onFlexible, onConvertirFlexible, setCss,
     guardarRutina, restaurarRutina,
-    toggleSet, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno,
+    toggleSet, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta,
     skipTimer, onExportar, onImportar]);
 
   return (

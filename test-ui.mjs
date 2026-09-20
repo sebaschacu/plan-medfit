@@ -943,6 +943,66 @@ await marcarSerie('Press inclinado', 1); await p.waitForTimeout(400);
 ok('Desmarcar una serie no arranca el temporizador', (await segundosTimer()) == null);
 await p.close();
 
+// ══ 16c · E11 · DESHACER UNA BI-SERIE SOBRE LA MARCHA ══
+// Las dos estaciones no siempre están libres. Hoy se pueden hacer los dos
+// ejercicios por separado sin que la sesión cuente como incompleta ni se pierda
+// el registro. Es del día, no de la rutina: mañana la bi-serie vuelve.
+seccion('E11 · BI-SERIE SUELTA SOLO POR HOY');
+const gymE11 = ago.find(d => d.sesion === 'gymA');
+p = await nuevaPagina();
+await abrirDia(p, gymE11.fecha);
+const badgeDe = (nombre) => p.evaluate((nom) => {
+  const h3 = [...document.querySelectorAll('main h3')].find(h => h.textContent.trim().startsWith(nom));
+  const card = h3?.closest('.rounded-lg');
+  const badge = [...(card?.querySelectorAll('span') ?? [])].find(s => /^BS\d/.test(s.textContent.trim()));
+  const boton = card?.querySelector('button[aria-pressed]');
+  return { badge: badge?.textContent.trim(), boton: boton?.textContent.trim(), pulsado: boton?.getAttribute('aria-pressed') };
+}, nombre);
+const antes3 = await badgeDe('Press inclinado'), antes4 = await badgeDe('Face pull');
+ok('La BS1 se ve emparejada en sus dos ejercicios', /BS1 · antag\./.test(antes3.badge) && /BS1 · antag\./.test(antes4.badge), `${antes3.badge} / ${antes4.badge}`);
+ok('Y cada uno ofrece "Hoy por separado"', antes3.boton === 'Hoy por separado' && antes4.pulsado === 'false');
+// Marcar una serie ANTES de soltar, para comprobar que el registro no se pierde
+await marcarSerie('Press inclinado', 1); await p.waitForTimeout(300);
+await p.locator('button', { hasText: 'SALTAR' }).click().catch(() => {});
+// Soltar desde el press inclinado
+await p.evaluate(() => {
+  const h3 = [...document.querySelectorAll('main h3')].find(h => h.textContent.trim().startsWith('Press inclinado'));
+  h3?.closest('.rounded-lg')?.querySelector('button[aria-pressed]')?.click();
+});
+await p.waitForTimeout(400);
+const tras3 = await badgeDe('Press inclinado'), tras4 = await badgeDe('Face pull');
+ok('Soltar desde uno cambia el badge de LOS DOS a "hoy sueltos"', /hoy sueltos/.test(tras3.badge) && /hoy sueltos/.test(tras4.badge), `${tras3.badge} / ${tras4.badge}`);
+ok('Y el botón pasa a "Emparejar" en los dos', tras3.boton === 'Emparejar' && tras4.pulsado === 'true');
+const dE11 = await ls(p);
+ok('Se guarda en el día bajo __bsSueltas', JSON.stringify(dE11.prog?.[gymE11.fecha]?.__bsSueltas) === '["BS1"]', JSON.stringify(dE11.prog?.[gymE11.fecha]?.__bsSueltas));
+ok('El registro previo de la serie no se pierde', dE11.prog?.[gymE11.fecha]?.['A-3']?.sets?.[0] === true);
+ok('Y no cuenta como ejercicio registrado (el Reset sigue mirando solo los ejercicios)',
+  Object.keys(dE11.prog[gymE11.fecha]).filter(k => !k.startsWith('__')).length === 1);
+// La sesión se completa igual: marcar TODAS las series de la BS1 suelta
+for (let i = 2; i <= 3; i++) { await marcarSerie('Press inclinado', i); await p.waitForTimeout(150); }
+for (let i = 1; i <= 3; i++) { await marcarSerie('Face pull', i); await p.waitForTimeout(150); }
+await p.locator('button', { hasText: 'SALTAR' }).click().catch(() => {});
+await p.waitForTimeout(300);
+ok('Los dos ejercicios sueltos se marcan como hechos igual que emparejados',
+  await p.evaluate(() => [...document.querySelectorAll('main h3')].filter(h => /Press inclinado|Face pull/.test(h.textContent))
+    .every(h => /Hecho/.test(h.closest('.rounded-lg')?.textContent ?? ''))));
+// Al día siguiente (otro gymA), la bi-serie vuelve a estar emparejada
+await p.locator('text=Calendario').first().click(); await p.waitForTimeout(400);
+const gymE11b = ago.find(d => d.sesion === 'gymA' && d.fecha > gymE11.fecha);
+await abrirDia(p, gymE11b.fecha);
+const otroDia = await badgeDe('Press inclinado');
+ok('En otro día la bi-serie sigue emparejada: era una decisión de hoy, no de la rutina', /BS1 · antag\./.test(otroDia.badge) && otroDia.pulsado === 'false', otroDia.badge);
+// Volver a emparejar limpia la clave
+await p.locator('text=Calendario').first().click(); await p.waitForTimeout(400);
+await abrirDia(p, gymE11.fecha);
+await p.evaluate(() => {
+  const h3 = [...document.querySelectorAll('main h3')].find(h => h.textContent.trim().startsWith('Face pull'));
+  h3?.closest('.rounded-lg')?.querySelector('button[aria-pressed]')?.click();
+});
+await p.waitForTimeout(400);
+ok('Emparejar de nuevo quita la clave del día (sin basura)', (await ls(p)).prog?.[gymE11.fecha]?.__bsSueltas === undefined);
+await p.close();
+
 // ══ 17 · UN RESPALDO CON EJERCICIOS MALFORMADOS NO DEJA EL CALENDARIO EN BLANCO ══
 // `musculos` es metadata que llegó en la v6. Un respaldo anterior, o uno editado
 // a mano, puede traerlo con otra forma o sin `primario`. VolumenMuscular hacía

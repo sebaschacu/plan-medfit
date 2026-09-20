@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Moon, Trophy, RotateCcw, ChevronRight, Settings, ArrowLeft, Star, AlertTriangle, Clock } from 'lucide-react';
-import { SESION_INFO, SESIONES, PARTES, PISCINA_DURACION_MIN } from '../../data.js';
+import { SESION_INFO, SESIONES, PARTES, PISCINA_DURACION_MIN, E11 } from '../../data.js';
 import { S4, ultimaSesion, sugerirCarga } from '../../reglas.js';
 import { estaEditada, huerfanosDelDia } from '../../rutina.js';
 import { VACIO, COLUMNA } from '../../utiles/constantes-ui.js';
@@ -66,6 +66,8 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
   const esAgua = String(sesionKey).startsWith('nat');
   const mostrarPartes = grupos.length > 1 && !esAgua && sesionKey !== 'running';
   const s4 = S4(dayProg.__sueno);
+  // E11: bi-series que hoy se hacen por separado (nota del día, no de la rutina)
+  const bsSueltas = Array.isArray(dayProg[E11.clave]) ? dayProg[E11.clave] : [];
 
   return (
     <div className="min-h-screen bg-[#0f1417]">
@@ -246,6 +248,7 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
                 {ejs.map(ex => (
                   <ExerciseCard key={ex.id} ex={ex} prog={dayProg[ex.id]} pr={prMap[ex.id]} color={color}
                     avisoReset={avisosReset[ex.id]}
+                    bsSuelta={!!ex.bs && bsSueltas.includes(ex.bs)}
                     ultima={ultimaSesion(progresoTotal, ex.id, diaData.fecha)}
                     sugerencia={sugerirCarga(ex, progresoTotal, { hasta: diaData.fecha, descarga: !!diaData.descarga })} />
                 ))}

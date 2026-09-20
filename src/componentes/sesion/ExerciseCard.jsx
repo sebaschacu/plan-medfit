@@ -1,13 +1,13 @@
 import React from 'react';
-import { Check, Trophy, Backpack, Zap, AlertTriangle, Link2, Sparkles, Ruler, Clock } from 'lucide-react';
-import { PALAS_MAX_M } from '../../data.js';
+import { Check, Trophy, Backpack, Zap, AlertTriangle, Link2, Unlink2, Sparkles, Ruler, Clock } from 'lucide-react';
+import { PALAS_MAX_M, E11 } from '../../data.js';
 import { useAccionesCtx } from '../../estado/contextos.js';
 import NumInput from '../comunes/NumInput.jsx';
 import Musculos from '../comunes/Musculos.jsx';
 
 // ═══════════════ EXERCISE CARD ═══════════════
-const ExerciseCard = ({ ex, prog, pr, color, avisoReset, ultima, sugerencia }) => {
-  const { toggleSet: onToggleSet, onLog, onLastre, onBanda, usarSugerido: onUsarSugerido } = useAccionesCtx();
+const ExerciseCard = ({ ex, prog, pr, color, avisoReset, ultima, sugerencia, bsSuelta = false }) => {
+  const { toggleSet: onToggleSet, onLog, onLastre, onBanda, usarSugerido: onUsarSugerido, toggleBiserieSuelta: onToggleBiserieSuelta } = useAccionesCtx();
   const setCount = typeof ex.series === 'number' ? ex.series : 1;
   const p = prog || { sets: [], logs: [], lastre: null };
   const allDone = setCount > 0 && p.sets?.length === setCount && p.sets.every(Boolean);
@@ -33,14 +33,28 @@ const ExerciseCard = ({ ex, prog, pr, color, avisoReset, ultima, sugerencia }) =
                 </span>
               )}
               {ex.bs && (
-                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded flex items-center gap-1 border"
-                  style={{
-                    background: ex.bstipo === 'ant' ? '#7c2d1233' : '#5b21b633',
-                    borderColor: ex.bstipo === 'ant' ? '#c2410c88' : '#7c3aed88',
-                    color: ex.bstipo === 'ant' ? '#fdba74' : '#c4b5fd'
-                  }}>
-                  <Link2 size={9} strokeWidth={3} />{ex.bs} · {ex.bstipo === 'ant' ? 'antag.' : 'no comp.'}
-                </span>
+                <>
+                  {/* E11: hoy la pareja puede ir suelta. El badge lo dice, y el
+                      botón lo alterna para los DOS ejercicios de la bi-serie. */}
+                  <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded flex items-center gap-1 border"
+                    style={bsSuelta
+                      ? { background: '#33415533', borderColor: '#64748b88', color: '#94a3b8' }
+                      : {
+                        background: ex.bstipo === 'ant' ? '#7c2d1233' : '#5b21b633',
+                        borderColor: ex.bstipo === 'ant' ? '#c2410c88' : '#7c3aed88',
+                        color: ex.bstipo === 'ant' ? '#fdba74' : '#c4b5fd',
+                      }}>
+                    {bsSuelta ? <Unlink2 size={9} strokeWidth={3} /> : <Link2 size={9} strokeWidth={3} />}
+                    {ex.bs} · {bsSuelta ? 'hoy sueltos' : (ex.bstipo === 'ant' ? 'antag.' : 'no comp.')}
+                  </span>
+                  <button onClick={() => onToggleBiserieSuelta(ex.bs)}
+                    aria-label={bsSuelta ? `Volver a emparejar ${ex.bs}` : `Hacer ${ex.bs} por separado hoy`}
+                    aria-pressed={bsSuelta} title={E11.texto}
+                    className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border transition-all ${
+                      bsSuelta ? 'border-slate-500 bg-slate-700/30 text-slate-300' : 'border-[#2a3540] text-slate-500'}`}>
+                    {bsSuelta ? 'Emparejar' : E11.label}
+                  </button>
+                </>
               )}
               {allDone && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-700/50 flex items-center gap-1"><Check size={9} strokeWidth={3} />Hecho</span>}
               {(ex.lastre || ex.acarreo) && pr?.kg != null && (

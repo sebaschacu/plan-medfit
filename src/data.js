@@ -609,3 +609,19 @@ export const PARTES = {
   3: { label: 'Parte 3 · Aislamientos', desc: 'Bi-series de aislamiento + aislamiento' },
   finisher: { label: 'Finisher', desc: 'Un solo acarreo por sesión (E9)' },
 };
+
+// ─── E11 · Deshacer una bi-serie sobre la marcha (v7.1) ───
+// Una bi-serie (E8) da por hecho que las dos estaciones están libres. En un
+// gimnasio lleno muchas veces no lo están. E11: ese día se pueden hacer los dos
+// ejercicios POR SEPARADO, en series rectas, sin que la sesión cuente como
+// incompleta ni se pierda el registro. Es una decisión del momento, no una
+// edición de la rutina: al día siguiente la bi-serie vuelve a estar como
+// estaba. Se guarda en el progreso del día, bajo la clave `__bsSueltas`, como
+// lista de bi-series (['BS1', 'BS3']) — el prefijo `__` la deja fuera del
+// recuento de ejercicios registrados, igual que `__sueno`.
+export const E11 = {
+  regla: 'E11',
+  clave: '__bsSueltas',
+  label: 'Hoy por separado',
+  texto: 'Las dos estaciones no siempre están libres. Hoy haces los dos ejercicios en series rectas, con su descanso normal; la bi-serie sigue igual mañana.',
+};
