@@ -162,6 +162,17 @@ const rr = R.guardarVersion(R.guardarVersion({}, 'gymA', v1, '2026-09-15', 'a'),
 check('Editar dos veces el mismo día sustituye la versión, no la duplica', rr.gymA.length === 1);
 check('Y se queda con la última', rr.gymA[0].motivo === 'b');
 
+// El motivo es opcional (v7.1): vacío, en blanco, null o undefined → "Sin motivo"
+check('Sin motivo se guarda "Sin motivo", no un hueco',
+  R.guardarVersion({}, 'gymA', v1, '2026-09-15').gymA[0].motivo === R.SIN_MOTIVO
+  && R.guardarVersion({}, 'gymA', v1, '2026-09-15', '').gymA[0].motivo === R.SIN_MOTIVO
+  && R.guardarVersion({}, 'gymA', v1, '2026-09-15', '   ').gymA[0].motivo === R.SIN_MOTIVO
+  && R.guardarVersion({}, 'gymA', v1, '2026-09-15', null).gymA[0].motivo === R.SIN_MOTIVO);
+check('Un motivo con espacios alrededor se guarda limpio',
+  R.guardarVersion({}, 'gymA', v1, '2026-09-15', '  cambio de máquina  ').gymA[0].motivo === 'cambio de máquina');
+check('Restaurar el plan conserva su motivo propio',
+  R.restaurarPlan({}, 'gymA', '2026-09-15').gymA[0].motivo === 'Vuelta al plan original');
+
 check('estaEditada detecta la diferencia con el plan',
   R.estaEditada('gymA', '2026-09-20', rutina) && !R.estaEditada('gymA', '2026-09-01', rutina));
 

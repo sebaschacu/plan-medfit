@@ -521,8 +521,9 @@ await p.locator('text=/Editar esta rutina/').first().click();
 await p.waitForTimeout(700);
 ok('Abre el editor', await p.locator('text=/Editar Gym A/').count() > 0);
 ok('El plan original pasa el verificador limpio', await p.locator('text=/Cumple todas las reglas/').count() > 0);
-ok('No deja guardar sin motivo',
-  await p.evaluate(() => [...document.querySelectorAll('button')].find(b => /Escribe el motivo/.test(b.textContent))?.disabled === true));
+// El motivo es OPCIONAL (Tarea 2 · 2.4): el botón de guardar está activo desde el principio
+ok('Deja guardar sin motivo: el botón está activo',
+  await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find(b => /^Guardar/.test(b.textContent.trim())); return !!b && !b.disabled; }));
 // Romper una regla: quitar el face pull
 await p.evaluate(() => {
   const b = [...document.querySelectorAll('button[aria-label^="Quitar Face pull"]')][0];
@@ -547,6 +548,24 @@ ok('El face pull ya no está en la versión guardada',
   !trasEditar.rutina.gymA[0].ejercicios.some(e => /face pull/i.test(e.nombre)));
 await p.waitForTimeout(400);
 ok('La sesión se marca como editada', await p.locator('text=/· editada/').count() > 0);
+await p.close();
+
+// ══ 10a · GUARDAR SIN MOTIVO ══
+// El motivo es opcional. Si se deja vacío, el historial guarda "Sin motivo": no
+// quedan huecos y se sigue sabiendo cuándo cambió cada cosa.
+seccion('EDITOR · GUARDAR SIN MOTIVO');
+p = await nuevaPagina();
+await abrirDia(p, diaGymE.fecha);
+await p.locator('text=/Editar esta rutina/').first().click(); await p.waitForTimeout(600);
+// Un cambio inocuo: marcar el último ejercicio como opcional
+await p.evaluate(() => [...document.querySelectorAll('button')].filter(b => b.textContent.trim() === 'Obligatorio').at(-1)?.click());
+await p.waitForTimeout(300);
+ok('El campo de motivo dice que es opcional', /Opcional/.test(await p.getByLabel('Motivo del cambio').getAttribute('placeholder')));
+await p.locator('button', { hasText: /^Guardar/ }).first().click(); await p.waitForTimeout(800);
+const sinMotivo = await ls(p);
+ok('Guarda sin escribir motivo', !!sinMotivo.rutina?.gymA?.[0], JSON.stringify(Object.keys(sinMotivo.rutina ?? {})));
+ok('Y en el historial queda "Sin motivo", no un hueco', sinMotivo.rutina?.gymA?.[0]?.motivo === 'Sin motivo', sinMotivo.rutina?.gymA?.[0]?.motivo);
+ok('El editor se cierra y la sesión queda editada', await p.locator('text=/· editada/').count() > 0);
 await p.close();
 
 // ══ 10b · AÑADIR EJERCICIO: AGRUPADO POR MÚSCULO ══

@@ -40,11 +40,15 @@ export function estaEditada(sesionKey, fecha, rutina = {}) {
 
 // Guarda una versión nueva con fecha de hoy. Si ya hay una versión de hoy,
 // la sustituye: editar dos veces el mismo día no crea dos versiones.
+// El motivo es OPCIONAL al guardar. Si viene vacío se anota "Sin motivo": así
+// el historial no tiene huecos y se sigue sabiendo cuándo cambió cada cosa,
+// aunque no por qué.
+export const SIN_MOTIVO = 'Sin motivo';
 export function guardarVersion(rutina, sesionKey, ejercicios, desde, motivo) {
   const previas = (rutina[sesionKey] ?? []).filter(v => v.desde !== desde);
   return {
     ...rutina,
-    [sesionKey]: [...previas, { desde, ejercicios, motivo: motivo || '' }]
+    [sesionKey]: [...previas, { desde, ejercicios, motivo: String(motivo ?? '').trim() || SIN_MOTIVO }]
       .sort((a, b) => a.desde.localeCompare(b.desde)),
   };
 }

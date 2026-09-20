@@ -8,8 +8,9 @@ import NumInput from '../comunes/NumInput.jsx';
 
 // ═══════════════ EDITOR DE RUTINA ═══════════════
 // Libertad total sobre la sesión, con el verificador informando en vivo.
-// NO bloquea: clasifica en duras y blandas y exige un motivo al guardar, que es
-// lo que hace útil la revisión de las 8 semanas (N3).
+// NO bloquea: clasifica en duras y blandas. El motivo es opcional; si se deja
+// vacío se guarda "Sin motivo", para que el historial de versiones no tenga
+// huecos y la revisión de las 8 semanas (N3) siga sabiendo cuándo cambió qué.
 //
 // Arranca con la rutina VIGENTE hoy, resuelta desde el contexto. onGuardar,
 // onRestaurar y onCerrar vienen de App, que además cierra el editor.
@@ -210,14 +211,14 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
       <div className="fixed bottom-0 left-0 right-0 bg-[#0f1417]/95 backdrop-blur border-t border-[#232c34] p-3">
         <div className="max-w-2xl mx-auto space-y-2">
           <input value={motivo} onChange={e => setMotivo(e.target.value)} aria-label="Motivo del cambio"
-            placeholder="¿Por qué lo cambias? (se guarda con la versión)"
+            placeholder="¿Por qué lo cambias? Opcional: si lo dejas vacío queda «Sin motivo»"
             className="w-full h-9 px-2 bg-[#151b21] border border-[#2a3540] focus:border-emerald-600 focus:outline-none text-slate-100 text-xs rounded" />
           <div className="flex gap-2">
             <button onClick={onCerrar} className="px-4 py-2.5 border border-[#2a3540] text-slate-300 text-xs font-bold uppercase rounded-lg">Cancelar</button>
-            <button onClick={() => onGuardar(lista, motivo)} disabled={!motivo.trim()}
+            <button onClick={() => onGuardar(lista, motivo)}
               className={`flex-1 py-2.5 text-white text-xs font-bold uppercase rounded-lg ${
-                !motivo.trim() ? 'bg-slate-700 text-slate-500' : res.duras.length ? 'bg-amber-700' : 'bg-emerald-600'}`}>
-              {!motivo.trim() ? 'Escribe el motivo' : res.duras.length ? `Guardar con ${res.duras.length} aviso(s)` : 'Guardar'}
+                res.duras.length ? 'bg-amber-700' : 'bg-emerald-600'}`}>
+              {res.duras.length ? `Guardar con ${res.duras.length} aviso(s)` : 'Guardar'}
             </button>
           </div>
           <p className="text-[9px] text-slate-600 leading-relaxed">
