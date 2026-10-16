@@ -52,7 +52,12 @@ export const DOBLES = {
   },
   maxPorSemana: 2,            // D1
   noConsecutivos: true,       // D2
-  saltarEnDescarga: true,     // D3 · semana 8 del bloque
+  // D3 · semana 8 del bloque (descarga: mitad de series, RIR +2). Antes no se
+  // doblaba nada, y eso dejaba 9 semanas al año sin cardio: 5 huecos para 6
+  // sesiones y la única salida cerrada. Ahora se dobla solo con lo MÁS SUAVE:
+  // la natación (pasa a segunda sesión y le cede su día al cardio) o la bici
+  // (impacto cero). Running doblado en descarga, nunca. Medido: 0.81 → 0.90.
+  descarga: { doblesSuaves: ['natacion', 'ciclismo'] },
   semanasBloque: 8,
   separacionMinima: 3,
   separacionIdeal: 4,
@@ -70,6 +75,17 @@ export const ORDEN_DOBLE = { fuerza: 1, cardio: 2 };
 // turno C: 12h de pie dejan pies, tibias y sóleo castigados, y correr encima
 // carga justo esos tejidos. Mismo estímulo aeróbico, sin ese coste.
 export const CARDIO_FLEXIBLE = ['running', 'ciclismo'];
+
+// ─── v7.1 · El cupo de running es un cupo de CARDIO ───
+// El requisito es cardio regular, 1 sesión/semana, no correr en concreto. La
+// bici cuenta igual: si el usuario convierte el flexible a bici, esa semana ya
+// tiene su cardio y el generador no busca otro hueco para el running. Y cuando
+// el cardio no cabe en ningún día no-C, el flexible pasa a BICI POR DEFECTO
+// (cero impacto tras las 12h; cubre el ciclismo del triatlón), con el running
+// a un toque si ese día apetece correr. Sin esto el cardio se quedaba en 0.81
+// semanal; con esto llega a 1.00.
+export const CARDIO_CUPO = ['running', 'ciclismo'];
+export const CARDIO_POR_DEFECTO_FLEXIBLE = 'ciclismo';
 
 export const COMPLEMENTOS = {
   calistenia: {

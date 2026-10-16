@@ -20,7 +20,8 @@
 // dos filas de la tabla y reproduce el ejemplo del plan.
 
 import { SECUENCIA_GYM, SECUENCIA_NATACION, NATACION_CSS, PISCINA, VENTANA_PISCINA, CUPO_SEMANAL,
-  PRIORIDAD_TURNO, S7_PIERNA, DOBLES, GYM_PIERNA, GYM_TORSO, GYM_SOLAPAN, ORDEN_DOBLE, CARDIO_FLEXIBLE } from './data.js';
+  PRIORIDAD_TURNO, S7_PIERNA, DOBLES, GYM_PIERNA, GYM_TORSO, GYM_SOLAPAN, ORDEN_DOBLE, CARDIO_FLEXIBLE,
+  CARDIO_CUPO, CARDIO_POR_DEFECTO_FLEXIBLE } from './data.js';
 
 // El cupo y las prioridades se LEEN de data.js: si se hardcodearan aquí, esas
 // constantes volverían a ser decoración y cambiar el plan obligaría a tocar dos
@@ -303,7 +304,9 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
       gym: Math.max(0, CUPO_SEMANAL.gym - yaHay(s => s.startsWith('gym'))),
       natacion: Math.max(0, CUPO_SEMANAL.natacion - yaHay(s => s === 'natacion')),
       calistenia: Math.max(0, CUPO_SEMANAL.calistenia - yaHay(s => s === 'calistenia')),
-      running: Math.max(0, CUPO_SEMANAL.running - yaHay(s => s === 'running')),
+      // El cupo de running es de CARDIO: una bici fijada (en el flexible o donde
+      // sea) ya cubre la semana, y no se busca otro hueco para correr.
+      running: Math.max(0, CUPO_SEMANAL.running - yaHay(s => CARDIO_CUPO.includes(s))),
     };
 
     // Consecutivos de gym hacia atrás desde un día dado (cruza semanas y meses)
@@ -470,9 +473,12 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
     // El déficit es de ~3 sesiones cada 28 días, no un problema semanal.
     // Se dobla en días aptos (L sin restricción, P condicional) respetando D1-D4.
     if (pendientes.length) {
-      // D3 · en la semana de descarga no se dobla
+      // D3 · en la semana de descarga solo se dobla con lo MÁS SUAVE (natación o
+      // bici, nunca running). Antes no se doblaba nada y esas semanas perdían el
+      // cardio: 5 huecos para 6 sesiones y la única salida cerrada.
       const semanaBloque = Math.floor(diffDias(deISO(ds[0].fecha), inicio) / 7) % DOBLES.semanasBloque + 1;
-      const enDescarga = DOBLES.saltarEnDescarga && semanaBloque === DOBLES.semanasBloque;
+      const enDescarga = semanaBloque === DOBLES.semanasBloque;
+      const esSuave = (s) => DOBLES.descarga.doblesSuaves.includes(s);
 
       // Orden de preferencia de qué se dobla (el running es el más flexible de horario)
       const rango = (x) => { const i = DOBLES.prioridad.indexOf(x); return i === -1 ? 99 : i; };
@@ -483,14 +489,40 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
       // Candidata: natación principal, no fijada, cuyo día admite running (turno y
       // S3). Anfitrión para ella: otro día con principal que no sea natación, turno
       // que permite doblar, franja de piscina compatible, y sin romper D1 ni D2.
+      // D2: sin días doblados pegados
+      const sinVecinosDoblados = (d) => {
+        if (!DOBLES.noConsecutivos) return true;
+        const vecino = (n) => [...dias, ...ds].find(x => x.fecha === aISO(sumarDias(deISO(d.fecha), n)));
+        return !vecino(-1)?.sesionSecundaria && !vecino(1)?.sesionSecundaria;
+      };
+      // Anfitriones posibles para doblar `sesion`: días con principal, turno que
+      // admite doblar, combinación válida, no tras pierna si es cardio (S3 para
+      // el running; para la bici es el mismo criterio que en el flexible: el
+      // cuádriceps sí trabaja), y D2.
+      // L antes que P: el P es condicional (ventana corta tras dormir).
+      const anfitrionesPara = (sesion) => ds
+        .filter(d => d.sesion && !d.sesionSecundaria && DOBLES.turnos[d.turno]?.permite)
+        .filter(d => combinacionValida(d.sesion, sesion).ok)
+        .filter(d => !(CARDIO_CUPO.includes(sesion) && esTrasPierna(d)))
+        .filter(sinVecinosDoblados)
+        .sort((a, b) => (DOBLES.turnos[a.turno].condicional - DOBLES.turnos[b.turno].condicional)
+          || a.fecha.localeCompare(b.fecha));
+
+      // Dobla `sesion` sobre su mejor anfitrión. Devuelve el anfitrión o null.
+      const doblar = (sesion, host) => {
+        host.sesionSecundaria = sesion;
+        host.dobleOrden = ordenDoble(host.sesion, sesion);
+        host.dobleCondicional = !!DOBLES.turnos[host.turno].condicional;
+        if (host.dobleCondicional) {
+          avisos.push({ semana: ds[0].fecha, fecha: host.fecha, tipo: 'doble_condicional',
+            texto: `Día ${host.dia} (posturno): se dobló ${sesion} sobre ${host.sesion}. ${DOBLES.turnos.P.condicion}.` });
+        }
+        return host;
+      };
+
       const natCedeDiaARunning = () => {
         const dobladosSemana = ds.filter(d => d.sesionSecundaria).length;
         if (dobladosSemana >= DOBLES.maxPorSemana) return false;                      // D1
-        const sinVecinosDoblados = (d) => {
-          if (!DOBLES.noConsecutivos) return true;                                     // D2
-          const vecino = (n) => [...dias, ...ds].find(x => x.fecha === aISO(sumarDias(deISO(d.fecha), n)));
-          return !vecino(-1)?.sesionSecundaria && !vecino(1)?.sesionSecundaria;
-        };
         const candidatas = ds
           .filter(d => d.sesion === 'natacion' && !d.fijado && !d.sesionSecundaria)
           .filter(d => admiteCardio(d.turno) && !esTrasPierna(d))
@@ -525,12 +557,6 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
       };
 
       for (const queFalta of [...pendientes]) {
-        if (enDescarga) {
-          noResueltos.push(queFalta);
-          avisos.push({ semana: ds[0].fecha, fecha: ds[0].fecha, tipo: 'doble_en_descarga',
-            texto: `Semana del ${ds[0].dia}: es la semana ${semanaBloque} del bloque, la de DESCARGA (P4: mitad de series, RIR +2). No se dobla en descarga (D3), así que ${queFalta} no cabe como segunda sesión — se propone en el día flexible.` });
-          continue;
-        }
         const dobladosSemana = ds.filter(d => d.sesionSecundaria).length;
         if (dobladosSemana >= DOBLES.maxPorSemana) {   // D1
           noResueltos.push(queFalta);
@@ -539,26 +565,34 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
           continue;
         }
 
-        // Anfitriones posibles: días con sesión principal, turno que admite doblar,
-        // combinación válida, y sin romper D2 (dos doblados seguidos)
+        // D3 · en descarga, lo que no es suave no se dobla. El gym se queda fuera
+        // sin más. El running tiene dos salidas suaves, en este orden: que una
+        // natación ceda su día (la doble es la natación) o que la bici lo
+        // sustituya doblada sobre un gym de torso. Running doblado, nunca.
+        if (enDescarga && !esSuave(queFalta)) {
+          if (queFalta === 'running') {
+            if (natCedeDiaARunning()) continue;
+            const host = anfitrionesPara('ciclismo')[0];
+            if (host) {
+              doblar('ciclismo', host);
+              avisos.push({ semana: ds[0].fecha, fecha: host.fecha, tipo: 'bici_en_descarga',
+                texto: `Día ${host.dia}: semana de DESCARGA (D3). El running no se dobla; en su lugar, bici sobre ${host.sesion} —lo más suave que quedaba—. El cardio semanal no se pierde.` });
+              continue;
+            }
+          }
+          noResueltos.push(queFalta);
+          avisos.push({ semana: ds[0].fecha, fecha: ds[0].fecha, tipo: 'doble_en_descarga',
+            texto: `Semana del ${ds[0].dia}: es la semana ${semanaBloque} del bloque, la de DESCARGA (P4: mitad de series, RIR +2). Solo se dobla con natación o bici (D3), y ${queFalta} no cabe así${queFalta === 'running' ? ' — se propone en el día flexible' : ''}.` });
+          continue;
+        }
+
         // Un 'gym' pendiente se materializa en la sesión que toque de la cola:
         // guardar el token genérico dejaba días con sesionSecundaria: 'gym'.
         // Con guardarraíl: un gym doblado también es un gym consecutivo.
         const gymDoble = queFalta === 'gym' ? proximaGym() : null;
         const sesionPendiente = gymDoble ? gymDoble.sesion : queFalta;
 
-        const anfitriones = ds
-          .filter(d => d.sesion && !d.sesionSecundaria && DOBLES.turnos[d.turno]?.permite)
-          .filter(d => combinacionValida(d.sesion, sesionPendiente).ok)
-          .filter(d => !(queFalta === 'running' && esTrasPierna(d)))   // S3 también para la secundaria
-          .filter(d => {
-            if (!DOBLES.noConsecutivos) return true;                    // D2
-            const vecino = (n) => [...dias, ...ds].find(x => x.fecha === aISO(sumarDias(deISO(d.fecha), n)));
-            return !vecino(-1)?.sesionSecundaria && !vecino(1)?.sesionSecundaria;
-          })
-          // L antes que P: el P es condicional (ventana corta tras dormir)
-          .sort((a, b) => (DOBLES.turnos[a.turno].condicional - DOBLES.turnos[b.turno].condicional)
-            || a.fecha.localeCompare(b.fecha));
+        const anfitriones = anfitrionesPara(sesionPendiente);
 
         if (!anfitriones.length) {
           // El running solo dobla sobre gym de torso en L o P, y a menudo no queda
@@ -603,21 +637,39 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
         }
       }
 
-      // Si el running no encontró sitio, el día flexible es su casa: para eso está.
-      // No se impone —sigue siendo descanso por defecto— sino que se propone, y la
-      // app pregunta las dos condiciones que no puede saber (sueño y peso).
-      // `sesion` es lo que no cupo (running); `opciones`, lo que puedes hacer con
-      // ese hueco: running o bici, a elegir. La bici existe para este día
-      // precisamente —turno C, 12h de pie— y cubre el ciclismo del triatlón.
+      // Si el cardio no encontró sitio, el día flexible es su casa: para eso está.
+      // Y ya no se propone: se PONE. Bici por defecto, porque el flexible cae en
+      // turno C —12h de pie— y la bici da el mismo Z2 sin castigar pies ni tibias.
+      // Lo importante es no saltarse el cardio de la semana; correr o pedalear es
+      // lo de menos. La app ofrece cambiarlo a running o a descanso.
+      // Solo cuando la app SABE que no toca (viene de pierna, o de dos gym
+      // seguidos) se queda en descanso y se vuelve a proponer, como antes.
       if (noResueltos.includes('running') && flexible && !flexible.sesionSecundaria) {
-        flexible.sugerencia = {
-          sesion: 'running',
-          opciones: [...CARDIO_FLEXIBLE],
-          motivo: 'Esta semana el running no cupo en ningún otro día. Si dormiste bien, el peso va subiendo y no vienes de dos días de gym seguidos, haz cardio hoy: running, o bici si los pies vienen castigados de las 12h.',
-          cond3Cumplida: flexible.flexibleCond3,
-        };
-        avisos.push({ semana: ds[0].fecha, fecha: flexible.fecha, tipo: 'running_al_flexible',
-          texto: `Día ${flexible.dia}: el running no cupo en ningún día no-C, así que se propone cardio en el día flexible —running o bici, a elegir. La app te preguntará por el sueño y el peso.` });
+        const puedePorDefecto = !flexible.trasPierna && flexible.flexibleCond3;
+        if (puedePorDefecto) {
+          flexible.sesion = CARDIO_POR_DEFECTO_FLEXIBLE;
+          flexible.cardioPorDefecto = true;
+          flexible.sugerencia = {
+            sesion: CARDIO_POR_DEFECTO_FLEXIBLE,
+            porDefecto: CARDIO_POR_DEFECTO_FLEXIBLE,
+            opciones: [...CARDIO_FLEXIBLE],
+            motivo: 'Esta semana el cardio no cupo en ningún otro día, así que hoy toca bici por defecto: mismo Z2 que correr, sin impacto tras 12h de pie. Si te apetece correr, cámbialo; si no dormiste o el peso no sube, descansa.',
+            cond3Cumplida: true,
+          };
+          avisos.push({ semana: ds[0].fecha, fecha: flexible.fecha, tipo: 'bici_por_defecto',
+            texto: `Día ${flexible.dia}: el cardio no cupo en ningún día no-C, así que el día flexible pasa a BICI por defecto. Puedes cambiarlo a running o a descanso desde la sesión.` });
+        } else {
+          flexible.sugerencia = {
+            sesion: 'running',
+            opciones: [...CARDIO_FLEXIBLE],
+            motivo: flexible.trasPierna
+              ? 'Esta semana el cardio no cupo en ningún otro día, pero ayer fue pierna: no se pone bici por defecto. Si dormiste bien y el peso va subiendo, bici suave; correr no (S3).'
+              : 'Esta semana el cardio no cupo en ningún otro día, pero vienes de dos días de gym seguidos: no se pone bici por defecto. Si dormiste bien y el peso va subiendo, cardio suave.',
+            cond3Cumplida: flexible.flexibleCond3,
+          };
+          avisos.push({ semana: ds[0].fecha, fecha: flexible.fecha, tipo: 'running_al_flexible',
+            texto: `Día ${flexible.dia}: el cardio no cupo en ningún día no-C y el flexible ${flexible.trasPierna ? 'viene de pierna' : 'viene de dos gym seguidos'}, así que no se pone bici por defecto: se propone. La app te preguntará por el sueño y el peso.` });
+        }
       }
     }
 

@@ -642,6 +642,61 @@ if (flexTrasPierna) {
   await p.close();
 }
 
+// ══ 11b · BICI POR DEFECTO EN EL FLEXIBLE ══
+// Cuando el cardio de la semana no cupo en ningún otro día, el generador ya no
+// lo propone: pone BICI en el flexible. Lo importante es no saltarse el cardio;
+// correr o pedalear es lo de menos. Aquí no se pregunta nada: se explica y se
+// deja cambiar a running (si apetece correr) o a descanso. El primer caso en el
+// calendario es 2026-09-23, un mes después del ancla.
+seccion('FLEXIBLE · BICI POR DEFECTO');
+const FECHA_BICI_DEF = '2026-09-23';
+const sepD = generarMes({ anio: 2026, mes: 8 }).dias;
+const biciDef = sepD.find(d => d.fecha === FECHA_BICI_DEF);
+ok(`El generador pone bici por defecto el ${FECHA_BICI_DEF}`,
+  biciDef?.cardioPorDefecto === true && biciDef.sesion === 'ciclismo', `${biciDef?.sesion} · porDefecto=${biciDef?.cardioPorDefecto}`);
+if (biciDef?.cardioPorDefecto) {
+  const irASeptiembre = async (pg) => {
+    await pg.locator('button[aria-label="Mes siguiente"]').click();
+    await pg.waitForTimeout(600);
+  };
+  p = await nuevaPagina();
+  await irASeptiembre(p);
+  // La celda sigue llevando el marcador "flex" pegado a la etiqueta: el día es
+  // bici, pero NO está fijado — sigue siendo el día negociable de la semana.
+  const celdaBici = (await sesionPorDia(p))[biciDef.dia];
+  ok('El calendario de septiembre ya lo pinta como Bici', /^Bici/.test(celdaBici ?? ''), celdaBici);
+  ok('Y sigue marcado como flexible: no está fijado', /flex$/.test(celdaBici ?? ''), celdaBici);
+  await abrirDia(p, FECHA_BICI_DEF);
+  const txtDef = await p.evaluate(() => document.body.innerText);
+  ok('El panel dice que hoy toca bici por defecto', /bici por defecto/i.test(txtDef));
+  ok('Y explica por qué: el cardio no cupo en ningún otro día', /no cupo en ningún otro día/i.test(txtDef));
+  ok('No pregunta nada: ya está puesto, no hay sueño ni peso que decidir',
+    await p.locator('text=/¿Dormiste bien esta semana\\?/').count() === 0
+    && await p.locator('text=/¿El peso corporal va subiendo\\?/').count() === 0);
+  ok('La sesión del día es la de bici, con sus bloques Z2', await p.locator('text=/Z2 continuo/').count() > 0);
+  const botones = await p.evaluate(() => [...document.querySelectorAll('button')].map(x => x.textContent.trim()));
+  ok('Ofrece correr en su lugar', botones.includes('Correr en su lugar'), botones.filter(t => /Correr|descanso/i.test(t)).join(' · '));
+  ok('Y ofrece descansar', botones.includes('Hoy descanso'));
+  // "Si algún día me apetece correr, que la app me deje elegir"
+  await p.locator('button[aria-label="Correr en su lugar"]').click();
+  await p.waitForTimeout(700);
+  ok('Pulsar correr fija el día a running', (await ls(p)).fijados?.[FECHA_BICI_DEF]?.sesion === 'running',
+    JSON.stringify((await ls(p)).fijados?.[FECHA_BICI_DEF]));
+  await p.locator('text=Calendario').first().click(); await p.waitForTimeout(600);
+  ok('Y el calendario lo refleja', (await sesionPorDia(p))[biciDef.dia] === 'Running', (await sesionPorDia(p))[biciDef.dia]);
+  await p.close();
+
+  // La otra salida: no me apetece, hoy descanso
+  p = await nuevaPagina();
+  await irASeptiembre(p);
+  await abrirDia(p, FECHA_BICI_DEF);
+  await p.locator('button[aria-label="Hoy descanso"]').click();
+  await p.waitForTimeout(700);
+  ok('Pulsar descanso fija el día a descanso', (await ls(p)).fijados?.[FECHA_BICI_DEF]?.sesion === 'descanso',
+    JSON.stringify((await ls(p)).fijados?.[FECHA_BICI_DEF]));
+  await p.close();
+}
+
 seccion('BOTÓN SÍ/NO ESTABLE ENTRE RENDERS');
 // Si el componente se recreara en cada render, el foco se perdería al pulsar
 p = await nuevaPagina();
@@ -670,7 +725,12 @@ if (diaDesc) {
   ok('El día de descarga lo avisa explícitamente', txtDesc.includes('DESCARGA (P4)'));
   ok('Y dice qué hacer: mitad de series y RIR +2',
     txtDesc.includes('mitad de las series') && txtDesc.includes('RIR +2'));
-  ok('Explica que no se dobla esa semana', await p.locator('text=/No se doblan sesiones esta semana/i').count() > 0);
+  // D3 cambió: antes en descarga no se doblaba NADA y el cardio de esas semanas
+  // se perdía. Ahora se dobla solo con lo suave (natación o bici), así que el
+  // aviso del día dice eso. La aserción sigue cubriendo lo mismo: que el día
+  // explique la política de dobles de la semana, no solo las series y el RIR.
+  ok('Explica la política de dobles de esa semana: solo lo suave',
+    /solo se dobla con lo suave/i.test(txtDesc) && /natación o bici/i.test(txtDesc));
 } else {
   ok('Hay un día de descarga que comprobar', false, 'no se encontró');
 }

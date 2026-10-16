@@ -9,11 +9,11 @@ Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 
 | # | Comando | Baseline |
 |---|---|---|
-| 1 · Lógica | `npm test` | 124/124 + 82/82 = **206** (158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4) |
-| 2a · Interfaz | `npm run test:ui` | **199/199** · 0 errores de página (142 al cerrar la Tarea 1; +5 en 1.1; +4 en 1.4; +4 en 1.5; +6 en 2.2; +8 en 2.1; +9 en 2.3; +4 en 2.4; +7 en 2.5; +10 en E11) |
+| 1 · Lógica | `npm test` | 139/139 + 82/82 = **221** (158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4; +15 en la decisión 1) |
+| 2a · Interfaz | `npm run test:ui` | **210/210** · 0 errores de página (142 al cerrar la Tarea 1; +5 en 1.1; +4 en 1.4; +4 en 1.5; +6 en 2.2; +8 en 2.1; +9 en 2.3; +4 en 2.4; +7 en 2.5; +10 en E11; +11 en la decisión 1) |
 | 2b · Auditoría | `npm run audit` | **21/21** · 0 errores de página |
 | 3 · Lint | `npx oxlint` | **0 avisos / 0 errores** |
-| 4 · Build | `npm run build` | compila · 352 kB (gzip 104) |
+| 4 · Build | `npm run build` | compila · 369 kB (gzip 109) |
 | 5 · Snapshot | `npm run test:snapshot` | **2/2** · contrato de localStorage intacto |
 | 6 · Renders | `npm run test:renders` | **App = 0** al marcar la 2ª serie |
 
@@ -163,14 +163,16 @@ Requiere `npx playwright install chromium` una vez.
 2. `test-snapshot.mjs` + `baseline-snapshot.json` — la puerta 5, nueva.
 3. `package.json` — el script `test:snapshot`.
 
-## Tarea 2 · lo hecho y lo que queda por decidir
+## Tarea 2 · lo hecho
 
-Doce puntos en tres bloques, un commit cada uno (`4a02914..0c79e60`). Los
-números del plan salen de `npm run audit:plan`; al cerrar el bloque 1:
+Doce puntos en tres bloques, un commit cada uno (`4a02914..0c79e60`), más las
+dos decisiones que quedaron abiertas al cerrar el bloque 1. Los números del
+plan salen de `npm run audit:plan`; con la decisión 1 ya dentro:
 
 ```
-  gym 3.00 · natación 2.00 · running 0.81 (era 0.71) · bici 0.00 (ofrecida en 15)
-  semanas sin correr 15/78 (eran 23) · dobles 43 · solapes fijado→siguiente 0 (eran 14)
+  gym 3.00 · natación 2.00 · running 0.90 (era 0.71) · bici 0.10 · CARDIO 1.00
+  semanas sin cardio 0/78 (eran 23 sin correr) · dobles 50
+  solapes fijado→siguiente 0 (eran 14)
 ```
 
 Tres de los puntos (1.4, 1.5 y la mitad de 1.2) describían el estado anterior
@@ -179,20 +181,28 @@ arreglar lo que quedaba detrás. Y aparecieron cosas que ningún punto pedía:
 38 ejercicios sin temporizador por un `includes('0s')`, sesiones fantasma al
 usar la carga sugerida sin entrenar, y un agujero de S3 en el flexible.
 
-### Decisiones abiertas (bloque 1)
+### Decisión 1 · el cardio al 1.00 — IMPLEMENTADA
 
-**Los 24 solapes `anterior → fijado`.** El guardarraíl da 0 en su clase. Los
-otros 24 los provoca el usuario al fijar un gym que solapa con el anterior ya
-generado. Opciones: (a) aviso al fijar, en `SelectorVariante` y `EditModal`
-— recomendada —; (b) mirar hacia delante en el generador, que reescribe días
-no editados y no garantiza 0.
+El criterio es del usuario: *"lo importante es hacer cardio de forma regular;
+la distinción entre correr y pedalear me importa menos que no saltármelo"*. Así
+que el cupo de 1 pasó a ser de **cardio** (`CARDIO_CUPO = ['running',
+'ciclismo']`), no de running: una bici cubre la semana y no se busca otro hueco.
+Dos cambios, los dos con la bici como salida suave:
 
-**El running al 1.00.** Quedan 15 semanas: 9 de descarga (D3 no deja doblar;
-5 huecos para 6 sesiones) y 6 con las dos natación tras pierna. Ninguna se
-resuelve sin tocar algo: (a) permitir una doble suave en descarga → ~0.92;
-(b) que la natación prefiera P a L cuando los dos L caen tras pierna → +0.05;
-(c) running por defecto en el flexible cuando no cupo → 1.00, pero es correr
-tras 12h de pie; (d) dejarlo en 0.81 asignado + 0.19 ofrecido con bici.
+- **D3 ya no prohíbe doblar en descarga: prohíbe doblar FUERTE.**
+  `DOBLES.descarga.doblesSuaves = ['natacion', 'ciclismo']`. En esas semanas
+  (5 huecos para 6 sesiones) el orden es: que una natación ceda su día al
+  running → si no, bici doblada sobre un gym de torso → si no, al flexible.
+  Running doblado en descarga nunca; gym extra, tampoco.
+- **El flexible pone BICI por defecto cuando el cardio no cupo** (antes solo lo
+  proponía y por defecto era descanso). `CARDIO_POR_DEFECTO_FLEXIBLE`. Bici y
+  no running porque ese día cae en turno C: 12h de pie, y la bici da el mismo
+  Z2 sin castigar pies ni tibias. El panel ya no pregunta nada ahí: explica y
+  ofrece **Correr en su lugar** o **Hoy descanso**. Si el flexible viene de
+  pierna (S3) o de dos gym seguidos, no se pone nada: se sigue proponiendo.
+
+Resultado: running 0.90, bici 0.10, **cardio 1.00/sem y 0 semanas sin cardio**.
+8 de los 78 flexibles pasan a bici por defecto.
 
 ## Pendientes detectados durante la Tarea 1 (para la Tarea 2)
 

@@ -175,7 +175,7 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
             <p className="text-[11px] text-violet-100 leading-relaxed">
               <span className="font-bold">Semana {diaData.semanaBloque} del bloque: DESCARGA (P4).</span> Hoy haces
               la <span className="font-bold">mitad de las series</span> y dejas <span className="font-bold">2 repeticiones más en el tanque</span> (RIR +2).
-              No se doblan sesiones esta semana (D3): si algo no cupo, se propone en el día flexible.
+              Esta semana solo se dobla con lo suave —natación o bici— (D3): nada de running doblado ni gym extra.
               Prioriza dormir — la descarga es donde se consolida lo de las siete semanas anteriores.
             </p>
           </div>

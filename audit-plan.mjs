@@ -9,7 +9,7 @@
 //   node audit-plan.mjs 2027-01-31   → hasta esa fecha
 
 import { generarDesdeAncla, ANCLA_DEFAULT } from './src/generador.js';
-import { CUPO_SEMANAL } from './src/data.js';
+import { CUPO_SEMANAL, CARDIO_CUPO } from './src/data.js';
 
 const hasta = process.argv[2] ?? (() => {
   const [y, m] = ANCLA_DEFAULT.fecha.split('-').map(Number);
@@ -39,10 +39,13 @@ const run = cuenta(s => s === 'running');
 const bici = cuenta(s => s === 'ciclismo');
 const dobles = completas.reduce((a, s) => a + s.filter(d => d.sesionSecundaria).length, 0);
 const flexibles = completas.reduce((a, s) => a + s.filter(d => d.flexible).length, 0);
-const flexSugRun = completas.reduce((a, s) => a + s.filter(d => d.flexible && d.sugerencia?.opciones?.includes('running')).length, 0);
-const flexSugBici = completas.reduce((a, s) => a + s.filter(d => d.flexible && d.sugerencia?.opciones?.includes('ciclismo')).length, 0);
+const flexBiciDef = completas.reduce((a, s) => a + s.filter(d => d.flexible && d.cardioPorDefecto).length, 0);
+const flexSug = completas.reduce((a, s) => a + s.filter(d => d.flexible && d.sugerencia && !d.cardioPorDefecto).length, 0);
 const flexTrasPierna = completas.reduce((a, s) => a + s.filter(d => d.flexible && d.trasPierna).length, 0);
+// El cupo de running es de CARDIO (CARDIO_CUPO): running o bici cubren la semana.
+const esCardio = (d) => CARDIO_CUPO.includes(d.sesion) || CARDIO_CUPO.includes(d.sesionSecundaria);
 const semSinRun = completas.filter(s => !s.some(d => d.sesion === 'running' || d.sesionSecundaria === 'running')).length;
+const semSinCardio = completas.filter(s => !s.some(esCardio)).length;
 
 const porTipo = {};
 for (const a of avisos) porTipo[a.tipo] = (porTipo[a.tipo] || 0) + 1;
@@ -52,10 +55,11 @@ const f = (x) => (x / n).toFixed(2).padStart(5);
 console.log(`\n══ AUDITORÍA DEL PLAN · ${dias.length} días · ${n} semanas completas · ${ANCLA_DEFAULT.fecha} → ${hasta} ══\n`);
 console.log(`  gym       ${f(gym)} /sem   (cupo ${CUPO_SEMANAL.gym})`);
 console.log(`  natación  ${f(nat)} /sem   (cupo ${CUPO_SEMANAL.natacion})`);
-console.log(`  running   ${f(run)} /sem   (cupo ${CUPO_SEMANAL.running} · mínimo exigido 1.00)   semanas sin running: ${semSinRun}/${n}`);
-console.log(`  bici      ${f(bici)} /sem`);
+console.log(`  running   ${f(run)} /sem   semanas sin running: ${semSinRun}/${n}`);
+console.log(`  bici      ${f(bici)} /sem   (de ellas ${flexBiciDef} por defecto en el flexible)`);
+console.log(`  cardio    ${f(run + bici)} /sem   (running + bici · cupo ${CUPO_SEMANAL.running} · mínimo exigido 1.00)   semanas sin cardio: ${semSinCardio}/${n}`);
 console.log(`  dobles    ${dobles} totales · ${f(dobles)} /sem`);
-console.log(`  flexible  ${flexibles} días · con sugerencia de cardio en ${flexSugRun} (running) / ${flexSugBici} (bici) · tras pierna: ${flexTrasPierna} (sin running por S3)`);
+console.log(`  flexible  ${flexibles} días · bici por defecto en ${flexBiciDef} · solo propuesta (tras pierna o dos gym seguidos) en ${flexSug} · tras pierna: ${flexTrasPierna}`);
 console.log(`\n  avisos por tipo (${avisos.length}):`);
 for (const [t, c] of Object.entries(porTipo).sort((a, b) => b[1] - a[1])) console.log(`    ${t.padEnd(22)} ${c}`);
 if (runPerdidos) console.log(`    · de los sin_hueco_doblando, ${runPerdidos} son de running`);

@@ -8,8 +8,39 @@ import BotonSiNo from '../comunes/BotonSiNo.jsx';
 // Por defecto descanso. Pasa a running solo si se cumplen las TRES. La tercera
 // la calcula el generador (no venir de dos días de gym seguidos); las otras dos
 // dependen de datos que solo sabe el usuario, así que se preguntan.
+//
+// EXCEPCIÓN · cardio por defecto. Si el cardio de la semana no cupo en ningún
+// otro día, el generador ya ha puesto BICI en este (lo importante es no
+// saltárselo). Aquí no se pregunta nada: se explica y se ofrece cambiar a
+// running —si apetece correr— o a descanso —si no se dormió o el peso no sube—.
 const PanelFlexible = ({ dia, respuesta }) => {
   const { onFlexible: onResponder, onConvertirFlexible: onConvertir } = useAccionesCtx();
+  if (dia.cardioPorDefecto) {
+    return (
+      <div className="mb-3 rounded-lg border-l-4 border-sky-600 bg-sky-950/20 px-3 py-2.5">
+        <div className="flex items-start gap-2 mb-2">
+          <Zap size={15} className="text-sky-300 flex-shrink-0 mt-0.5" />
+          <div className="text-[11px] text-slate-300 leading-relaxed">
+            <span className="font-bold">Día flexible · hoy bici por defecto.</span> {dia.sugerencia?.motivo}
+          </div>
+        </div>
+        <div className="flex gap-1.5">
+          <button onClick={() => onConvertir(dia.fecha, 'running')} aria-label="Correr en su lugar"
+            className="flex-1 py-2 rounded-lg text-white text-[11px] font-bold uppercase"
+            style={{ background: SESION_INFO.running.color }}>
+            Correr en su lugar
+          </button>
+          <button onClick={() => onConvertir(dia.fecha, 'descanso')} aria-label="Hoy descanso"
+            className="flex-1 py-2 rounded-lg text-slate-200 text-[11px] font-bold uppercase bg-slate-700">
+            Hoy descanso
+          </button>
+        </div>
+        <p className="text-[10px] text-slate-500 leading-relaxed mt-1.5">
+          Cualquiera de los dos fija el día: el generador lo respeta al recalcular. Se deshace desde el modo edición (liberar día).
+        </p>
+      </div>
+    );
+  }
   const cond3 = dia.flexibleCond3 !== false;
   const durmio = respuesta?.sueno;
   const peso = respuesta?.peso;

@@ -1,7 +1,8 @@
 // Banco de pruebas del generador v6.
 // Verifica las reglas del plan contra 6 meses generados, no contra un caso feliz.
 import { generarMes, generarDesdeAncla, FESTIVOS_DEFAULT, franjasCompatibles, deISO, aISO } from './src/generador.js';
-import { SECUENCIA_GYM, SECUENCIA_NATACION, NATACION_CSS, S7_PIERNA, CUPO_SEMANAL, DOBLES, GYM_PIERNA, SESIONES, CARDIO_FLEXIBLE } from './src/data.js';
+import { SECUENCIA_GYM, SECUENCIA_NATACION, NATACION_CSS, S7_PIERNA, CUPO_SEMANAL, DOBLES, GYM_PIERNA, GYM_TORSO, SESIONES,
+  CARDIO_FLEXIBLE, CARDIO_CUPO, CARDIO_POR_DEFECTO_FLEXIBLE } from './src/data.js';
 import { combinacionValida, ordenDoble, validarSeparacion, POLITICA_FIJADO, solapanGym } from './src/generador.js';
 
 const ES_PIERNA = new Set(['gymC1', 'gymC2']);
@@ -239,14 +240,12 @@ sems.forEach(([lun, ds]) => {
 });
 check(`3 gym y 2 natación en las ${sems.length} semanas completas`, fuera.length === 0, fuera.slice(0, 4).join(' · '));
 
-// El running: o cae en la semana, o se propone en el día flexible
-const sinRunning = sems.filter(([, ds]) => {
-  const hay = ds.some(d => d.sesion === 'running' || d.sesionSecundaria === 'running');
-  const propuesto = ds.some(d => d.sugerencia?.sesion === 'running');
-  return !hay && !propuesto;
-});
-check(`Toda semana tiene running asignado o propuesto en el flexible (${sinRunning.length} sin nada)`,
-  sinRunning.length === 0, sinRunning.slice(0, 3).map(([l]) => l).join(', '));
+// El cardio: cae en la semana, siempre. Running si cupo; si no, bici (doblada en
+// descarga, o por defecto en el flexible). Antes bastaba con "propuesto".
+const sinCardio = sems.filter(([, ds]) =>
+  !ds.some(d => CARDIO_CUPO.includes(d.sesion) || CARDIO_CUPO.includes(d.sesionSecundaria)));
+check(`Toda semana tiene cardio ASIGNADO, running o bici (${sinCardio.length} sin nada)`,
+  sinCardio.length === 0, sinCardio.slice(0, 3).map(([l]) => l).join(', '));
 
 // La calistenia YA NO ocupa día
 const calDias = dias.filter(d => d.sesion === 'calistenia' || d.sesionSecundaria === 'calistenia');
@@ -299,15 +298,18 @@ check('Toda día marcado como descarga es la semana 8 del bloque',
 check('Y todos los días llevan su número de semana del bloque',
   dias.every(d => d.semanaBloque >= 1 && d.semanaBloque <= DOBLES.semanasBloque));
 
-// En descarga NO se dobla, pero la sesión no se pierde: se propone en el flexible
+// D3 · en descarga solo se dobla con lo MÁS SUAVE (natación o bici). Antes no se
+// doblaba nada y el cardio de esas semanas se perdía (0.81 → 1.00 con esto y el
+// flexible). Running doblado en descarga, nunca; gym extra, tampoco.
 const semanasDescarga = {};
 dias.forEach(d => { if (!d.descarga) return;
   const f = deISO(d.fecha);
   const lun = aISO(new Date(f.getTime() - ((f.getUTCDay() + 6) % 7) * 86400000));
   (semanasDescarga[lun] ??= []).push(d); });
 const descCompletas = Object.values(semanasDescarga).filter(ds => ds.length === 7);
-check(`En descarga no se dobla ninguna sesión (${descCompletas.length} semanas)`,
-  descCompletas.every(ds => !ds.some(d => d.sesionSecundaria)));
+const doblesDesc = descCompletas.flatMap(ds => ds.filter(d => d.sesionSecundaria).map(d => d.sesionSecundaria));
+check(`En descarga toda doble es suave: natación o bici, nunca running ni gym (${doblesDesc.length} dobles en ${descCompletas.length} semanas)`,
+  doblesDesc.every(s => DOBLES.descarga.doblesSuaves.includes(s)), doblesDesc.join(', '));
 check('Y en descarga se conservan gym y natación completos',
   descCompletas.every(ds => {
     const n = { gym: 0, natacion: 0 };
@@ -315,11 +317,8 @@ check('Y en descarga se conservan gym y natación completos',
       const k = String(x).startsWith('gym') ? 'gym' : x; if (k in n) n[k]++; }));
     return n.gym === CUPO_SEMANAL.gym && n.natacion === CUPO_SEMANAL.natacion;
   }));
-check('Lo que no cupo en descarga se propone en el flexible, no se pierde',
-  descCompletas.every(ds => {
-    const hayRun = ds.some(d => d.sesion === 'running' || d.sesionSecundaria === 'running');
-    return hayRun || ds.some(d => d.sugerencia?.sesion === 'running');
-  }));
+check('En descarga el cardio no se pierde: running o bici en todas',
+  descCompletas.every(ds => ds.some(d => CARDIO_CUPO.includes(d.sesion) || CARDIO_CUPO.includes(d.sesionSecundaria))));
 check('El aviso de descarga ya no dice que la sesión se salta',
   !avisos.filter(a => a.tipo === 'doble_en_descarga').some(a => /se salta/i.test(a.texto)));
 
@@ -566,8 +565,9 @@ check('Sin dato → sin veredicto', S4(null) === null && S4('') === null);
 // quedaba fuera: 0.71/sem, 23 semanas de 78 sin correr. Dos intercambios que no
 // tocan ninguna regla ni cupo lo suben: el swap-S3 (la pierna cede su día al
 // running y pasa al hueco que S3 bloqueaba) y la natación que se dobla para
-// dejarle su día. Lo que queda son semanas de descarga (D3: no se dobla) y
-// semanas con las dos natación tras pierna: eso ya es una decisión de reglas.
+// dejarle su día. Lo que quedaba (descarga y semanas con las dos natación tras
+// pierna) lo cubre la bici: doblada en descarga o por defecto en el flexible.
+// El cupo de running es de CARDIO: running o bici, 1.00/sem exigido.
 console.log('\n── RUNNING · ASIGNACIÓN REAL EN 18 MESES ──');
 const largo = generarDesdeAncla({ hasta: '2028-01-31' });
 const semanasDe18 = (() => {
@@ -584,12 +584,42 @@ const runSem = mediaSemanal18(s => s === 'running'), gymSem = mediaSemanal18(s =
 check(`${nSem} semanas completas: gym exactamente 3.00/sem (real ${gymSem.toFixed(2)})`, Math.abs(gymSem - 3) < 0.005);
 check(`Natación exactamente 2.00/sem (real ${natSem.toFixed(2)})`, Math.abs(natSem - 2) < 0.005);
 check(`Running ≥ 0.80/sem (real ${runSem.toFixed(2)} · era 0.71 antes de los intercambios)`, runSem >= 0.80);
+const biciSem = mediaSemanal18(s => s === 'ciclismo');
+check(`Cardio (running + bici) exactamente 1.00/sem (real ${(runSem + biciSem).toFixed(2)} · era 0.81 solo con running)`,
+  Math.abs(runSem + biciSem - 1) < 0.005);
+const esCardio18 = (d) => CARDIO_CUPO.includes(d.sesion) || CARDIO_CUPO.includes(d.sesionSecundaria);
+check('Ninguna semana de las 78 se queda sin cardio', semanasDe18.every(s => s.some(esCardio18)));
+check('Nunca dos cardios en la misma semana: la bici solo entra donde el running no cupo',
+  semanasDe18.every(s => s.reduce((a, d) => a + (CARDIO_CUPO.includes(d.sesion) ? 1 : 0) + (CARDIO_CUPO.includes(d.sesionSecundaria) ? 1 : 0), 0) === 1));
 const sinRun = semanasDe18.filter(s => !s.some(d => d.sesion === 'running' || d.sesionSecundaria === 'running'));
-check(`Toda semana sin running tiene motivo (descarga o sin hueco) y lo propone en el flexible (${sinRun.length} semanas)`,
+check(`Toda semana sin running tiene bici, y con motivo: doblada en descarga o por defecto en el flexible (${sinRun.length} semanas)`,
   sinRun.every(s => {
     const av = largo.avisos.filter(a => a.semana === s[0].fecha).map(a => a.tipo);
-    return (av.includes('doble_en_descarga') || av.includes('sin_hueco_doblando')) && av.includes('running_al_flexible');
+    return s.some(d => d.sesion === 'ciclismo' || d.sesionSecundaria === 'ciclismo')
+      && (av.includes('bici_en_descarga') || av.includes('bici_por_defecto'));
   }));
+// D3 nuevo: la doble de descarga es la más suave disponible, en orden natación →
+// bici. En estos 18 meses la bici doblada no llega a hacer falta (la natación
+// cede, o el flexible la recoge), así que el `every` puede ser vacío: lo que se
+// exige es que, si ocurre, sea donde debe.
+const biciDesc = largo.avisos.filter(a => a.tipo === 'bici_en_descarga');
+check(`Bici doblada en descarga (${biciDesc.length} en 18 meses): si ocurre, en semana de descarga, nunca sobre pierna ni el día después`,
+  biciDesc.every(a => {
+    const i = largo.dias.findIndex(x => x.fecha === a.fecha); const d = largo.dias[i];
+    return d?.descarga && d.sesionSecundaria === 'ciclismo' && (GYM_TORSO.includes(d.sesion) || d.sesion === 'natacion')
+      && !ES_PIERNA.has(largo.dias[i - 1]?.sesion);
+  }));
+check('Y solo cuando la natación no pudo ceder su día: nunca coinciden en la misma semana',
+  biciDesc.every(a => !largo.avisos.some(b => b.semana === a.semana && b.tipo === 'natacion_cede_a_running')));
+check('Ningún running doblado en semana de descarga (D3)',
+  !largo.dias.some(d => d.descarga && d.sesionSecundaria === 'running'));
+check('Ningún gym doblado en semana de descarga (D3)',
+  !largo.dias.some(d => d.descarga && d.sesionSecundaria?.startsWith('gym')));
+const descSinSalida = largo.avisos.filter(a => a.tipo === 'doble_en_descarga');
+check(`Cuando en descarga no hay doble suave posible (${descSinSalida.length} veces), el flexible de esa semana recoge el cardio como bici`,
+  descSinSalida.every(a => largo.avisos.some(b => b.semana === a.semana && b.tipo === 'bici_por_defecto')));
+const semDesc18 = semanasDe18.filter(s => s[0].descarga);
+check(`Ninguna de las ${semDesc18.length} semanas de descarga se queda sin cardio`, semDesc18.every(s => s.some(esCardio18)));
 const swapsS3 = largo.avisos.filter(a => a.tipo === 'running_por_swap_s3');
 const cedidas = largo.avisos.filter(a => a.tipo === 'natacion_cede_a_running');
 check(`El swap-S3 actúa (${swapsS3.length} veces) y el running queda ese día`,
@@ -614,12 +644,13 @@ const gyms18 = l18.filter(d => d.sesion.startsWith('gym'));
 const saltos18 = gyms18.filter((d, i) => i > 0 && d.sesion !== SECUENCIA_GYM[(SECUENCIA_GYM.indexOf(gyms18[i - 1].sesion) + 1) % 5]);
 check(`La cola de gym no se descoloca con el swap-S3 (${saltos18.length} saltos en ${gyms18.length} gyms)`, saltos18.length === 0);
 
-// ── BICI EN EL FLEXIBLE (v7.1) ──
+// ── BICI EN EL FLEXIBLE (v7.1 → v7.2) ──
 // El flexible cae en turno C: 12h de pie. La bici es el cardio que no castiga
-// pies ni tibias, y cubre el ciclismo del triatlón. La sugerencia del generador
-// decía solo "running"; ahora dice qué no cupo (running) y qué opciones hay
-// (running o bici). Y anota si el día anterior fue pierna: ahí S3 prohíbe el
-// running y la UI no debe ofrecerlo.
+// pies ni tibias, y cubre el ciclismo del triatlón. Cuando el cardio de la
+// semana no cupo en ningún otro día, el generador ya no lo PROPONE: lo PONE,
+// bici por defecto (lo importante es no saltárselo; correr o pedalear es lo de
+// menos). La app deja cambiarlo a running o a descanso. Solo si el flexible
+// viene de pierna o de dos gym seguidos se queda en descanso y se propone.
 console.log('\n── BICI EN EL FLEXIBLE ──');
 const flex18 = l18.filter(d => d.flexible);
 check(`Todo flexible sabe si viene de pierna (${flex18.length} flexibles)`, flex18.every(d => typeof d.trasPierna === 'boolean'));
@@ -630,8 +661,33 @@ check('Y los que no, no', flex18.filter(d => !d.trasPierna).every(d => !ES_PIERN
 const conSug = flex18.filter(d => d.sugerencia);
 check(`Toda sugerencia del flexible ofrece running Y bici (${conSug.length} sugerencias)`,
   conSug.length > 0 && conSug.every(d => d.sugerencia.opciones?.includes('running') && d.sugerencia.opciones?.includes('ciclismo')));
-check('La sugerencia sigue diciendo qué no cupo: running', conSug.every(d => d.sugerencia.sesion === 'running'));
-check('Ninguna sugerencia cae en un flexible tras pierna (sería proponer romper S3)', conSug.every(d => !d.trasPierna));
+const porDefecto = flex18.filter(d => d.cardioPorDefecto);
+check(`Bici por defecto en el flexible: existe (${porDefecto.length}) y la sesión del día ES bici, no descanso`,
+  porDefecto.length > 0 && porDefecto.every(d => d.sesion === CARDIO_POR_DEFECTO_FLEXIBLE && d.sugerencia?.porDefecto === CARDIO_POR_DEFECTO_FLEXIBLE));
+check('El defecto es la bici, no el running', CARDIO_POR_DEFECTO_FLEXIBLE === 'ciclismo');
+check('Nunca por defecto tras pierna ni tras dos gym seguidos: eso lo sabe la app',
+  porDefecto.every(d => !d.trasPierna && d.flexibleCond3 !== false));
+check('Y sigue siendo flexible: conserva la marca y la sugerencia con las dos opciones',
+  porDefecto.every(d => d.flexible && d.sugerencia.opciones.includes('running') && d.sugerencia.opciones.includes('ciclismo')));
+const soloPropuesta = conSug.filter(d => !d.cardioPorDefecto);
+check(`Lo que solo se propone (${soloPropuesta.length}) es porque viene de pierna o de dos gym seguidos, y el día sigue en descanso`,
+  soloPropuesta.every(d => (d.trasPierna || d.flexibleCond3 === false) && d.sesion === 'descanso' && d.sugerencia.sesion === 'running'));
+check('Cada bici por defecto tiene su aviso, y solo uno por semana',
+  porDefecto.every(d => largo.avisos.filter(a => a.tipo === 'bici_por_defecto' && a.fecha === d.fecha).length === 1)
+  && largo.avisos.filter(a => a.tipo === 'bici_por_defecto').length === porDefecto.length);
+// Si me apetece correr, la app me deja: fijar el flexible a running lo respeta el generador
+const unaBici = porDefecto[0];
+if (unaBici) {
+  const [y, m] = unaBici.fecha.split('-').map(Number);
+  const conRun = generarMes({ anio: y, mes: m - 1, fijados: { [unaBici.fecha]: { turno: 'C', sesion: 'running' } } }).dias;
+  const dRun = conRun.find(d => d.fecha === unaBici.fecha);
+  const lunesDe = (iso) => aISO(new Date(deISO(iso).getTime() - ((deISO(iso).getUTCDay() + 6) % 7) * 86400000));
+  check(`Fijar ese flexible a running (${unaBici.fecha}) se respeta: running, fijado, y sin bici de más esa semana`,
+    dRun?.sesion === 'running' && dRun.fijado
+    && !conRun.some(d => lunesDe(d.fecha) === lunesDe(unaBici.fecha) && (d.sesion === 'ciclismo' || d.sesionSecundaria === 'ciclismo')));
+  const conDesc = generarMes({ anio: y, mes: m - 1, fijados: { [unaBici.fecha]: { turno: 'C', sesion: 'descanso' } } }).dias;
+  check('Y fijarlo a descanso también: ese día descansa', conDesc.find(d => d.fecha === unaBici.fecha)?.sesion === 'descanso');
+}
 
 console.log(`\n══ TOTAL: ${pruebas - fallos}/${pruebas} pruebas pasadas ══`);
 process.exit(fallos ? 1 : 0);
