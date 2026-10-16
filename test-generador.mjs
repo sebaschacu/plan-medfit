@@ -3,7 +3,7 @@
 import { generarMes, generarDesdeAncla, FESTIVOS_DEFAULT, franjasCompatibles, deISO, aISO } from './src/generador.js';
 import { SECUENCIA_GYM, SECUENCIA_NATACION, NATACION_CSS, S7_PIERNA, CUPO_SEMANAL, DOBLES, GYM_PIERNA, GYM_TORSO, SESIONES,
   CARDIO_FLEXIBLE, CARDIO_CUPO, CARDIO_POR_DEFECTO_FLEXIBLE } from './src/data.js';
-import { combinacionValida, ordenDoble, validarSeparacion, POLITICA_FIJADO, solapanGym } from './src/generador.js';
+import { combinacionValida, ordenDoble, validarSeparacion, POLITICA_FIJADO, solapanGym, avisoAlFijar } from './src/generador.js';
 
 const ES_PIERNA = new Set(['gymC1', 'gymC2']);
 const diff = (a, b) => Math.round((deISO(a) - deISO(b)) / 86400000);
@@ -420,6 +420,80 @@ check('El guardarraíl NO crea violaciones de S7: las que hay son piernas fijada
 // Los que quedan son decisión del usuario: fijar una A justo después de la A que
 // el generador ya había puesto. El guardarraíl no reescribe días anteriores.
 console.log(`  · quedan ${bAnte} solapes "generado anterior → fijado": los provoca el propio fijado, no la cola`);
+
+// ── AVISO AL FIJAR · los solapes hacia atrás, avisados ──
+// Hacia atrás no se puede arreglar sin reescribir días que el usuario no editó,
+// así que no se arregla: se AVISA antes de fijar, y la decisión sigue siendo
+// suya. `avisoAlFijar` es pura y mira el calendario que ya se está viendo. Aquí
+// se comprueba que PREDICE exactamente lo que pasaría: ni un solape sin aviso
+// (silencio donde hay problema) ni un aviso sin solape (ruido).
+// Funciona porque fijar un día no cambia nada ANTES de ese día: la generación es
+// cronológica desde el ancla.
+console.log('\n── AVISO AL FIJAR (solape hacia atrás y S7) ──');
+const baseAgosto = generarDesdeAncla({ hasta: '2026-08-31' }).dias;
+const piernaEn = (d) => [d.sesion, d.sesionSecundaria].find(s => ES_P.has(s));
+let sinAviso = [], aviosDeMas = [], s7SinAviso = [], s7DeMas = [], totalSolape = 0, totalS7 = 0;
+for (const d of gymsAgosto) for (const g of SECUENCIA_GYM) {
+  const avs = avisoAlFijar(baseAgosto, d.fecha, g);
+  const dioSolape = avs.some(a => a.tipo === 'solape_al_fijar');
+  const dioS7 = avs.some(a => a.regla === 'S7');
+
+  // Lo que REALMENTE pasa al fijar: se mira la transición que entra al día fijado
+  const { dias: tras } = generarDesdeAncla({ hasta: HASTA_BARRIDO, fijados: { [d.fecha]: { turno: d.turno, sesion: g } } });
+  const gymsT = tras.filter(x => x.sesion?.startsWith('gym'));
+  const iFij = gymsT.findIndex(x => x.fecha === d.fecha);
+  const haySolape = iFij > 0 && solapanGym(gymsT[iFij - 1].sesion, g);
+  const piernasT = tras.filter(piernaEn);
+  const jFij = piernasT.findIndex(x => x.fecha === d.fecha);
+  const hayS7 = ES_P.has(g) && jFij > 0 && diasEntre(piernasT[jFij - 1].fecha, d.fecha) < S7_PIERNA.separacionMinimaDias;
+
+  if (haySolape) totalSolape++;
+  if (hayS7) totalS7++;
+  if (haySolape && !dioSolape) sinAviso.push(`${d.fecha}→${g}`);
+  if (!haySolape && dioSolape) aviosDeMas.push(`${d.fecha}→${g}`);
+  if (hayS7 && !dioS7) s7SinAviso.push(`${d.fecha}→${g}`);
+  if (!hayS7 && dioS7) s7DeMas.push(`${d.fecha}→${g}`);
+}
+check(`Los ${totalSolape} solapes hacia atrás del barrido quedan todos avisados`,
+  totalSolape > 0 && sinAviso.length === 0, sinAviso.slice(0, 4).join(', '));
+check('Y no se avisa donde no hay solape: cero falsos positivos', aviosDeMas.length === 0, aviosDeMas.slice(0, 4).join(', '));
+check(`Las ${totalS7} violaciones de S7 por fijar pierna tras pierna quedan todas avisadas`,
+  totalS7 > 0 && s7SinAviso.length === 0, s7SinAviso.slice(0, 4).join(', '));
+check('Y tampoco se avisa de S7 donde la separación se respeta', s7DeMas.length === 0, s7DeMas.slice(0, 4).join(', '));
+check('Avisar no cambia el plan: la función es pura y no toca el calendario',
+  JSON.stringify(generarDesdeAncla({ hasta: '2026-08-31' }).dias) === JSON.stringify(baseAgosto));
+
+// Casos a mano, para que el contrato quede escrito y no dependa del barrido
+const calDemo = [
+  { fecha: '2026-09-01', dia: 1, sesion: 'gymA' },
+  { fecha: '2026-09-02', dia: 2, sesion: 'natacion' },
+  { fecha: '2026-09-03', dia: 3, sesion: 'gymC1' },
+  { fecha: '2026-09-04', dia: 4, sesion: 'descanso' },
+];
+check('Fijar gymD tras gymA avisa de solape (comparten banca), aunque haya un día en medio',
+  avisoAlFijar(calDemo, '2026-09-02', 'gymD').some(a => a.tipo === 'solape_al_fijar'));
+check('Fijar gymB tras gymA no avisa: son antagonistas, no solapan',
+  avisoAlFijar(calDemo, '2026-09-02', 'gymB').length === 0);
+check('Fijar la MISMA sesión que la anterior avisa: repetirla solapa siempre',
+  avisoAlFijar(calDemo, '2026-09-02', 'gymA').some(a => a.tipo === 'solape_al_fijar'));
+check('Fijar gymC2 un día después de gymC1 avisa de S7 y de solape de pierna',
+  avisoAlFijar(calDemo, '2026-09-04', 'gymC2').some(a => a.regla === 'S7')
+  && avisoAlFijar(calDemo, '2026-09-04', 'gymC2').some(a => a.tipo === 'solape_al_fijar'));
+check(`Con ${S7_PIERNA.separacionMinimaDias} días de separación, la pierna ya no avisa de S7`,
+  !avisoAlFijar([...calDemo, { fecha: '2026-09-05', dia: 5, sesion: 'gymB' }], '2026-09-05', 'gymC2')
+    .some(a => a.regla === 'S7'));
+check('Fijar natación o descanso no avisa de nada: no hay patrón que solape',
+  avisoAlFijar(calDemo, '2026-09-02', 'natacion').length === 0 && avisoAlFijar(calDemo, '2026-09-02', 'descanso').length === 0);
+check('Sin nada antes (primer día del plan) no hay nada de lo que avisar',
+  avisoAlFijar(calDemo, '2026-08-01', 'gymA').length === 0);
+check('Un día de pierna YA FIJADO justo después también avisa: el generador no lo moverá',
+  avisoAlFijar([{ fecha: '2026-09-10', dia: 10, sesion: 'gymC2', fijado: true }], '2026-09-09', 'gymC1')
+    .some(a => a.regla === 'S7' && a.contra === '2026-09-10'));
+check('Pero si ese día de después NO está fijado, no se avisa: se recalcula solo',
+  avisoAlFijar([{ fecha: '2026-09-10', dia: 10, sesion: 'gymC2' }], '2026-09-09', 'gymC1')
+    .every(a => a.regla !== 'S7'));
+check('Los avisos traen texto y contra qué día chocan, para poder pintarlos',
+  avisoAlFijar(calDemo, '2026-09-02', 'gymA').every(a => a.texto?.length > 40 && a.fecha && a.contra));
 
 console.log('\n── FIJAR VARIANTE DE NATACIÓN ──');
 const variantesDe = (fijados = {}) => generarDesdeAncla({ hasta: '2026-12-31', fijados }).dias

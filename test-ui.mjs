@@ -819,6 +819,77 @@ ok('Confirmar cambia la sesión', dV.fijados?.[gymV.fecha]?.sesion === 'gymC1');
 ok('Y borra el registro que quedaría huérfano', !dV.prog?.[gymV.fecha]);
 await p.close();
 
+// ══ 13b · AVISO AL FIJAR UN GYM QUE SOLAPA (o rompe S7) ══
+// Fijar a mano se salta las reglas del generador, que solo protege hacia
+// delante. Hacia atrás no se puede arreglar sin reescribir días que no se
+// editaron, así que se avisa y se deja decidir. Caso del calendario: el día 8 de
+// agosto viene de una C1 el día 7, así que fijar C1 o C2 ahí solapa (pierna) Y
+// rompe S7 (un solo día de separación).
+seccion('AVISO AL FIJAR · SELECTOR');
+const DIA_SOLAPE = '2026-08-08';      // gymD, con gymC1 justo el día antes
+p = await nuevaPagina();
+await abrirDia(p, DIA_SOLAPE);
+await abrirSelector(p);
+const insignias = await p.evaluate(() => [...document.querySelectorAll('[aria-label$="con aviso"]')]
+  .map(b => b.getAttribute('aria-label')));
+ok('Las opciones problemáticas vienen marcadas antes de tocarlas', insignias.length === 2,
+  insignias.join(' · ') || 'ninguna');
+ok('Y las marcadas son las dos de pierna',
+  insignias.length === 2 && insignias.every(t => /Gym C/.test(t)), insignias.join(' · ') || 'ninguna');
+await pulsar(p, 'Gym C1');
+const txtAviso = await p.evaluate(() => document.body.innerText);
+ok('No fija nada todavía: primero avisa', !(await ls(p)).fijados?.[DIA_SOLAPE], JSON.stringify((await ls(p)).fijados));
+ok('Dice que son dos problemas', /tiene 2 problemas/i.test(txtAviso), txtAviso.match(/tiene \d+ problemas?/i)?.[0]);
+ok('Avisa del solape y nombra el gym anterior', /Solape ·/.test(txtAviso) && /El gym anterior \(día 7, ayer mismo\) es Gym C1/.test(txtAviso));
+ok('Y avisa de S7 con la separación que quedaría', /S7 ·/.test(txtAviso) && /un solo día antes/.test(txtAviso));
+await p.locator('button[aria-label="Cancelar el cambio de sesión"]').click(); await p.waitForTimeout(400);
+ok('"Mejor no" deja el día como estaba', !(await ls(p)).fijados?.[DIA_SOLAPE]);
+await pulsar(p, 'Gym C1');
+await p.locator('button[aria-label="Fijar igual"]').click(); await p.waitForTimeout(700);
+ok('Pero "Fijar igual" lo fija: el aviso informa, no bloquea',
+  (await ls(p)).fijados?.[DIA_SOLAPE]?.sesion === 'gymC1', JSON.stringify((await ls(p)).fijados?.[DIA_SOLAPE]));
+await p.close();
+
+// Una opción que NO solapa se fija directa, sin pasar por el aviso
+p = await nuevaPagina();
+await abrirDia(p, DIA_SOLAPE);
+await abrirSelector(p); await pulsar(p, 'Gym B');
+ok('Una opción sin problema se fija directa, sin aviso de por medio',
+  (await ls(p)).fijados?.[DIA_SOLAPE]?.sesion === 'gymB', JSON.stringify((await ls(p)).fijados?.[DIA_SOLAPE]));
+await p.close();
+
+// El mismo aviso en el modo edición del calendario, donde se elige la sesión de
+// un día que no es de gym. Día 13: viene de una C1 el día 12 (pierna).
+seccion('AVISO AL FIJAR · MODO EDICIÓN');
+const DIA_EDIT = '2026-08-13';
+p = await nuevaPagina();
+await p.locator('button[aria-label="Modo edición"]').click();
+await p.waitForTimeout(400);
+await abrirDia(p, DIA_EDIT);
+const hayModal = await p.locator('text=/Editar día 13/').count() > 0;
+ok('Se abre el modal de edición del día 13', hayModal);
+if (hayModal) {
+  await elegirSesionEnModal(p, 'Gym C1', 'Gym');
+  await p.waitForTimeout(400);
+  const txtEdit = await p.evaluate(() => document.body.innerText);
+  ok('El modal avisa del solape antes de guardar', /Solape ·/.test(txtEdit), txtEdit.match(/Solape ·[^\n]{0,60}/)?.[0]);
+  ok('Y de S7', /S7 ·/.test(txtEdit));
+  ok('Dice explícitamente que no se reescribe ningún otro día', /los días que no edites se quedan como están/i.test(txtEdit));
+  ok('Guardar sigue habilitado: el aviso no bloquea',
+    await p.evaluate(() => ![...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Guardar')?.disabled));
+  await p.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Guardar')?.click());
+  await p.waitForTimeout(800);
+  ok('Y guarda el día que elegí', (await ls(p)).fijados?.[DIA_EDIT]?.sesion === 'gymC1',
+    JSON.stringify((await ls(p)).fijados?.[DIA_EDIT]));
+  // "Nada de reescribir días que no edité"
+  const trasFijar = generarMes(MES_TEST).dias;
+  const conFijado = generarMes({ ...MES_TEST, fijados: { [DIA_EDIT]: { turno: 'L', sesion: 'gymC1' } } }).dias;
+  const antes13 = trasFijar.filter(d => d.fecha < DIA_EDIT).map(d => `${d.fecha}:${d.sesion}`).join('|');
+  const antes13b = conFijado.filter(d => d.fecha < DIA_EDIT).map(d => `${d.fecha}:${d.sesion}`).join('|');
+  ok('Fijar ese día no toca ni un día anterior', antes13 === antes13b);
+}
+await p.close();
+
 // ══ 14 · IMPORTAR RESTAURA TODO LO QUE EXPORTA ══
 // snapshot() guarda 7 campos; onImportar solo restauraba 5. Importar un respaldo
 // borraba en silencio las rutinas editadas, el test CSS y los complementos.

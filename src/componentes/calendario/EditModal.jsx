@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { X, Star, AlertTriangle, RotateCcw } from 'lucide-react';
 import { TURNO_INFO, SESION_INFO } from '../../data.js';
-import { useProgresoCtx } from '../../estado/contextos.js';
+import { useProgresoCtx, usePlanCtx } from '../../estado/contextos.js';
+import { avisoAlFijar } from '../../generador.js';
 import MenuSesiones from './MenuSesiones.jsx';
 
 // ═══════════════ EDIT DAY MODAL ═══════════════
@@ -9,6 +10,7 @@ import MenuSesiones from './MenuSesiones.jsx';
 // pantalla y cerrarlo es cosa del enrutador. El progreso lo lee de aquí.
 const EditModal = ({ dia, onSave, onLiberar, onClose }) => {
   const { progress } = useProgresoCtx();
+  const { calendario } = usePlanCtx();
   // Las horas de sueño (__sueno) no son un ejercicio: no cuentan como registro.
   const ejerciciosRegistrados = Object.keys(progress[dia.fecha] || {}).filter(k => !k.startsWith('__')).length;
   const [turno, setTurno] = useState(dia.turno);
@@ -21,6 +23,11 @@ const EditModal = ({ dia, onSave, onLiberar, onClose }) => {
   const cambiaSesion = sesion !== dia.sesion;
   const destruye = cambiaSesion && ejerciciosRegistrados > 0;
   const bloqueado = destruye && !asumido;
+  // Fijar a mano se salta las reglas del generador, que solo puede proteger
+  // hacia delante: el día anterior ya está en el calendario y moverlo sería
+  // reescribir días que no se editaron. Así que se avisa, con la sesión ya
+  // elegida y antes de guardar; guardar sigue siendo posible.
+  const avisos = cambiaSesion ? avisoAlFijar(calendario, dia.fecha, sesion) : [];
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 bg-black/80" onClick={onClose}>
       <div className="w-full max-w-md bg-[#151b21] border border-[#2a3540] rounded-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -59,6 +66,27 @@ const EditModal = ({ dia, onSave, onLiberar, onClose }) => {
           </div>
         </div>
         <div className="p-4 pt-0 flex flex-col gap-2">
+          {/* Aviso: la sesión elegida solapa con el gym anterior, o rompe S7 */}
+          {avisos.length > 0 && (
+            <div className="px-3 py-2.5 rounded-lg border-l-4 border-amber-500 bg-amber-950/25">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={15} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-bold text-amber-200">
+                    {SESION_INFO[sesion]?.label} aquí {avisos.length === 1 ? 'tiene un problema' : `tiene ${avisos.length} problemas`}, pero puedes guardar igual:
+                  </p>
+                  {avisos.map((a, i) => (
+                    <p key={i} className="text-[11px] text-amber-100/90 leading-relaxed">
+                      <span className="font-bold">{a.regla === 'S7' ? 'S7 · ' : 'Solape · '}</span>{a.texto}
+                    </p>
+                  ))}
+                  <p className="text-[10px] text-amber-200/70 leading-relaxed">
+                    Nada se reescribe por este aviso: los días que no edites se quedan como están.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Aviso: este día ya tiene entrenamiento registrado */}
           {destruye && (
             <div className="px-3 py-2.5 rounded-lg border-l-4 border-red-500 bg-red-950/25">

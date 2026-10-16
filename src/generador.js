@@ -21,7 +21,7 @@
 
 import { SECUENCIA_GYM, SECUENCIA_NATACION, NATACION_CSS, PISCINA, VENTANA_PISCINA, CUPO_SEMANAL,
   PRIORIDAD_TURNO, S7_PIERNA, DOBLES, GYM_PIERNA, GYM_TORSO, GYM_SOLAPAN, ORDEN_DOBLE, CARDIO_FLEXIBLE,
-  CARDIO_CUPO, CARDIO_POR_DEFECTO_FLEXIBLE } from './data.js';
+  CARDIO_CUPO, CARDIO_POR_DEFECTO_FLEXIBLE, SESION_INFO } from './data.js';
 
 // El cupo y las prioridades se LEEN de data.js: si se hardcodearan aquí, esas
 // constantes volverían a ser decoración y cambiar el plan obligaría a tocar dos
@@ -123,6 +123,56 @@ export function solapanGym(a, b) {
   if (!a || !b) return false;
   if (a === b) return true;
   return GYM_SOLAPAN.some(([x, y]) => (a === x && b === y) || (a === y && b === x));
+}
+
+// ─── Avisos al fijar un gym a mano ───
+// El guardarraíl de arriba solo protege HACIA DELANTE: lo que el generador pone
+// después de un día fijado. Hacia atrás no puede hacer nada, porque el día
+// anterior ya está en el calendario y reescribirlo sería mover días que el
+// usuario no editó. Medido: de 38 solapes con un día fijado, 14 eran
+// fijado→siguiente (los arregla el guardarraíl, hoy 0) y 24 anterior→fijado.
+// Para esos 24 la respuesta no es tocar nada: es AVISAR antes de fijar, y que
+// la decisión siga siendo del usuario. Se avisa de dos cosas:
+//   · solape de patrón con el gym anterior (GYM_SOLAPAN)
+//   · S7, la separación mínima entre días de pierna
+// Función PURA: recibe el calendario que ya se está viendo y devuelve la lista
+// de avisos. No muta nada, no fija nada, no decide nada.
+export function avisoAlFijar(calendario, fecha, sesion) {
+  const out = [];
+  if (!sesion || !String(sesion).startsWith('gym') || !fecha) return out;
+  const gymDe = (d) => [d.sesion, d.sesionSecundaria].find(s => String(s).startsWith('gym'));
+  const piernaDe = (d) => [d.sesion, d.sesionSecundaria].find(s => GYM_PIERNA.includes(s));
+  const dias = (calendario ?? []).filter(d => d?.fecha).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const previos = dias.filter(d => d.fecha < fecha);
+
+  // 1. Solape de patrón con el gym anterior. No hace falta que sea el día de
+  //    antes: lo que castiga la misma zona dos veces son dos SESIONES seguidas.
+  const anterior = previos.filter(gymDe).at(-1);
+  if (anterior && solapanGym(gymDe(anterior), sesion)) {
+    const dist = diffDias(deISO(fecha), deISO(anterior.fecha));
+    out.push({ tipo: 'solape_al_fijar', regla: 'guardarraíl', fecha, contra: anterior.fecha,
+      texto: `El gym anterior (día ${anterior.dia}, ${dist === 1 ? 'ayer mismo' : `${dist} días antes`}) es ${SESION_INFO[gymDe(anterior)]?.label ?? gymDe(anterior)}, y comparte patrón principal con ${SESION_INFO[sesion]?.label ?? sesion}: harías la misma zona dos sesiones seguidas sin recuperar. El generador evita esto solo hacia delante; este día lo eliges tú.` });
+  }
+
+  // 2. S7 · separación mínima entre días de pierna, hacia atrás y hacia delante.
+  //    Hacia delante solo se mira contra días ya FIJADOS: los demás los
+  //    recalcula el generador respetando S7, así que avisar de ellos sería ruido.
+  if (GYM_PIERNA.includes(sesion)) {
+    const minimo = S7_PIERNA.separacionMinimaDias;
+    const antes = previos.filter(piernaDe).at(-1);
+    if (antes && diffDias(deISO(fecha), deISO(antes.fecha)) < minimo) {
+      const dist = diffDias(deISO(fecha), deISO(antes.fecha));
+      out.push({ tipo: 's7_al_fijar', regla: 'S7', fecha, contra: antes.fecha,
+        texto: `El día de pierna anterior fue el ${antes.dia}, ${dist === 1 ? 'un solo día antes' : `${dist} días antes`}. S7 pide al menos ${minimo} días entre piernas y aquí quedarían ${dist}: el cuádriceps no llega a recuperar. Puedes fijarlo igual, pero sabiendo esto.` });
+    }
+    const despues = dias.find(d => d.fecha > fecha && d.fijado && piernaDe(d));
+    if (despues && diffDias(deISO(despues.fecha), deISO(fecha)) < minimo) {
+      const dist = diffDias(deISO(despues.fecha), deISO(fecha));
+      out.push({ tipo: 's7_al_fijar', regla: 'S7', fecha, contra: despues.fecha,
+        texto: `El día ${despues.dia} ya está fijado con pierna, ${dist === 1 ? 'un solo día después' : `${dist} días después`}. S7 pide al menos ${minimo} días: al estar fijado, el generador no lo va a mover para hacer sitio.` });
+    }
+  }
+  return out;
 }
 
 // ═══════════════ SESIONES DOBLES ═══════════════

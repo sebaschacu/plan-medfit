@@ -9,8 +9,8 @@ Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 
 | # | Comando | Baseline |
 |---|---|---|
-| 1 · Lógica | `npm test` | 139/139 + 82/82 = **221** (158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4; +15 en la decisión 1) |
-| 2a · Interfaz | `npm run test:ui` | **210/210** · 0 errores de página (142 al cerrar la Tarea 1; +5 en 1.1; +4 en 1.4; +4 en 1.5; +6 en 2.2; +8 en 2.1; +9 en 2.3; +4 en 2.4; +7 en 2.5; +10 en E11; +11 en la decisión 1) |
+| 1 · Lógica | `npm test` | 154/154 + 82/82 = **236** (158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4; +15 en la decisión 1; +15 en la decisión 2) |
+| 2a · Interfaz | `npm run test:ui` | **227/227** · 0 errores de página (142 al cerrar la Tarea 1; +5 en 1.1; +4 en 1.4; +4 en 1.5; +6 en 2.2; +8 en 2.1; +9 en 2.3; +4 en 2.4; +7 en 2.5; +10 en E11; +11 en la decisión 1; +17 en la decisión 2) |
 | 2b · Auditoría | `npm run audit` | **21/21** · 0 errores de página |
 | 3 · Lint | `npx oxlint` | **0 avisos / 0 errores** |
 | 4 · Build | `npm run build` | compila · 369 kB (gzip 109) |
@@ -167,12 +167,12 @@ Requiere `npx playwright install chromium` una vez.
 
 Doce puntos en tres bloques, un commit cada uno (`4a02914..0c79e60`), más las
 dos decisiones que quedaron abiertas al cerrar el bloque 1. Los números del
-plan salen de `npm run audit:plan`; con la decisión 1 ya dentro:
+plan salen de `npm run audit:plan`; al cerrar la tarea entera:
 
 ```
   gym 3.00 · natación 2.00 · running 0.90 (era 0.71) · bici 0.10 · CARDIO 1.00
   semanas sin cardio 0/78 (eran 23 sin correr) · dobles 50
-  solapes fijado→siguiente 0 (eran 14)
+  solapes fijado→siguiente 0 (eran 14) · los 24 anterior→fijado, avisados
 ```
 
 Tres de los puntos (1.4, 1.5 y la mitad de 1.2) describían el estado anterior
@@ -203,6 +203,26 @@ Dos cambios, los dos con la bici como salida suave:
 
 Resultado: running 0.90, bici 0.10, **cardio 1.00/sem y 0 semanas sin cardio**.
 8 de los 78 flexibles pasan a bici por defecto.
+
+### Decisión 2 · los 24 solapes `anterior → fijado` — IMPLEMENTADA
+
+No se arreglan: se **avisan**. Arreglarlos exigiría reescribir el día anterior,
+que el usuario no editó, y eso no se hace. `avisoAlFijar(calendario, fecha,
+sesion)` es una función **pura** en `generador.js` que mira el calendario que ya
+se está viendo y devuelve los avisos. Cubre dos cosas:
+
+- **solape de patrón** con el gym anterior (`GYM_SOLAPAN`), haya o no días en
+  medio: lo que castiga la zona son dos *sesiones* seguidas, no dos días.
+- **S7** hacia atrás (pierna fijada 1 día tras otra pierna: eran 4 en el
+  barrido) y hacia delante solo contra días ya fijados, que el generador no
+  moverá.
+
+Se pinta en los dos sitios donde se fija a mano: `SelectorVariante` marca las
+opciones problemáticas antes de tocarlas y pide confirmar (**Mejor no** /
+**Fijar igual**), y `EditModal` lo muestra con la sesión elegida, sin bloquear
+Guardar. El aviso informa; la decisión sigue siendo del usuario. Verificado
+contra el barrido de 60 combinaciones: los 24 solapes y las 4 violaciones de S7
+quedan avisados, con cero falsos positivos.
 
 ## Pendientes detectados durante la Tarea 1 (para la Tarea 2)
 
