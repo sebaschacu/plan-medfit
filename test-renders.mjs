@@ -9,9 +9,9 @@
 //   App          el enrutador. Con el estado en el Provider, debería quedar en 0.
 //   SessionView  la pantalla que se está tocando: 1 es lo esperado.
 //   CalendarView nunca está montado a la vez que SessionView: debe ser 0.
-//   PanelDia     hermano que NO depende del progreso. Sigue re-renderizando por
-//                arrastre del padre: eso lo arregla React.memo en la Tarea 4,
-//                no los contextos. Se mide para dejarlo visible.
+//   DiaView      la pantalla del día. En el rediseño D la sesión se abre desde
+//                ella y la sustituye: tampoco está montada, debe ser 0.
+//   PanelDia     vive en la pantalla del día: tampoco está montado, debe ser 0.
 //
 // USO: build + preview en :4173 (ver BASELINE.md), y CHROMIUM en Windows.
 //   node test-renders.mjs
@@ -41,7 +41,7 @@ await p.goto(URL, { waitUntil: 'networkidle' });
 await p.waitForTimeout(1100);
 
 // Al calendario y hasta el mes del ancla, como hace test-ui.mjs
-await p.locator('text=Calendario').first().click().catch(() => {});
+await p.locator('nav[aria-label="Secciones"] button', { hasText: 'Calendario' }).first().click().catch(() => {});
 await p.waitForTimeout(500);
 if (await p.locator('header .lucide-settings').count() === 0) {
   throw new Error(`no se llegó al calendario${errores.length ? ' · ' + errores.at(-1) : ''}`);
@@ -52,11 +52,12 @@ for (let i = 0; i < Math.abs(mesesDesdeHoy); i++) {
   await p.waitForTimeout(160);
 }
 
-// Abrir el primer gym del mes
-await p.evaluate(n => [...document.querySelectorAll('main button')]
-  .find(x => x.textContent.trim().startsWith(n + ' ·'))?.click(), gymV.dia);
+// Abrir el primer gym del mes y entrar en su sesión
+await p.locator(`main button[data-dia="${gymV.dia}"]`).click();
 await p.waitForTimeout(600);
 ok('Se abre un día de gym', await p.locator('text=/ejercicios/i').count() > 0, gymV.fecha + ' ' + gymV.sesion);
+await p.locator('button', { hasText: /^Empezar sesión/ }).click();
+await p.waitForTimeout(600);
 
 // ── La medida ──
 // Se resetea el contador justo antes del toque y se lee 300 ms después:
@@ -69,11 +70,11 @@ ok('Se abre un día de gym', await p.locator('text=/ejercicios/i').count() > 0, 
 // progreso llega a componentes que no lo necesitan.
 const medir = async (n) => {
   await p.evaluate(() => { window.__renders = {}; });
-  await p.locator('main button').filter({ hasText: new RegExp(`^${n}$`) }).first().click();
+  await p.locator(`button[aria-label^="Hecha la serie ${n} de"]`).first().click();
   await p.waitForTimeout(300);
   const r = await p.evaluate(() => ({ ...window.__renders }));
   // Saltar el temporizador para que la siguiente medida arranque limpia
-  await p.locator('button', { hasText: 'SALTAR' }).click().catch(() => {});
+  await p.locator('button', { hasText: /^Saltar$/ }).click().catch(() => {});
   await p.waitForTimeout(200);
   return r;
 };
@@ -83,11 +84,12 @@ const r2 = await medir(2);
 const fila = (k) => `  ${k.padEnd(13)} ${String(r1[k] ?? 0).padStart(2)}   ${String(r2[k] ?? 0).padStart(2)}`;
 console.log('\n── RENDERS AL MARCAR UNA SERIE ──');
 console.log('                1ª   2ª');
-for (const k of ['App', 'SessionView', 'CalendarView', 'PanelDia']) console.log(fila(k));
+for (const k of ['App', 'SessionView', 'CalendarView', 'DiaView', 'PanelDia']) console.log(fila(k));
 console.log();
 
-ok('Las dos series quedaron marcadas', await p.locator('main button svg.lucide-check').count() >= 2);
+ok('Las dos series quedaron marcadas', await p.locator('main button[aria-label^="Serie 1 hecha"], main button[aria-label^="Serie 2 hecha"]').count() >= 2);
 ok('CalendarView no se renderiza (no está montado)', (r1.CalendarView ?? 0) === 0 && (r2.CalendarView ?? 0) === 0);
+ok('Ni la pantalla del día, que la sesión sustituye', (r2.DiaView ?? 0) === 0 && (r2.PanelDia ?? 0) === 0);
 ok('SessionView se renderiza (es la pantalla activa)', (r1.SessionView ?? 0) >= 1 && (r2.SessionView ?? 0) >= 1);
 // El objetivo del paso 7, medido en la 2ª serie. Se informa siempre; se exige a partir de 7e.
 const objetivo = process.argv.includes('--exigir-app-0');
@@ -99,6 +101,6 @@ if (errores.length) { fallos++; console.log(`\n  ❌ Errores de página: ${error
 else ok('Sin errores de página', true);
 
 await b.close();
-const res = (r) => `App=${r.App ?? 0} SV=${r.SessionView ?? 0} Cal=${r.CalendarView ?? 0} PanelDia=${r.PanelDia ?? 0}`;
+const res = (r) => `App=${r.App ?? 0} SV=${r.SessionView ?? 0} Cal=${r.CalendarView ?? 0} Dia=${r.DiaView ?? 0} PanelDia=${r.PanelDia ?? 0}`;
 console.log(`\n══ RENDERS: ${fallos ? 'FALLA' : 'ok'} · 1ª[${res(r1)}] 2ª[${res(r2)}] ══\n`);
 process.exit(fallos ? 1 : 0);

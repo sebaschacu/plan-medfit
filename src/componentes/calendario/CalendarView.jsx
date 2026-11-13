@@ -85,8 +85,12 @@ const CalendarView = ({ onEditDay, editMode, setEditMode }) => {
                 const descanso = d.sesion === 'descanso';
                 const aMano = d.fijado && !d.fijadoAuto;
                 const nombre = d.flexible && descanso ? 'Día flexible' : ses.label;
+                // Para lectores de pantalla y para las pruebas: el nombre entero de lo que toca.
+                const etiqueta = `${ses.label}${sec ? ` + ${sec.label}` : ''}${d.flexible && !d.fijado ? ' flex' : ''}`;
                 return (
                   <button key={d.fecha} onClick={() => alTocar(d)}
+                    data-dia={d.dia} data-etiqueta={etiqueta} data-estado={comp}
+                    data-festivo={d.festivo ? '' : undefined} data-fijado-a-mano={aMano ? '' : undefined}
                     aria-label={`${d.dia}, ${turno.label}, ${nombre}${sec ? ` y ${sec.label}` : ''}${hecho ? ', hecho' : comp === 'partial' ? ', a medias' : ''}${isToday ? ', hoy' : ''}`}
                     className="relative h-16 pt-2 pb-1.5 rounded-xl flex flex-col items-center gap-1 overflow-hidden"
                     style={{
@@ -109,7 +113,7 @@ const CalendarView = ({ onEditDay, editMode, setEditMode }) => {
                       </span>
                     )}
                     {/* Segunda sesión: raya abajo de su color */}
-                    {sec && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px]" style={{ background: sec.color }} />}
+                    {sec && <span aria-hidden="true" data-segunda className="absolute inset-x-0 bottom-0 h-[3px]" style={{ background: sec.color }} />}
                     {/* Esquina derecha: hecho, a medias o calistenia apilada */}
                     {hecho && <Check size={11} strokeWidth={3.5} aria-hidden="true" className="absolute top-1.5 right-1" style={{ color: ses.color }} />}
                     {!hecho && comp === 'partial' && <span aria-hidden="true" className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-ambar" />}

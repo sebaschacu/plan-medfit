@@ -62,14 +62,22 @@ p.on('console', m => { if (m.type()==='error') errs.push('CONSOLE: ' + m.text().
 await p.addInitScript(([h]) => localStorage.setItem('plan-internado-hoy', h), [HOY]);
 await p.goto('http://localhost:4173/', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
 const ago = generarMes({ anio: hoyAudit.getFullYear(), mes: hoyAudit.getMonth() }).dias;
-// La app arranca en la sesión de hoy: se pasa al calendario primero
-await p.locator('text=Calendario').first().click().catch(() => {});
+// La app arranca en HOY: se pasa al calendario primero
+const pestana = (nombre) => p.locator('nav[aria-label="Secciones"] button', { hasText: nombre }).first();
+await pestana('Calendario').click().catch(() => {});
 await p.waitForTimeout(500);
-// Recorrer TODOS los días del mes abriendo cada sesión
+// Recorrer TODOS los días del mes: abrir el día, entrar en su sesión (si la
+// tiene) y volver. Pasa por las dos pantallas que más cambian con el día.
 for (const d of ago) {
-  await p.evaluate(nn => [...document.querySelectorAll('main button')].find(x=>x.textContent.trim().startsWith(nn+' ·'))?.click(), d.dia);
+  await p.locator(`main button[data-dia="${d.dia}"]`).click().catch(() => {});
   await p.waitForTimeout(120);
-  await p.locator('text=Calendario').first().click().catch(()=>{});
+  const cta = p.locator('button', { hasText: /^(Empezar sesión|Empezar versión reducida|Continuar ·|Ver sesión)/ });
+  if (await cta.count()) {
+    await cta.first().click(); await p.waitForTimeout(120);
+    await p.locator('button[aria-label="Volver al día"]').click().catch(() => {});
+    await p.waitForTimeout(80);
+  }
+  await pestana('Calendario').click().catch(() => {});
   await p.waitForTimeout(80);
 }
 ok(`Abrir los 31 días del mes sin errores`, errs.length === 0, errs.slice(0,3).join(' | '));
@@ -81,6 +89,22 @@ const NOM = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','
 const esperadoTitulo = `${NOM[hoyAudit.getMonth()]} ${hoyAudit.getFullYear() + 1}`;
 ok('Y el título es correcto tras 12 meses', (await p.locator('header h1').first().textContent()) === esperadoTitulo,
   `${await p.locator('header h1').first().textContent()} · esperado ${esperadoTitulo}`);
+// Las otras pestañas y pantallas: Progreso (con volumen abierto), Rutinas con
+// cada ficha, el editor y Ajustes.
+await pestana('Progreso').click(); await p.waitForTimeout(300);
+await p.locator('button', { hasText: 'Volumen por músculo' }).click().catch(() => {}); await p.waitForTimeout(200);
+await pestana('Rutinas').click(); await p.waitForTimeout(300);
+const nRutinas = await p.locator('main button').count();
+for (let i = 0; i < nRutinas; i++) {
+  await p.locator('main button').nth(i).click(); await p.waitForTimeout(120);
+  if (i === 0) { await p.locator('button', { hasText: 'Editar esta rutina' }).click().catch(() => {}); await p.waitForTimeout(150);
+    await p.locator('button', { hasText: 'Salir sin guardar' }).click().catch(() => {}); await p.waitForTimeout(120); }
+  await p.locator('button', { hasText: /^\s*Volver$/ }).click().catch(() => {}); await p.waitForTimeout(100);
+}
+ok(`Abrir las ${nRutinas} rutinas, una ficha y el editor sin errores`, nRutinas >= 15 && errs.length === 0, `${nRutinas} · ${errs.slice(0, 2).join(' | ')}`);
+await pestana('Calendario').click(); await p.waitForTimeout(200);
+await p.locator('header button[aria-label="Ajustes"]').click(); await p.waitForTimeout(200);
+ok('Progreso, Rutinas y Ajustes sin errores', errs.length === 0, errs.slice(0, 2).join(' | '));
 await b.close();
 
 console.log(`\n══ AUDITORÍA: ${n-f}/${n} · errores de página: ${errs.length} ══`);

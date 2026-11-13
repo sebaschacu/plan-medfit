@@ -53,12 +53,12 @@ const ExerciseCard = ({ ex, numero, prog, pr, color, avisoReset, ultima, sugeren
   // ─── Plegada ───
   if (!abierta) {
     return (
-      <div className="relative min-h-[64px] px-4 py-3 rounded-[18px] bg-tarjeta flex items-center gap-3.5">
+      <div data-ejercicio={ex.id} className="relative min-h-[64px] px-4 py-3 rounded-[18px] bg-tarjeta flex items-center gap-3.5">
         <span className="w-6 text-sm text-mudo flex-shrink-0">{allDone ? <Check size={18} strokeWidth={2.6} style={{ color }} /> : num}</span>
         <div className="flex-1 min-w-0">
           <h3 className={`text-[17px] font-medium leading-snug ${allDone ? 'text-tinta3' : 'text-tinta'}`}>
             {/* El botón es el nombre, pero su zona de toque es la fila entera. */}
-            <button onClick={() => onAbrir(ex.id)} aria-expanded="false"
+            <button onClick={() => onAbrir(ex.id)} aria-expanded="false" data-fila
               className="text-left after:absolute after:inset-0 after:rounded-[18px]">{ex.nombre}</button>
           </h3>
           <p className="text-sm text-tinta3 truncate">
@@ -80,7 +80,7 @@ const ExerciseCard = ({ ex, numero, prog, pr, color, avisoReset, ultima, sugeren
   ].filter(Boolean)[0];
 
   return (
-    <div className="rounded-3xl bg-tarjeta p-5">
+    <div data-ejercicio={ex.id} data-abierto className="rounded-3xl bg-tarjeta p-5">
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1.5">

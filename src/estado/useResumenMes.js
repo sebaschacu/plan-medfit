@@ -27,9 +27,11 @@ export function useResumenMes() {
       const pr = p[ex.id];
       return sc > 0 && pr?.sets?.length === sc && pr.sets.every(Boolean);
     }).length;
-    if (done === 0) return 'none';
     if (done === total) return 'full';
-    return 'partial';
+    if (done > 0) return 'partial';
+    // A medias también es haber empezado: una serie marcada ya cuenta.
+    const empezado = ejercicios.some(ex => p[ex.id]?.sets?.some(Boolean));
+    return empezado ? 'partial' : 'none';
   }, [progress, rutina]);
 
   const stats = useMemo(() => {

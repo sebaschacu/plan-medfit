@@ -13,7 +13,7 @@ const BarraCalendario = ({ editMode, setEditMode }) => {
     <header className="sticky top-0 z-30 bg-fondo">
       <div className={`px-4 pt-4 pb-3 flex items-center gap-1 ${COLUMNA}`}>
         <div className="flex-1 min-w-0">
-          <h1 className="text-[26px] leading-8 font-semibold tracking-[-0.02em] text-tinta truncate">{mesInfo.nombre}</h1>
+          <h1 className="text-[26px] leading-8 font-semibold tracking-[-0.02em] text-tinta truncate">{mesInfo.nombre}<span className="sr-only"> {mesInfo.anio}</span></h1>
           <p className="text-sm text-tinta3 h-5 flex items-center gap-1">
             {mesInfo.anio}
             {saveStatus === 'saved' && <> · <Check size={14} strokeWidth={3} className="text-emerald-400" /> Guardado</>}

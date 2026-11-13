@@ -1,6 +1,7 @@
 # BASELINE — contrato del refactor de `App.jsx`
 
-Capturado el 2026-09-03, antes de tocar `src/`.
+Capturado el 2026-09-03, antes de tocar `src/`. Actualizado el 2026-11-13 con
+el rediseño D (rama `rediseno-d`): mismas seis puertas, números de abajo.
 
 Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 "no petar". Si un paso no pasa las cinco puertas, se revierte ese paso entero.
@@ -9,13 +10,13 @@ Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 
 | # | Comando | Baseline |
 |---|---|---|
-| 1 · Lógica | `npm test` | 154/154 + 82/82 = **236** (158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4; +15 en la decisión 1; +15 en la decisión 2) |
-| 2a · Interfaz | `npm run test:ui` | **227/227** · 0 errores de página (142 al cerrar la Tarea 1; +5 en 1.1; +4 en 1.4; +4 en 1.5; +6 en 2.2; +8 en 2.1; +9 en 2.3; +4 en 2.4; +7 en 2.5; +10 en E11; +11 en la decisión 1; +17 en la decisión 2) |
-| 2b · Auditoría | `npm run audit` | **21/21** · 0 errores de página |
+| 1 · Lógica | `npm test` | 155/155 + 82/82 = **237** (158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4; +15 en la decisión 1; +15 en la decisión 2; +1 en el rediseño D: S4 a dos tramos) |
+| 2a · Interfaz | `npm run test:ui` | **270/270** · 0 errores de página (227 antes del rediseño D; la suite se reescribió para la navegación nueva conservando cada comprobación, +43 nuevas) |
+| 2b · Auditoría | `npm run audit` | **23/23** · 0 errores de página (recorre también Progreso, Rutinas, el editor y Ajustes) |
 | 3 · Lint | `npx oxlint` | **0 avisos / 0 errores** |
-| 4 · Build | `npm run build` | compila · 369 kB (gzip 109) |
+| 4 · Build | `npm run build` | compila · 393 kB (gzip 117) + Geist 29 kB |
 | 5 · Snapshot | `npm run test:snapshot` | **2/2** · contrato de localStorage intacto |
-| 6 · Renders | `npm run test:renders` | **App = 0** al marcar la 2ª serie |
+| 6 · Renders | `npm run test:renders` | **App = 0** al marcar la 2ª serie (y DiaView/PanelDia = 0) |
 
 ### La puerta 6, añadida en el paso 7
 
@@ -121,11 +122,14 @@ src/
 │   └── useRutinas.js     21   rutina versionada
 ├── utiles/                    constantes-ui · formato · sonido · medir
 └── componentes/
-    ├── comunes/          IconFor · NumInput · BotonSiNo · RestTimer · FichaEjercicio
-    ├── biblioteca/       Biblioteca · FichaSesion · EditorRutina
+    ├── comunes/          ui (Punto · ChipTurno · Detalle · BotonCTA · Segmentado · Hoja) · BarraInferior
+    │                     IconFor · NumInput · BotonSiNo · RestTimer · FichaEjercicio · Musculos
+    ├── ajustes/          AjustesView (exportar · importar)
+    ├── biblioteca/       Biblioteca (pestaña Rutinas) · FichaSesion · EditorRutina
     ├── calendario/       CalendarView · BarraCalendario · EditModal · MenuSesiones
-    ├── estadisticas/     PanelEstadisticas · VolumenMuscular · GraficaProgresion
-    └── sesion/           SessionView · ExerciseCard · SelectorVariante · PanelDia · PanelCSS · PanelFlexible
+    ├── estadisticas/     ProgresoView · VolumenMuscular
+    └── sesion/           DiaView (pestaña Hoy) · SessionView · ExerciseCard · HojaSerie
+                          SelectorVariante · PanelDia · PanelCSS · PanelFlexible
 ```
 
 El componente más grande es `SessionView` (279 líneas). Solo pasan de 300

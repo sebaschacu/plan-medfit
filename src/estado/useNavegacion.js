@@ -48,7 +48,11 @@ export function useNavegacion({ todayISO, skipTimer }) {
     skipTimer();
     if (destino === 'hoy') {
       setActiveFecha(todayISO); setActiveSesion(null); setCursor(mesDe(todayISO)); setView('dia');
-    } else setView(destino);
+    } else {
+      // Progreso habla de AHORA (esta semana, este bloque): se mira sobre el mes de hoy.
+      if (destino === 'progreso') setCursor(mesDe(todayISO));
+      setView(destino);
+    }
     window.scrollTo(0, 0);
   }, [todayISO, skipTimer]);
 
