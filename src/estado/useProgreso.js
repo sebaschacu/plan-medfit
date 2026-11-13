@@ -67,6 +67,28 @@ export function useProgreso({ activeFecha, diaActivo, fijarPorRegistro, startTim
     if (marcando && ex) { const r = parseRest(ex.descanso); if (r) startTimer(r, ex.nombre); }
   }, [activeFecha, startTimer, fijarPorRegistro, diaActivo]);
 
+  // ─── «Hecha»: marcar la serie Y anotar su carga en un solo toque ───
+  // Es toggleSet + onLog en una única actualización. `log` es lo que la tarjeta
+  // propone (carga sugerida, reps de la serie anterior); con `log` nulo solo
+  // marca. Sirve también para corregir una serie ya hecha: no la desmarca nunca.
+  const registrarSerie = useCallback((exId, i, setCount, ex, log) => {
+    fijarPorRegistro(diaActivo);
+    const yaEstaba = !!progressRef.current[activeFecha]?.[exId]?.sets?.[i];
+    setProgress(prev => {
+      const day = prev[activeFecha] || {};
+      const p = day[exId] || { sets: [], logs: [], lastre: null };
+      const sets = [...(p.sets || [])];
+      const logs = [...(p.logs || [])];
+      while (sets.length < setCount) sets.push(false);
+      while (logs.length < setCount) logs.push(null);
+      sets[i] = true;
+      if (log) logs[i] = log;
+      return { ...prev, [activeFecha]: { ...day, [exId]: { ...p, sets, logs } } };
+    });
+    if (log?.kg != null) checkPR(exId, log.kg);
+    if (!yaEstaba && ex) { const r = parseRest(ex.descanso); if (r) startTimer(r, ex.nombre); }
+  }, [activeFecha, startTimer, checkPR, fijarPorRegistro, diaActivo]);
+
   const onLog = useCallback((exId, i, log, setCount) => {
     fijarPorRegistro(diaActivo);
     setProgress(prev => {
@@ -153,6 +175,6 @@ export function useProgreso({ activeFecha, diaActivo, fijarPorRegistro, startTim
   return {
     progress, prMap, avisosReset,
     setProgress, setPrMap,   // los usa importar
-    toggleSet, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta, borrarRegistro,
+    toggleSet, registrarSerie, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta, borrarRegistro,
   };
 }

@@ -1,15 +1,15 @@
 import React from 'react';
 
 // ═══════════════ NUMERIC INPUT ═══════════════
-const NumInput = ({ value, onChange, placeholder, w = 'w-11', etiqueta }) => (
+// 44 px de alto: se toca con el pulgar, de pie.
+const NumInput = ({ value, onChange, placeholder, w = 'w-16', etiqueta, grande = false }) => (
   <input
-    type="text" inputMode="numeric" pattern="[0-9]*\.?[0-9]*"
+    type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*"
     value={value ?? ''}
     onChange={(e) => onChange(e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.'))}
     placeholder={placeholder}
     aria-label={etiqueta ?? placeholder}
-    className={`${w} h-8 px-1 bg-[#0f1417] border border-[#2a3540] focus:border-[#4a5560] focus:outline-none text-slate-100 text-xs text-center rounded transition-colors`}
-    style={{ fontFamily: 'ui-monospace, monospace' }}
+    className={`${w} ${grande ? 'h-14 text-2xl font-semibold' : 'h-11 text-base'} px-1 bg-fondo border border-borde focus:border-tinta3 focus:outline-none text-tinta text-center rounded-xl placeholder:text-mudo`}
   />
 );
 

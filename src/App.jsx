@@ -7,16 +7,24 @@ import EditorRutina from './componentes/biblioteca/EditorRutina.jsx';
 import CalendarView from './componentes/calendario/CalendarView.jsx';
 import EditModal from './componentes/calendario/EditModal.jsx';
 import SessionView from './componentes/sesion/SessionView.jsx';
+import DiaView from './componentes/sesion/DiaView.jsx';
+import ProgresoView from './componentes/estadisticas/ProgresoView.jsx';
+import AjustesView from './componentes/ajustes/AjustesView.jsx';
+import BarraInferior from './componentes/comunes/BarraInferior.jsx';
 
 // ═══════════════ MAIN APP · el enrutador ═══════════════
 // El estado vive en PlanProvider. Aquí solo queda qué pantalla se muestra y
-// los flags locales de la interfaz (modales, biblioteca, editor).
+// los flags locales de la interfaz (modales, ficha, editor).
+//
+// Cuatro pestañas abajo —Hoy, Calendario, Progreso, Rutinas— y, encima de
+// ellas, lo que se abre desde una: el día de otra fecha, la sesión, la ficha
+// de una rutina, su editor y los ajustes.
 export default function App() {
   contarRender('App');
 
   // App NO lee ContextoProgreso a propósito: así marcar una serie no lo
   // re-renderiza. Del plan solo necesita lo justo para enrutar.
-  const { view, diaActivo } = usePlanCtx();
+  const { view, diaActivo, activeFecha, todayISO } = usePlanCtx();
   const {
     saveEdit: saveEditBase, liberarDia: liberarDiaBase,
     guardarRutina: guardarRutinaBase, restaurarRutina: restaurarRutinaBase,
@@ -24,7 +32,6 @@ export default function App() {
 
   // ─── Flags de pantalla ───
   const [editandoRutina, setEditandoRutina] = useState(null);   // clave de sesión
-  const [biblioteca, setBiblioteca] = useState(false);
   const [fichaSesion, setFichaSesion] = useState(null);         // clave de sesión a consultar
   const [editMode, setEditMode] = useState(false);
   const [editingDay, setEditingDay] = useState(null);
@@ -36,15 +43,9 @@ export default function App() {
   const guardarRutina = useCallback((...args) => { guardarRutinaBase(...args); setEditandoRutina(null); }, [guardarRutinaBase]);
   const restaurarRutina = useCallback((k) => { restaurarRutinaBase(k); setEditandoRutina(null); }, [restaurarRutinaBase]);
 
-  const activeDiaData = diaActivo;
-
-  if (fichaSesion) {
-    return <FichaSesion sesionKey={fichaSesion} onCerrar={() => setFichaSesion(null)} />;
-  }
-
-  if (biblioteca) {
-    return <Biblioteca onAbrir={setFichaSesion} onCerrar={() => setBiblioteca(false)} />;
-  }
+  // Cambiar de pestaña cierra lo que hubiera abierto encima.
+  const [vistaPrevia, setVistaPrevia] = useState(view);
+  if (vistaPrevia !== view) { setVistaPrevia(view); setFichaSesion(null); setEditandoRutina(null); }
 
   if (editandoRutina) {
     return (
@@ -57,22 +58,43 @@ export default function App() {
     );
   }
 
-  // Si hay día activo se enseña su sesión. Si por lo que sea no lo hay (mes
-  // cambiado, fecha fuera de rango), se cae al calendario en lugar de dejar la
-  // pantalla vacía.
-  if (view === 'session' && activeDiaData) {
+  // Qué pestaña se marca abajo.
+  const pestana = view === 'dia' || view === 'session'
+    ? (activeFecha === todayISO ? 'hoy' : 'calendar')
+    : view === 'ajustes' ? null : view;
+
+  let pantalla;
+  if (fichaSesion) {
+    pantalla = <FichaSesion sesionKey={fichaSesion} onCerrar={() => setFichaSesion(null)} onEditar={setEditandoRutina} />;
+  } else if (view === 'session' && diaActivo) {
+    // La sesión se usa de pie en el gimnasio: sin barra inferior, toda la
+    // pantalla para el ejercicio y el temporizador.
     return <SessionView onEditarRutina={setEditandoRutina} onVerFicha={setFichaSesion} />;
+  } else if (view === 'dia' && diaActivo) {
+    pantalla = <DiaView onVerFicha={setFichaSesion} />;
+  } else if (view === 'progreso') {
+    pantalla = <ProgresoView />;
+  } else if (view === 'rutinas') {
+    pantalla = <Biblioteca onAbrir={setFichaSesion} />;
+  } else if (view === 'ajustes') {
+    pantalla = <AjustesView />;
+  } else {
+    // Calendario. También es el respaldo si el día activo no está en el mes
+    // generado (mes cambiado, fecha fuera de rango): mejor que una pantalla vacía.
+    pantalla = (
+      <>
+        <CalendarView onEditDay={setEditingDay} editMode={editMode} setEditMode={setEditMode} />
+        {editingDay && (
+          <EditModal dia={editingDay} onSave={saveEdit} onLiberar={liberarDia} onClose={() => setEditingDay(null)} />
+        )}
+      </>
+    );
   }
 
   return (
     <>
-      <CalendarView
-        onEditDay={setEditingDay} editMode={editMode} setEditMode={setEditMode}
-        onBiblioteca={() => setBiblioteca(true)}
-      />
-      {editingDay && (
-        <EditModal dia={editingDay} onSave={saveEdit} onLiberar={liberarDia} onClose={() => setEditingDay(null)} />
-      )}
+      {pantalla}
+      <BarraInferior activa={pestana} />
     </>
   );
 }

@@ -14,15 +14,15 @@ const Musculos = ({ musculos, className = '' }) => {
   const sec = Array.isArray(musculos?.secundario) ? musculos.secundario : [];
   if (!prim.length && !sec.length) return null;
   return (
-    <p className={`text-[10px] leading-snug ${className}`} aria-label="Músculos que trabaja">
+    <p className={`text-sm leading-snug ${className}`} aria-label="Músculos que trabaja">
       {prim.map((m, i) => (
-        <span key={m} className="font-semibold text-slate-300">
-          {i > 0 && <span className="text-slate-600 font-normal"> · </span>}{etiqueta(m)}
+        <span key={m} data-musculo="primario" className="font-semibold text-tinta2">
+          {i > 0 && <span className="font-normal opacity-60"> · </span>}{etiqueta(m)}
         </span>
       ))}
       {sec.length > 0 && (
-        <span className="text-slate-500">
-          {prim.length > 0 && <span className="text-slate-600"> · </span>}
+        <span data-musculo="secundario" className="text-mudo">
+          {prim.length > 0 && ' · '}
           {sec.map(etiqueta).join(' · ')}
         </span>
       )}

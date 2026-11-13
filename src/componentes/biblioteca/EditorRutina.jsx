@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Check, AlertTriangle, ChevronLeft, ChevronRight, X, RotateCcw } from 'lucide-react';
-import { SESION_INFO, MUSCULOS } from '../../data.js';
+import { ArrowLeft, Check, AlertTriangle, ChevronDown, ChevronRight, X, RotateCcw, ArrowUp, ArrowDown, Minus, Plus, Search } from 'lucide-react';
+import { SESION_INFO, MUSCULOS, PARTES } from '../../data.js';
 import { verificarSesion } from '../../validador.js';
 import { catalogoEjercicios, nuevoId, mover, gruposBS, resolverRutina, estaEditada } from '../../rutina.js';
 import { usePlanCtx } from '../../estado/contextos.js';
 import { COLUMNA } from '../../utiles/constantes-ui.js';
-import NumInput from '../comunes/NumInput.jsx';
+import Musculos from '../comunes/Musculos.jsx';
+import { Punto } from '../comunes/ui.jsx';
 
 // ═══════════════ EDITOR DE RUTINA ═══════════════
 // Libertad total sobre la sesión, con el verificador informando en vivo.
@@ -13,8 +14,36 @@ import NumInput from '../comunes/NumInput.jsx';
 // vacío se guarda "Sin motivo", para que el historial de versiones no tenga
 // huecos y la revisión de las 8 semanas (N3) siga sabiendo cuándo cambió qué.
 //
+// Cada ejercicio es una fila; al tocarla se abre su panel con todo lo que se
+// puede cambiar. Solo hay uno abierto a la vez.
+//
 // Arranca con la rutina VIGENTE hoy, resuelta desde el contexto. onGuardar,
 // onRestaurar y onCerrar vienen de App, que además cierra el editor.
+
+const Campo = ({ label, children }) => (
+  <div className="flex items-center gap-3 min-h-[52px]">
+    <span className="w-24 text-[15px] text-tinta3 flex-shrink-0">{label}</span>
+    <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">{children}</div>
+  </div>
+);
+
+const Opcion = ({ on, onClick, children, label }) => (
+  <button onClick={onClick} aria-pressed={on} aria-label={label}
+    className={`h-11 px-3 rounded-xl text-[15px] font-medium ${on ? 'bg-tinta text-[#0d1215]' : 'bg-fondo text-tinta2'}`}>
+    {children}
+  </button>
+);
+
+const texto = 'h-11 px-3 bg-fondo border border-borde focus:border-tinta3 focus:outline-none text-tinta text-base rounded-xl placeholder:text-mudo';
+
+// Tipo de progresión que lleva el ejercicio, en las tres variantes del plan.
+const progresionDe = (ex) => (ex.lineal ? (/5/.test(String(ex.progresion)) && !/2[.,]5/.test(String(ex.progresion)) ? 'l5' : 'l25') : 'doble');
+const PROGRESIONES = [
+  ['l25', 'Lineal +2,5', { lineal: true, progresion: '+2.5 kg' }],
+  ['l5', 'Lineal +5', { lineal: true, progresion: '+5 kg' }],
+  ['doble', 'Doble · RIR', { lineal: false, progresion: undefined }],
+];
+
 const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
   const { todayISO, rutina } = usePlanCtx();
   const editada = estaEditada(sesionKey, todayISO, rutina);
@@ -24,8 +53,10 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
   const [motivo, setMotivo] = useState('');
   const [anadiendo, setAnadiendo] = useState(false);
   const [busca, setBusca] = useState('');
+  const [abierto, setAbierto] = useState(null);       // índice del ejercicio con el panel abierto
 
   const info = SESION_INFO[sesionKey];
+  const esGym = String(sesionKey).startsWith('gym');
   const res = useMemo(() => verificarSesion(sesionKey, lista), [sesionKey, lista]);
   const catalogo = useMemo(() => catalogoEjercicios(), []);
   const yaEstan = new Set(lista.map(e => e.id));
@@ -35,8 +66,7 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
 
   // Agrupados por su músculo PRIMARIO principal (el primero de la lista), en el
   // orden en que MUSCULOS los declara: empuje, tracción, pierna, core. Un
-  // ejercicio sin músculos va a "Otros". Mismo patrón que el menú de sesiones:
-  // cabecera por grupo, desplegable. Cerrados al abrir; al buscar se abren
+  // ejercicio sin músculos va a "Otros". Cerrados al abrir; al buscar se abren
   // todos, porque lo que quieres ver es la coincidencia.
   const porMusculo = useMemo(() => {
     const g = new Map();
@@ -52,137 +82,199 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
   const alternar = (k) => setAbiertos(s => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const desplegado = (k) => !!busca || abiertos.has(k);
 
-  const editar = (i, cambio) => setLista(l => l.map((e, j) => j === i ? { ...e, ...cambio } : e));
-  const quitar = (i) => setLista(l => l.filter((_, j) => j !== i));
+  const editar = (i, cambio) => setLista(l => l.map((e, j) => {
+    if (j !== i) return e;
+    const n = { ...e, ...cambio };
+    Object.keys(cambio).forEach(k => { if (cambio[k] === undefined) delete n[k]; });
+    return n;
+  }));
+  const quitar = (i) => { setLista(l => l.filter((_, j) => j !== i)); setAbierto(null); };
+  const subirBajar = (i, d) => { setLista(l => mover(l, i, d)); setAbierto(a => (a === i ? Math.max(0, Math.min(lista.length - 1, i + d)) : a)); };
   const anadir = (ex) => {
     const copia = { ...JSON.parse(JSON.stringify(ex)), parte: 3, bs: undefined };
     delete copia.origen; delete copia.origenNombre;
     if (yaEstan.has(copia.id)) copia.id = nuevoId(sesionKey, lista);
     setLista(l => [...l, copia]);
     setAnadiendo(false); setBusca('');
+    setAbierto(lista.length);
   };
 
   const series = lista.filter(e => !e.opcional).reduce((a, e) => a + (typeof e.series === 'number' ? e.series : 0), 0);
   const grupos = gruposBS(lista);
+  const limpio = res.duras.length === 0 && res.blandas.length === 0;
+  let parteAnterior = null;
 
   return (
-    <div className="min-h-screen bg-[#0f1417]">
-      <header className="sticky top-0 z-30 bg-[#0f1417]/95 backdrop-blur border-b border-[#232c34]">
-        <div className={`px-4 py-3 ${COLUMNA}`}>
-          <button onClick={onCerrar} className="flex items-center gap-1.5 text-slate-400 text-xs font-bold uppercase tracking-wide mb-2">
-            <ArrowLeft size={14} /> Salir sin guardar
-          </button>
-          <h1 className="text-lg font-bold text-slate-50 leading-tight">Editar {info?.label}</h1>
-          <p className="text-[11px] text-slate-500 mt-0.5">
+    <div className="min-h-screen bg-fondo">
+      <header className={`px-4 pt-3 pb-2 ${COLUMNA}`}>
+        <button onClick={onCerrar} className="h-11 flex items-center gap-1.5 text-tinta3 text-[15px] font-medium">
+          <ArrowLeft size={20} /> Salir sin guardar
+        </button>
+        <div className="px-1">
+          <div className="flex items-center gap-2 text-[15px]"><Punto color={info?.color} /><span className="text-tinta3">Editar rutina</span></div>
+          <h1 className="text-[30px] leading-9 font-semibold tracking-[-0.02em] text-tinta mt-1">Editar {info?.label}</h1>
+          <p className="text-[15px] text-tinta3 mt-1">
             {lista.length} ejercicios · {series} series obligatorias
-            {editada && <span className="text-amber-400"> · ya editada respecto al plan</span>}
+            {editada && <span className="text-ambar"> · ya editada respecto al plan</span>}
           </p>
-        </div>
-
-        {/* Verificador en vivo */}
-        <div className={`px-4 pb-3 ${COLUMNA}`}>
-          {res.duras.length === 0 && res.blandas.length === 0 ? (
-            <div className="px-3 py-2 rounded-lg bg-emerald-950/30 border border-emerald-800/40 flex items-center gap-2">
-              <Check size={14} className="text-emerald-400" strokeWidth={3} />
-              <span className="text-[11px] text-emerald-300 font-bold">Cumple todas las reglas del plan</span>
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {res.duras.map((d, i) => (
-                <div key={'d' + i} className="px-3 py-2 rounded-lg border-l-4 border-red-500 bg-red-950/25 flex items-start gap-2">
-                  <AlertTriangle size={13} className="text-red-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-red-100 leading-relaxed">
-                    <span className="font-bold">{d.regla}.</span> {d.texto}
-                  </p>
-                </div>
-              ))}
-              {res.blandas.map((b, i) => (
-                <div key={'b' + i} className="px-3 py-2 rounded-lg border-l-4 border-amber-600 bg-amber-950/20 flex items-start gap-2">
-                  <AlertTriangle size={13} className="text-amber-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-amber-100/90 leading-relaxed">
-                    <span className="font-bold">{b.regla}.</span> {b.texto}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </header>
 
-      <main className={`px-3 py-3 ${COLUMNA} pb-32 space-y-2`}>
-        {lista.map((ex, i) => {
-          const senalado = [...res.duras, ...res.blandas].some(h => h.ejercicios?.includes(ex.id));
-          return (
-            <div key={ex.id + i} className={`rounded-lg border bg-[#151b21] p-2.5 ${senalado ? 'border-red-800/60' : 'border-[#232c34]'}`}>
-              <div className="flex items-start gap-2">
-                <div className="flex flex-col gap-0.5 flex-shrink-0">
-                  <button onClick={() => setLista(l => mover(l, i, -1))} disabled={i === 0}
-                    aria-label="Subir" className="w-7 h-6 rounded border border-[#2a3540] text-slate-400 disabled:text-slate-700 flex items-center justify-center">
-                    <ChevronLeft size={13} className="rotate-90" />
-                  </button>
-                  <button onClick={() => setLista(l => mover(l, i, 1))} disabled={i === lista.length - 1}
-                    aria-label="Bajar" className="w-7 h-6 rounded border border-[#2a3540] text-slate-400 disabled:text-slate-700 flex items-center justify-center">
-                    <ChevronRight size={13} className="rotate-90" />
-                  </button>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-slate-100 leading-tight">{ex.nombre}</div>
-                  <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-                    <select value={ex.parte ?? 3} onChange={e => editar(i, { parte: e.target.value === 'finisher' ? 'finisher' : Number(e.target.value) })}
-                      aria-label="Parte" className="h-7 px-1 bg-[#0f1417] border border-[#2a3540] text-slate-300 text-[10px] rounded">
-                      <option value={1}>Parte 1</option>
-                      <option value={2}>Parte 2</option>
-                      <option value={3}>Parte 3</option>
-                      <option value="finisher">Finisher</option>
-                    </select>
-                    <select value={ex.bs ?? ''} onChange={e => editar(i, { bs: e.target.value || undefined })}
-                      aria-label="Bi-serie" className="h-7 px-1 bg-[#0f1417] border border-[#2a3540] text-slate-300 text-[10px] rounded">
-                      {grupos.map(g => <option key={g ?? 'none'} value={g ?? ''}>{g ?? 'Sin bi-serie'}</option>)}
-                    </select>
-                    <NumInput value={ex.series} onChange={v => editar(i, { series: v === '' ? 0 : parseInt(v, 10) })} placeholder="ser" w="w-11" etiqueta={`Series de ${ex.nombre}`} />
-                    <button onClick={() => editar(i, { opcional: !ex.opcional })}
-                      className={`h-7 px-2 rounded border text-[10px] font-bold ${ex.opcional ? 'border-slate-500 bg-slate-700/30 text-slate-300' : 'border-[#2a3540] text-slate-500'}`}>
-                      {ex.opcional ? 'Opcional *' : 'Obligatorio'}
-                    </button>
-                    <button onClick={() => quitar(i)} aria-label={`Quitar ${ex.nombre}`}
-                      className="h-7 w-7 rounded border border-red-900/50 text-red-400 flex items-center justify-center ml-auto">
-                      <X size={13} />
-                    </button>
-                  </div>
-                </div>
+      <main className={`px-4 ${COLUMNA} pb-72 space-y-3`}>
+        {/* Verificador en vivo */}
+        {limpio ? (
+          <div className="px-4 min-h-[52px] rounded-2xl bg-tarjeta flex items-center gap-2.5">
+            <Check size={20} className="text-emerald-400" strokeWidth={3} />
+            <span className="text-[15px] text-tinta font-medium">Cumple todas las reglas del plan</span>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {res.duras.map((d, i) => (
+              <div key={'d' + i} className="px-4 py-3 rounded-2xl bg-red-950/40 flex items-start gap-2.5">
+                <AlertTriangle size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-[15px] text-red-100 leading-relaxed"><span className="font-semibold">{d.regla}.</span> {d.texto}</p>
               </div>
-            </div>
-          );
-        })}
+            ))}
+            {res.blandas.map((b, i) => (
+              <div key={'b' + i} className="px-4 py-3 rounded-2xl flex items-start gap-2.5" style={{ background: 'rgba(245,158,11,0.10)' }}>
+                <AlertTriangle size={18} className="text-ambar flex-shrink-0 mt-0.5" />
+                <p className="text-[15px] text-[#f3d9a4] leading-relaxed"><span className="font-semibold">{b.regla}.</span> {b.texto}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <section className="rounded-3xl bg-tarjeta px-4">
+          {lista.map((ex, i) => {
+            const senalado = [...res.duras, ...res.blandas].some(h => h.ejercicios?.includes(ex.id));
+            const parte = ex.parte ?? 3;
+            const cabecera = esGym && parte !== parteAnterior && PARTES[parte];
+            parteAnterior = parte;
+            const open = abierto === i;
+            const etiqueta = ex.lineal ? `Lineal ${String(ex.progresion ?? '').replace('.', ',').replace(' kg', '')}` : ex.bs ? `${ex.bs}` : ex.opcional ? 'Opcional' : null;
+            return (
+              <div key={ex.id + i} className="border-b border-divisor last:border-0">
+                {cabecera && <h2 className="text-sm font-medium text-tinta3 pt-4">{PARTES[parte].label}</h2>}
+                <button onClick={() => setAbierto(open ? null : i)} aria-expanded={open}
+                  className="w-full min-h-[64px] py-3 flex items-center gap-3 text-left">
+                  <span className="w-6 text-sm text-mudo flex-shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className={`block text-[17px] font-medium leading-snug ${senalado ? 'text-red-300' : 'text-tinta'}`}>{ex.nombre}</span>
+                    <span className="block text-sm text-tinta3">{ex.series} × {ex.reps ?? '—'}{ex.opcional ? ' · opcional' : ''}</span>
+                  </span>
+                  {etiqueta && <span className="h-6 px-2 rounded-lg bg-elevada text-xs font-semibold text-tinta2 inline-flex items-center flex-shrink-0">{etiqueta}</span>}
+                  <ChevronDown size={18} className={`text-mudo flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+                </button>
+
+                {open && (
+                  <div className="mb-3 p-3 rounded-2xl bg-elevada">
+                    <Musculos musculos={ex.musculos} className="mb-2 px-1" />
+                    <Campo label="Series">
+                      <button onClick={() => editar(i, { series: Math.max(0, (ex.series || 0) - 1) })} aria-label={`Menos series de ${ex.nombre}`}
+                        className="w-11 h-11 rounded-xl bg-fondo text-tinta2 flex items-center justify-center"><Minus size={18} /></button>
+                      <span className="w-8 text-center text-xl font-semibold text-tinta" aria-label={`Series de ${ex.nombre}`}>{ex.series}</span>
+                      <button onClick={() => editar(i, { series: (ex.series || 0) + 1 })} aria-label={`Más series de ${ex.nombre}`}
+                        className="w-11 h-11 rounded-xl bg-fondo text-tinta2 flex items-center justify-center"><Plus size={18} /></button>
+                    </Campo>
+                    <Campo label="Reps">
+                      <input value={ex.reps ?? ''} onChange={e => editar(i, { reps: e.target.value })} aria-label={`Repeticiones de ${ex.nombre}`}
+                        placeholder="8-12" className={`${texto} w-28`} />
+                    </Campo>
+                    <Campo label="Descanso">
+                      <input value={ex.descanso ?? ''} onChange={e => editar(i, { descanso: e.target.value })} aria-label={`Descanso de ${ex.nombre}`}
+                        placeholder="90s" className={`${texto} w-28`} />
+                    </Campo>
+                    {esGym && (
+                      <Campo label="Progresión">
+                        {PROGRESIONES.map(([k, l, cambio]) => (
+                          <Opcion key={k} on={progresionDe(ex) === k}
+                            onClick={() => editar(i, { ...cambio, rir: cambio.lineal ? ex.rir : (ex.rir ?? '1-2') })}>{l}</Opcion>
+                        ))}
+                      </Campo>
+                    )}
+                    {esGym && (
+                      <Campo label="Parte">
+                        <select value={ex.parte ?? 3} onChange={e => editar(i, { parte: e.target.value === 'finisher' ? 'finisher' : Number(e.target.value) })}
+                          aria-label="Parte" className={`${texto} pr-2`}>
+                          <option value={1}>Parte 1</option>
+                          <option value={2}>Parte 2</option>
+                          <option value={3}>Parte 3</option>
+                          <option value="finisher">Finisher</option>
+                        </select>
+                      </Campo>
+                    )}
+                    {esGym && (
+                      <Campo label="Bi-serie">
+                        <select value={ex.bs ?? ''} onChange={e => editar(i, { bs: e.target.value || undefined })}
+                          aria-label="Bi-serie" className={`${texto} pr-2`}>
+                          {grupos.map(g => <option key={g ?? 'none'} value={g ?? ''}>{g ?? 'Sin bi-serie'}</option>)}
+                        </select>
+                      </Campo>
+                    )}
+                    <Campo label="Tipo">
+                      <Opcion on={!ex.opcional} onClick={() => editar(i, { opcional: false })}>Obligatorio</Opcion>
+                      <Opcion on={!!ex.opcional} onClick={() => editar(i, { opcional: true })}>Opcional *</Opcion>
+                    </Campo>
+                    <div className="pt-2">
+                      <span className="block text-[15px] text-tinta3 mb-1.5">Nota</span>
+                      <textarea value={ex.nota ?? ''} onChange={e => editar(i, { nota: e.target.value || undefined })} rows={2}
+                        aria-label={`Nota de ${ex.nombre}`}
+                        className="w-full px-3 py-2.5 bg-fondo border border-borde focus:border-tinta3 focus:outline-none text-tinta text-base rounded-xl resize-none" />
+                    </div>
+                    <div className="flex gap-2 pt-3">
+                      <button onClick={() => subirBajar(i, -1)} disabled={i === 0} aria-label="Subir"
+                        className="flex-1 h-11 rounded-xl bg-fondo text-tinta2 text-[15px] font-medium flex items-center justify-center gap-1.5 disabled:opacity-30">
+                        <ArrowUp size={16} /> Subir
+                      </button>
+                      <button onClick={() => subirBajar(i, 1)} disabled={i === lista.length - 1} aria-label="Bajar"
+                        className="flex-1 h-11 rounded-xl bg-fondo text-tinta2 text-[15px] font-medium flex items-center justify-center gap-1.5 disabled:opacity-30">
+                        <ArrowDown size={16} /> Bajar
+                      </button>
+                      <button onClick={() => quitar(i)} aria-label={`Quitar ${ex.nombre}`}
+                        className="flex-1 h-11 rounded-xl bg-red-950/50 text-red-300 text-[15px] font-medium flex items-center justify-center gap-1.5">
+                        <X size={16} /> Quitar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </section>
 
         {/* Añadir ejercicio */}
         {anadiendo ? (
-          <div className="rounded-lg border border-[#232c34] bg-[#151b21] p-2.5">
-            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar ejercicio…" aria-label="Buscar ejercicio"
-              className="w-full h-9 px-2 mb-2 bg-[#0f1417] border border-[#2a3540] focus:border-emerald-600 focus:outline-none text-slate-100 text-xs rounded" />
-            <div className="max-h-72 overflow-y-auto space-y-1">
+          <section className="rounded-3xl bg-tarjeta p-4">
+            <div className="relative">
+              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-tinta3" />
+              <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar ejercicio…" aria-label="Buscar ejercicio"
+                className={`${texto} w-full h-12 pl-10`} />
+            </div>
+            <div className="mt-3 space-y-2">
               {porMusculo.map(([k, ejs]) => {
                 const m = MUSCULOS[k];
                 const label = m?.label ?? 'Otros';
-                const color = m?.color ?? '#94a3b8';
-                const abierto = desplegado(k);
+                const abiertoG = desplegado(k);
                 return (
-                  <div key={k} className="rounded-lg border border-[#2a3540] overflow-hidden">
+                  <div key={k} className="rounded-2xl bg-elevada">
                     <button onClick={() => alternar(k)}
-                      aria-label={`Músculo ${label}`} aria-expanded={abierto}
-                      className="w-full px-2.5 py-2 flex items-center gap-2 text-left">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
-                      <span className="text-xs font-bold flex-1" style={{ color }}>{label}</span>
-                      <span className="text-[10px] text-slate-500">{ejs.length}</span>
-                      <ChevronRight size={14} className={`text-slate-500 transition-transform ${abierto ? 'rotate-90' : ''}`} />
+                      aria-label={`Músculo ${label}`} aria-expanded={abiertoG}
+                      className="w-full min-h-[52px] px-4 flex items-center gap-3 text-left">
+                      <Punto color={m?.color ?? '#8a97a1'} />
+                      <span className="text-[17px] text-tinta flex-1">{label}</span>
+                      <span className="text-sm text-tinta3">{ejs.length}</span>
+                      <ChevronRight size={18} className={`text-mudo transition-transform ${abiertoG ? 'rotate-90' : ''}`} />
                     </button>
-                    {abierto && (
-                      <div className="space-y-1 p-2 pt-0">
+                    {abiertoG && (
+                      <div className="px-2 pb-2 space-y-1">
                         {ejs.map(e => (
                           <button key={e.origen + e.id} onClick={() => anadir(e)}
-                            className="w-full text-left px-2 py-1.5 rounded border border-[#232c34] hover:border-emerald-700">
-                            <div className="text-[12px] text-slate-200">{e.nombre}</div>
-                            <div className="text-[9px] text-slate-600">{SESION_INFO[e.origen]?.label ?? e.origen}</div>
+                            className="w-full min-h-[52px] text-left px-3 py-2 rounded-xl bg-fondo flex items-center gap-3">
+                            <span className="flex-1 min-w-0">
+                              <span className="block text-base text-tinta">{e.nombre}</span>
+                              <span className="block text-sm text-tinta3">{SESION_INFO[e.origen]?.label ?? e.origen}</span>
+                            </span>
+                            <Plus size={18} className="text-tinta3 flex-shrink-0" />
                           </button>
                         ))}
                       </div>
@@ -190,39 +282,38 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
                   </div>
                 );
               })}
-              {!candidatos.length && <p className="text-[11px] text-slate-600 py-2 text-center">Nada que coincida.</p>}
+              {!candidatos.length && <p className="text-[15px] text-tinta3 py-2 text-center">Nada que coincida.</p>}
             </div>
             <button onClick={() => { setAnadiendo(false); setBusca(''); }}
-              className="w-full mt-2 py-1.5 text-[10px] uppercase font-bold text-slate-400">Cancelar</button>
-          </div>
+              className="w-full mt-2 h-11 text-[15px] font-medium text-tinta3">Cancelar</button>
+          </section>
         ) : (
           <button onClick={() => setAnadiendo(true)}
-            className="w-full py-2.5 rounded-lg border border-dashed border-[#2a3540] text-slate-400 text-[11px] font-bold uppercase">
-            + Añadir ejercicio
+            className="w-full min-h-[56px] rounded-3xl bg-tarjeta text-[17px] font-medium text-tinta flex items-center justify-center gap-2">
+            <Plus size={20} /> Añadir ejercicio
           </button>
         )}
 
         <button onClick={onRestaurar}
-          className="w-full py-2 rounded-lg border border-amber-800/50 bg-amber-950/20 text-amber-300 text-[10px] font-bold uppercase flex items-center justify-center gap-1.5">
-          <RotateCcw size={12} /> Volver al plan original
+          className="w-full h-12 text-[15px] font-medium text-ambar flex items-center justify-center gap-2">
+          <RotateCcw size={16} /> Volver al plan original
         </button>
       </main>
 
       {/* Guardar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#0f1417]/95 backdrop-blur border-t border-[#232c34] p-3">
-        <div className={`${COLUMNA} space-y-2`}>
+      <div className="fixed bottom-0 inset-x-0 z-40 bg-fondo border-t border-divisor px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
+        <div className={`${COLUMNA} space-y-2.5`}>
           <input value={motivo} onChange={e => setMotivo(e.target.value)} aria-label="Motivo del cambio"
-            placeholder="¿Por qué lo cambias? Opcional: si lo dejas vacío queda «Sin motivo»"
-            className="w-full h-9 px-2 bg-[#151b21] border border-[#2a3540] focus:border-emerald-600 focus:outline-none text-slate-100 text-xs rounded" />
-          <div className="flex gap-2">
-            <button onClick={onCerrar} className="px-4 py-2.5 border border-[#2a3540] text-slate-300 text-xs font-bold uppercase rounded-lg">Cancelar</button>
+            placeholder="¿Por qué lo cambias? (opcional)"
+            className={`${texto} w-full h-12`} />
+          <div className="flex gap-2.5">
+            <button onClick={onCerrar} className="flex-1 h-[56px] rounded-2xl bg-elevada text-tinta text-base font-semibold">Cancelar</button>
             <button onClick={() => onGuardar(lista, motivo)}
-              className={`flex-1 py-2.5 text-white text-xs font-bold uppercase rounded-lg ${
-                res.duras.length ? 'bg-amber-700' : 'bg-emerald-600'}`}>
+              className={`flex-[1.6] h-[56px] rounded-2xl text-base font-semibold text-[#0d1215] ${res.duras.length ? 'bg-ambar' : 'bg-tinta'}`}>
               {res.duras.length ? `Guardar con ${res.duras.length} aviso(s)` : 'Guardar'}
             </button>
           </div>
-          <p className="text-[9px] text-slate-600 leading-relaxed">
+          <p className="text-sm text-tinta3 leading-relaxed">
             Se guarda como versión de hoy. Las sesiones que ya entrenaste conservan los ejercicios que hiciste.
           </p>
         </div>

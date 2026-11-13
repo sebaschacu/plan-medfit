@@ -1,243 +1,239 @@
 import React from 'react';
-import { Check, Trophy, Backpack, Zap, AlertTriangle, Link2, Unlink2, Sparkles, Ruler, Clock } from 'lucide-react';
+import { Check, Trophy, AlertTriangle, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { PALAS_MAX_M, E11 } from '../../data.js';
 import { useAccionesCtx } from '../../estado/contextos.js';
+import { anotaCarga, proponerSerie, textoSerie, serieQueToca } from '../../utiles/serie.js';
 import NumInput from '../comunes/NumInput.jsx';
 import Musculos from '../comunes/Musculos.jsx';
+import { Detalle } from '../comunes/ui.jsx';
 
-// ═══════════════ EXERCISE CARD ═══════════════
-const ExerciseCard = ({ ex, prog, pr, color, avisoReset, ultima, sugerencia, bsSuelta = false }) => {
-  const { toggleSet: onToggleSet, onLog, onLastre, onBanda, usarSugerido: onUsarSugerido, toggleBiserieSuelta: onToggleBiserieSuelta } = useAccionesCtx();
+// ═══════════════ TARJETA DE EJERCICIO ═══════════════
+// Dos tamaños. Plegada es una fila: número, nombre y lo que toca. Abierta es
+// la que se usa de pie en el gimnasio, y tiene UNA cosa grande —la carga y las
+// reps de la serie que toca— y UN botón grande: «Hecha».
+//
+// El texto técnico (nota, RIR, descanso, motivo de la sugerencia) no se pierde:
+// queda plegado en una línea que se abre al tocar.
+
+const Etiqueta = ({ children, tono = 'neutro' }) => (
+  <span className={`inline-flex items-center gap-1 h-6 px-2 rounded-lg text-xs font-semibold flex-shrink-0 ${
+    tono === 'ambar' ? 'text-ambar' : 'bg-elevada text-tinta2'}`}
+    style={tono === 'ambar' ? { background: 'rgba(245,158,11,0.10)' } : undefined}>
+    {children}
+  </span>
+);
+
+const ExerciseCard = ({ ex, numero, prog, pr, color, avisoReset, ultima, sugerencia, bsSuelta = false, abierta, onAbrir, onAjustar, onHecha }) => {
+  const { toggleSet, registrarSerie, onLastre, onBanda, toggleBiserieSuelta } = useAccionesCtx();
   const setCount = typeof ex.series === 'number' ? ex.series : 1;
   const p = prog || { sets: [], logs: [], lastre: null };
+  const hechas = (p.sets ?? []).filter(Boolean).length;
   const allDone = setCount > 0 && p.sets?.length === setCount && p.sets.every(Boolean);
-  const isPR = pr?.flash;
-  // ¿La carga sugerida ya está en todas las series? Entonces "Usar" no haría nada.
-  const yaUsado = sugerencia?.kg != null && setCount > 0
-    && Array.from({ length: setCount }).every((_, i) => p.logs?.[i]?.kg === sugerencia.kg);
+  const conCarga = anotaCarga(ex);
+  const toca = serieQueToca(p, setCount);
+  const propuesta = conCarga && toca >= 0 ? proponerSerie(ex, p, toca, sugerencia, ultima) : null;
+  const textoPropuesta = textoSerie(propuesta);
+  const num = String(numero).padStart(2, '0');
+  const nombreBS = ex.bs ? `${ex.bs} · ${bsSuelta ? 'hoy sueltos' : (ex.bstipo === 'ant' ? 'antagonistas' : 'no compiten')}` : null;
+
+  const hecha = (i) => {
+    onHecha?.(ex.id, i);
+    if (!conCarga) return toggleSet(ex.id, i, setCount, ex);
+    const prop = proponerSerie(ex, p, i, sugerencia, ultima);
+    registrarSerie(ex.id, i, setCount, ex, (prop.kg != null || prop.reps != null) ? prop : null);
+  };
+  // Tocar una casilla: sin marcar, la da por hecha; marcada, la corrige (o, si
+  // el ejercicio no anota carga, la desmarca).
+  const alTocarCasilla = (i) => {
+    if (!p.sets?.[i]) return hecha(i);
+    if (conCarga) return onAjustar(ex, i);
+    toggleSet(ex.id, i, setCount, ex);
+  };
+
+  // ─── Plegada ───
+  if (!abierta) {
+    return (
+      <div className="relative min-h-[64px] px-4 py-3 rounded-[18px] bg-tarjeta flex items-center gap-3.5">
+        <span className="w-6 text-sm text-mudo flex-shrink-0">{allDone ? <Check size={18} strokeWidth={2.6} style={{ color }} /> : num}</span>
+        <div className="flex-1 min-w-0">
+          <h3 className={`text-[17px] font-medium leading-snug ${allDone ? 'text-tinta3' : 'text-tinta'}`}>
+            {/* El botón es el nombre, pero su zona de toque es la fila entera. */}
+            <button onClick={() => onAbrir(ex.id)} aria-expanded="false"
+              className="text-left after:absolute after:inset-0 after:rounded-[18px]">{ex.nombre}</button>
+          </h3>
+          <p className="text-sm text-tinta3 truncate">
+            {ex.series} × {ex.reps}{hechas > 0 && !allDone ? ` · ${hechas} de ${setCount} hechas` : ''}{allDone ? ' · hecho' : ''}
+          </p>
+        </div>
+        {ex.bs && <Etiqueta>{ex.bs}</Etiqueta>}
+        {ex.opcional && <Etiqueta>Opcional</Etiqueta>}
+        {ex.nuevo && !ex.bs && !ex.opcional && <Etiqueta>Nuevo</Etiqueta>}
+        <ChevronDown size={18} className="text-mudo flex-shrink-0" aria-hidden="true" />
+      </div>
+    );
+  }
+
+  // ─── Abierta ───
+  const lineaPista = [
+    sugerencia?.tipo === 'subir' && 'sube',
+    sugerencia?.tipo === 'reset' && 'reset del 10 %',
+  ].filter(Boolean)[0];
 
   return (
-    <div className={`rounded-lg border transition-all ${allDone ? 'border-emerald-600/50 bg-emerald-950/10' : 'border-[#232c34] bg-[#151b21]'}`}>
-      <div className="p-3">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              {ex.nuevo && (
-                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded flex items-center gap-1 border bg-green-500/20 border-green-400/60 text-green-300">
-                  <Sparkles size={9} strokeWidth={3} />Nuevo v6
-                </span>
-              )}
-              {ex.opcional && (
-                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded flex items-center gap-1 border bg-slate-600/20 border-slate-500/60 text-slate-300">
-                  Opcional
-                </span>
-              )}
-              {ex.bs && (
-                <>
-                  {/* E11: hoy la pareja puede ir suelta. El badge lo dice, y el
-                      botón lo alterna para los DOS ejercicios de la bi-serie. */}
-                  <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded flex items-center gap-1 border"
-                    style={bsSuelta
-                      ? { background: '#33415533', borderColor: '#64748b88', color: '#94a3b8' }
-                      : {
-                        background: ex.bstipo === 'ant' ? '#7c2d1233' : '#5b21b633',
-                        borderColor: ex.bstipo === 'ant' ? '#c2410c88' : '#7c3aed88',
-                        color: ex.bstipo === 'ant' ? '#fdba74' : '#c4b5fd',
-                      }}>
-                    {bsSuelta ? <Unlink2 size={9} strokeWidth={3} /> : <Link2 size={9} strokeWidth={3} />}
-                    {ex.bs} · {bsSuelta ? 'hoy sueltos' : (ex.bstipo === 'ant' ? 'antag.' : 'no comp.')}
-                  </span>
-                  <button onClick={() => onToggleBiserieSuelta(ex.bs)}
-                    aria-label={bsSuelta ? `Volver a emparejar ${ex.bs}` : `Hacer ${ex.bs} por separado hoy`}
-                    aria-pressed={bsSuelta} title={E11.texto}
-                    className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border transition-all ${
-                      bsSuelta ? 'border-slate-500 bg-slate-700/30 text-slate-300' : 'border-[#2a3540] text-slate-500'}`}>
-                    {bsSuelta ? 'Emparejar' : E11.label}
-                  </button>
-                </>
-              )}
-              {allDone && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-700/50 flex items-center gap-1"><Check size={9} strokeWidth={3} />Hecho</span>}
-              {(ex.lastre || ex.acarreo) && pr?.kg != null && (
-                <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border flex items-center gap-1 ${isPR ? 'bg-amber-500/30 border-amber-400 text-amber-200 animate-pulse' : 'bg-amber-950/40 border-amber-700/50 text-amber-300'}`}>
-                  <Trophy size={9} strokeWidth={3} />PR {pr.kg}kg
-                </span>
-              )}
-            </div>
-            <h3 className="text-base font-bold text-slate-100 leading-tight">{ex.nombre}</h3>
-            <Musculos musculos={ex.musculos} className="mt-0.5" />
-            {ex.nota && <p className="text-[11px] text-slate-500 mt-0.5">{ex.nota}</p>}
-          </div>
-        </div>
-
-        {/* Historial y sugerencia · visibles sin tocar nada */}
-        {(ultima || sugerencia) && (
-          <div className="mb-2 px-2.5 py-2 rounded-lg bg-[#0f1417] border border-[#232c34] space-y-1">
-            <div className="text-[11px] text-slate-300 leading-relaxed">
-              {ultima ? (
-                <>
-                  <span className="text-slate-500">Última vez ({ultima.fecha.slice(8)}/{ultima.fecha.slice(5, 7)}):</span>{' '}
-                  <span className="font-bold" style={{ fontFamily: 'ui-monospace, monospace' }}>
-                    {ultima.kgMax ? `${ultima.kgMax} kg` : '—'}
-                    {ultima.logs.length ? ` × ${ultima.logs.map(l => l.reps ?? '–').join(', ')}` : ''}
-                  </span>
-                </>
-              ) : (
-                <span className="text-slate-500">Primera vez con este ejercicio.</span>
-              )}
-            </div>
-            {sugerencia && sugerencia.tipo !== 'primera' && sugerencia.tipo !== 'no-aplica' && (
-              <div className="text-[11px] leading-relaxed"
-                style={{ color: sugerencia.tipo === 'reset' ? '#fb923c' : sugerencia.tipo === 'subir' ? '#4ade80' : '#94a3b8' }}>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold">
-                    Sugerido: {sugerencia.kg != null ? `${sugerencia.kg} kg` : '—'}
-                  </span>
-                  {/* Un toque en vez de teclear la misma cifra en cada serie.
-                      Solo rellena las que aún no tienen carga: nunca pisa lo anotado.
-                      Los campos de kg no se ven hasta marcar la serie, así que el
-                      botón tiene que decir por sí mismo que ya está hecho. */}
-                  {sugerencia.kg != null && onUsarSugerido && (
-                    yaUsado ? (
-                      <span aria-label={`${sugerencia.kg} kg puestos en las ${setCount} series de ${ex.nombre}`}
-                        className="text-[9px] font-bold uppercase px-2 py-0.5 rounded border border-current/40 opacity-70 flex items-center gap-1">
-                        <Check size={9} strokeWidth={3} /> Puesto
-                      </span>
-                    ) : (
-                      <button onClick={() => onUsarSugerido(ex.id, sugerencia.kg, setCount)}
-                        aria-label={`Usar ${sugerencia.kg} kg en ${ex.nombre}`}
-                        className="text-[9px] font-bold uppercase px-2 py-0.5 rounded border border-current opacity-90">
-                        Usar
-                      </button>
-                    )
-                  )}
-                </div>
-                <span className="text-slate-500">{sugerencia.motivo}</span>
-              </div>
-            )}
-            {sugerencia && (sugerencia.tipo === 'primera' || sugerencia.tipo === 'no-aplica') && (
-              <div className="text-[11px] text-slate-500 leading-relaxed">{sugerencia.motivo}</div>
+    <div className="rounded-3xl bg-tarjeta p-5">
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+            <span className="text-sm text-mudo">{num}</span>
+            {ex.nuevo && <Etiqueta>Nuevo</Etiqueta>}
+            {ex.opcional && <Etiqueta>Opcional</Etiqueta>}
+            {ex.bs && <Etiqueta>{nombreBS}</Etiqueta>}
+            {allDone && <Etiqueta><Check size={12} strokeWidth={3} />Hecho</Etiqueta>}
+            {(ex.lastre || ex.acarreo) && pr?.kg != null && (
+              <Etiqueta tono="ambar"><Trophy size={12} />Récord {pr.kg} kg{pr.flash ? ' · nuevo' : ''}</Etiqueta>
             )}
           </div>
-        )}
-
-        {/* Palas · límite por carga de hombro */}
-        {ex.palas && (
-          <div className="mb-2 px-2.5 py-2 rounded-lg border-l-4 border-amber-600 bg-amber-950/20">
-            <p className="text-[11px] text-amber-100 leading-relaxed">
-              <span className="font-bold">Máximo {PALAS_MAX_M} m de palas por sesión.</span> Con tus series de press y
-              tirón el hombro ya va cargado y las palas multiplican la fuerza sobre el manguito. Si aparece molestia,
-              lo primero que sale son las palas — nunca el face pull, que es lo que protege.
-            </p>
-          </div>
-        )}
-
-        {/* Aviso de reset · regla P6 */}
-        {avisoReset && (
-          <div className="mb-2 px-2.5 py-2 rounded-lg border-l-4 border-orange-500 bg-orange-950/25">
-            <div className="flex items-start gap-2">
-              <AlertTriangle size={14} className="text-orange-400 flex-shrink-0 mt-0.5" />
-              <div className="text-[11px] text-orange-100 leading-relaxed">
-                <span className="font-bold">Toca reset (P6).</span> Fallaste el objetivo de {avisoReset.objetivo} reps
-                dos sesiones seguidas ({avisoReset.conseguido.join(' y ')} reps).
-                {avisoReset.sugerido != null && (
-                  <> Baja de <span className="font-bold">{avisoReset.actual} kg</span> a <span className="font-bold">{avisoReset.sugerido} kg</span> y vuelve a subir desde ahí.</>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* v6: los compuestos de Parte 1 muestran la progresión LINEAL en lugar del RIR */}
-        <div className="grid grid-cols-4 gap-1.5 mb-2">
-          {[
-            ['Series', ex.series, false],
-            ['Reps', ex.reps, false],
-            ex.lineal ? ['Lineal', ex.progresion, true] : ['RIR', ex.rir ?? '—', false],
-            ['Desc.', ex.descanso, false],
-          ].map(([l, v, destaca], i) => (
-            <div key={i} className={`px-1.5 py-1 rounded text-center border ${destaca ? 'bg-amber-950/30 border-amber-700/50' : 'bg-[#0f1417] border-[#232c34]'}`}>
-              <div className={`text-[8px] uppercase tracking-wide font-semibold ${destaca ? 'text-amber-500/80' : 'text-slate-600'}`}>{l}</div>
-              <div className={`text-xs font-bold ${destaca ? 'text-amber-200' : 'text-slate-200'}`} style={{ fontFamily: 'ui-monospace, monospace' }}>{v}</div>
-            </div>
-          ))}
+          <h3 className="text-2xl font-semibold text-tinta leading-tight tracking-[-0.01em]">{ex.nombre}</h3>
+          <Musculos musculos={ex.musculos} className="mt-1" />
         </div>
+      </div>
 
-        {/* Banda de asistencia */}
-        {ex.banda && (
-          <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded bg-purple-950/20 border border-purple-900/40">
-            <Zap size={14} className="text-purple-400 flex-shrink-0" />
-            <span className="text-[10px] uppercase tracking-wide text-purple-300/80 font-semibold">Banda</span>
-            <input
-              type="text"
-              value={p.banda ?? ''}
-              onChange={(e) => onBanda(ex.id, e.target.value)}
-              placeholder="color/nivel"
-              className="flex-1 min-w-0 h-8 px-2 bg-[#0f1417] border border-[#3a2a50] focus:border-purple-500/60 focus:outline-none text-slate-100 text-xs rounded"
-            />
-          </div>
-        )}
+      {/* E11 · hoy la pareja puede ir suelta. Alterna los DOS ejercicios de la bi-serie. */}
+      {ex.bs && (
+        <button onClick={() => toggleBiserieSuelta(ex.bs)}
+          aria-label={bsSuelta ? `Volver a emparejar ${ex.bs}` : `Hacer ${ex.bs} por separado hoy`}
+          aria-pressed={bsSuelta} title={E11.texto}
+          className={`mt-3 h-11 px-3.5 rounded-xl text-sm font-medium ${bsSuelta ? 'bg-elevada text-tinta' : 'border border-borde text-tinta3'}`}>
+          {bsSuelta ? 'Emparejar' : E11.label}
+        </button>
+      )}
 
-        {/* Acarreo (distancia + carga) */}
-        {ex.acarreo && (
-          <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded bg-cyan-950/20 border border-cyan-900/40 flex-wrap">
-            <Ruler size={14} className="text-cyan-400 flex-shrink-0" />
-            <span className="text-[10px] uppercase tracking-wide text-cyan-300/80 font-semibold">Acarreo</span>
+      {/* Texto técnico, plegado */}
+      <Detalle className="mt-3" resumen={ex.nota || `${ex.series} × ${ex.reps} · descanso ${ex.descanso}`}>
+        {ex.nota && <p>{ex.nota}</p>}
+        <p className="mt-1 text-tinta3">
+          {ex.series} series × {ex.reps} · {ex.lineal ? `lineal ${ex.progresion}` : `RIR ${ex.rir ?? '—'}`} · descanso {ex.descanso}
+        </p>
+        {sugerencia?.motivo && <p className="mt-1 text-tinta3">{sugerencia.motivo}</p>}
+      </Detalle>
+
+      {/* Aviso de reset · regla P6 */}
+      {avisoReset && (
+        <Detalle className="mt-2" tono="ambar" abiertoInicial icono={<AlertTriangle size={18} />} resumen="Toca reset (P6)">
+          Fallaste el objetivo de {avisoReset.objetivo} reps dos sesiones seguidas ({avisoReset.conseguido.join(' y ')} reps).
+          {avisoReset.sugerido != null && (
+            <> Baja de <b>{avisoReset.actual} kg</b> a <b>{avisoReset.sugerido} kg</b> y vuelve a subir desde ahí.</>
+          )}
+        </Detalle>
+      )}
+
+      {/* Palas · límite por carga de hombro */}
+      {ex.palas && (
+        <Detalle className="mt-2" tono="ambar" icono={<AlertTriangle size={18} />} resumen={`Máximo ${PALAS_MAX_M} m de palas por sesión`}>
+          Con tus series de press y tirón el hombro ya va cargado y las palas multiplican la fuerza sobre el manguito.
+          Si aparece molestia, lo primero que sale son las palas — nunca el face pull, que es lo que protege.
+        </Detalle>
+      )}
+
+      {/* Registros que no son kg × reps */}
+      {ex.banda && (
+        <label className="mt-3 flex items-center gap-3">
+          <span className="text-sm text-tinta3 w-20">Banda</span>
+          <input type="text" value={p.banda ?? ''} onChange={(e) => onBanda(ex.id, e.target.value)}
+            placeholder="color/nivel" aria-label="Banda de asistencia"
+            className="flex-1 min-w-0 h-11 px-3 bg-fondo border border-borde focus:border-tinta3 focus:outline-none text-tinta text-base rounded-xl placeholder:text-mudo" />
+        </label>
+      )}
+      {ex.acarreo && (
+        <div className="mt-3">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="text-sm text-tinta3 w-20">Acarreo</span>
             <input type="text" inputMode="numeric" value={p.banda ?? ''}
               onChange={(e) => onBanda(ex.id, e.target.value.replace(/[^0-9.]/g, ''))}
-              placeholder="m" className="w-12 h-8 px-1 bg-[#0f1417] border border-cyan-900/50 focus:border-cyan-500/60 focus:outline-none text-slate-100 text-xs text-center rounded" />
-            <span className="text-[10px] text-slate-500">m</span>
-            <NumInput value={p.lastre} onChange={(v) => onLastre(ex.id, v === '' ? null : parseFloat(v))} placeholder="kg" w="w-12" />
-            <span className="text-[10px] text-slate-500">kg</span>
-            <span className="text-[9px] text-cyan-500/70 w-full">Sube primero distancia (30→40→50m), luego carga</span>
+              placeholder="m" aria-label="Metros"
+              className="w-16 h-11 px-1 bg-fondo border border-borde focus:border-tinta3 focus:outline-none text-tinta text-base text-center rounded-xl placeholder:text-mudo" />
+            <span className="text-sm text-tinta3">m</span>
+            <NumInput value={p.lastre} onChange={(v) => onLastre(ex.id, v === '' ? null : parseFloat(v))} placeholder="kg" />
+            <span className="text-sm text-tinta3">kg</span>
           </div>
-        )}
-
-        {/* Isométrico (segundos) - métrica clave */}
-        {ex.iso && (
-          <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded bg-rose-950/20 border border-rose-900/40 flex-wrap">
-            <Clock size={14} className="text-rose-400 flex-shrink-0" />
-            <span className="text-[10px] uppercase tracking-wide text-rose-300/80 font-semibold">Isométrico</span>
-            <NumInput value={p.segundos} onChange={(v) => onLastre(ex.id, v === '' ? null : parseFloat(v))} placeholder="seg" w="w-14" />
-            <span className="text-[10px] text-slate-500">seg</span>
-            <span className="text-[9px] text-rose-500/70 w-full">Métrica clave del objetivo. Solo tiempo hasta 60s, luego carga</span>
+          <p className="text-sm text-mudo mt-1.5">Sube primero distancia (30→40→50m), luego carga</p>
+        </div>
+      )}
+      {ex.iso && (
+        <div className="mt-3">
+          <div className="flex items-center gap-2.5">
+            <span className="text-sm text-tinta3 w-20">Tiempo</span>
+            <NumInput value={p.segundos ?? (ex.lastre ? null : p.lastre)} onChange={(v) => onLastre(ex.id, v === '' ? null : parseFloat(v))} placeholder="seg" />
+            <span className="text-sm text-tinta3">seg</span>
           </div>
-        )}
+          <p className="text-sm text-mudo mt-1.5">Métrica clave del objetivo. Solo tiempo hasta 60s, luego carga</p>
+        </div>
+      )}
+      {ex.lastre && (
+        <div className="mt-3 flex items-center gap-2.5">
+          <span className="text-sm text-tinta3 w-20">Lastre</span>
+          <NumInput value={p.lastre} onChange={(v) => onLastre(ex.id, v === '' ? null : parseFloat(v))} placeholder="kg" />
+          <span className="text-sm text-tinta3">kg</span>
+        </div>
+      )}
 
-        {/* Lastre (mochila) */}
-        {ex.lastre && (
-          <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded bg-amber-950/20 border border-amber-900/40">
-            <Backpack size={14} className="text-amber-400 flex-shrink-0" />
-            <span className="text-[10px] uppercase tracking-wide text-amber-300/80 font-semibold">Lastre</span>
-            <NumInput value={p.lastre} onChange={(v) => onLastre(ex.id, v === '' ? null : parseFloat(v))} placeholder="kg" w="w-14" />
-            <span className="text-[10px] text-slate-500">kg</span>
-          </div>
-        )}
+      {setCount > 0 && (
+        <div className="mt-4 pt-4 border-t border-divisor">
+          <div className="rotulo">{allDone ? `${setCount} series hechas` : `Serie ${toca + 1} de ${setCount}`}</div>
 
-        {/* Checklist de series */}
-        {setCount > 0 && (
-          <div className="flex items-start gap-1.5 flex-wrap pt-2 border-t border-[#232c34]">
+          {/* El dato gigante: lo que toca levantar ahora */}
+          {conCarga && !allDone && (
+            <>
+              <div className="mt-1 flex items-baseline gap-2 text-tinta font-semibold leading-none">
+                {propuesta.kg != null ? (
+                  <><span className="text-[60px] tracking-[-0.03em]">{propuesta.kg}</span><span className="text-xl text-tinta3 font-medium">kg</span></>
+                ) : <span className="text-[40px] text-tinta3">— kg</span>}
+                {propuesta.reps != null && (
+                  <><span className="text-2xl text-mudo font-normal mx-1">×</span><span className="text-[40px]">{propuesta.reps}</span></>
+                )}
+              </div>
+              <p className="mt-2 text-sm text-tinta3">
+                {lineaPista && <span className="font-semibold" style={{ color: sugerencia.tipo === 'reset' ? '#f5b54a' : color }}>{lineaPista} · </span>}
+                objetivo {ex.reps}
+                {ultima ? ` · última vez ${ultima.kgMax ? ultima.kgMax : '—'} × ${ultima.logs.map(l => l.reps ?? '–').join(', ')}` : ' · primera vez'}
+              </p>
+            </>
+          )}
+
+          {/* Casillas de serie */}
+          <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(setCount, 5)}, minmax(0, 1fr))` }}>
             {Array.from({ length: setCount }).map((_, i) => {
-              const checked = p.sets?.[i];
-              const log = p.logs?.[i] || {};
+              const checked = !!p.sets?.[i];
+              const t = checked ? textoSerie(p.logs?.[i]).replace(' × ', '×') : '';
               return (
-                <div key={i} className="flex flex-col items-center gap-1">
-                  <button onClick={() => onToggleSet(ex.id, i, setCount, ex)}
-                    className={`w-9 h-9 rounded-md border-2 flex items-center justify-center font-bold text-xs transition-all ${checked ? 'border-transparent' : 'border-[#2a3540] bg-[#0f1417] text-slate-500'}`}
-                    style={{ background: checked ? color : undefined, color: checked ? '#0a0a0a' : undefined, fontFamily: 'ui-monospace, monospace' }}>
-                    {checked ? <Check size={14} strokeWidth={3} /> : i + 1}
-                  </button>
-                  {checked && (ex.lineal || (ex.rir && ex.rir !== '—')) && (
-                    <div className="flex flex-col gap-0.5">
-                      <NumInput value={log.kg} onChange={(v) => onLog(ex.id, i, { ...log, kg: v === '' ? null : parseFloat(v) }, setCount)} placeholder="kg" />
-                      <NumInput value={log.reps} onChange={(v) => onLog(ex.id, i, { ...log, reps: v === '' ? null : parseInt(v, 10) }, setCount)} placeholder="rep" />
-                    </div>
-                  )}
-                </div>
+                <button key={i} onClick={() => alTocarCasilla(i)}
+                  aria-label={checked ? `Serie ${i + 1} hecha${t ? `, ${t}` : ''}` : undefined}
+                  className={`h-14 rounded-2xl flex flex-col items-center justify-center font-semibold ${checked ? 'text-tinta' : i === toca ? 'text-tinta bg-fondo' : 'text-tinta3 bg-elevada'}`}
+                  style={checked ? { background: color + '33', boxShadow: `inset 0 0 0 1.5px ${color}66` } : i === toca ? { boxShadow: `inset 0 0 0 1.5px ${color}` } : undefined}>
+                  {checked ? <><Check size={16} strokeWidth={3} style={{ color }} /><span className="text-xs mt-0.5">{t}</span></> : <span className="text-xl">{i + 1}</span>}
+                </button>
               );
             })}
           </div>
-        )}
-      </div>
+
+          {/* Hecha, de un toque. Al lado, ajustar antes de guardar. */}
+          {!allDone && (
+            <div className="mt-3 flex gap-2.5" data-accion-serie>
+              <button onClick={() => hecha(toca)} aria-label={`Hecha la serie ${toca + 1} de ${ex.nombre}${textoPropuesta ? `: ${textoPropuesta}` : ''}`}
+                className="flex-1 h-[60px] rounded-[18px] flex items-center justify-center gap-2.5 text-lg font-semibold text-[#0d1215]"
+                style={{ background: color }}>
+                <Check size={22} strokeWidth={2.8} /> Hecha{textoPropuesta ? ` · ${textoPropuesta}` : ''}
+              </button>
+              {conCarga && (
+                <button onClick={() => onAjustar(ex, toca)} aria-label={`Ajustar la serie ${toca + 1} de ${ex.nombre}`}
+                  className="w-[60px] h-[60px] rounded-[18px] bg-elevada flex items-center justify-center text-tinta2 flex-shrink-0">
+                  <SlidersHorizontal size={22} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

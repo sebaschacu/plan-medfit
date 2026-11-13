@@ -1,37 +1,25 @@
 import React from 'react';
 import Musculos from './Musculos.jsx';
+import { Detalle } from './ui.jsx';
 
-// Un ejercicio renderizado en modo consulta: sin checkboxes, sin inputs.
-// Se usa en la biblioteca y en la ficha que se abre desde el nombre del día,
-// para no duplicar la lógica de presentación de ExerciseCard.
-const FichaEjercicio = ({ ex }) => (
-  <div className="rounded-lg border border-[#232c34] bg-[#151b21] p-2.5">
-    <div className="flex items-center gap-2 flex-wrap mb-1">
-      {ex.bs && (
-        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border"
-          style={{
-            background: ex.bstipo === 'ant' ? '#7c2d1233' : '#5b21b633',
-            borderColor: ex.bstipo === 'ant' ? '#c2410c88' : '#7c3aed88',
-            color: ex.bstipo === 'ant' ? '#fdba74' : '#c4b5fd',
-          }}>{ex.bs}</span>
-      )}
-      {ex.opcional && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border border-slate-600 text-slate-400">Opcional</span>}
-    </div>
-    <div className="text-sm font-bold text-slate-100 leading-tight">{ex.nombre}</div>
-    <Musculos musculos={ex.musculos} className="mt-0.5" />
-    {ex.nota && <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{ex.nota}</p>}
-    <div className="grid grid-cols-4 gap-1.5 mt-2">
-      {[
-        ['Series', ex.series],
-        ['Reps', ex.reps],
-        ex.lineal ? ['Lineal', ex.progresion] : ['RIR', ex.rir ?? '—'],
-        ['Desc.', ex.descanso],
-      ].map(([l, v], i) => (
-        <div key={i} className="px-1.5 py-1 rounded text-center border bg-[#0f1417] border-[#232c34]">
-          <div className="text-[8px] uppercase tracking-wide text-slate-600 font-semibold">{l}</div>
-          <div className="text-xs font-bold text-slate-200" style={{ fontFamily: 'ui-monospace, monospace' }}>{v}</div>
+// Un ejercicio en modo consulta: sin casillas, sin campos.
+// Se usa en la ficha que se abre desde Rutinas o desde el nombre de la sesión.
+const FichaEjercicio = ({ ex, numero }) => (
+  <div className="py-3">
+    <div className="flex items-start gap-3">
+      {numero != null && <span className="w-6 text-sm text-mudo pt-0.5 flex-shrink-0">{String(numero).padStart(2, '0')}</span>}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start gap-2">
+          <h3 className="flex-1 text-[17px] font-medium text-tinta leading-snug">{ex.nombre}</h3>
+          {ex.bs && <span className="h-6 px-2 rounded-lg bg-elevada text-xs font-semibold text-tinta2 inline-flex items-center flex-shrink-0">{ex.bs}</span>}
+          {ex.opcional && <span className="h-6 px-2 rounded-lg bg-elevada text-xs font-semibold text-tinta2 inline-flex items-center flex-shrink-0">Opcional</span>}
         </div>
-      ))}
+        <Musculos musculos={ex.musculos} className="mt-0.5" />
+        <p className="text-[15px] text-tinta2 mt-1">
+          {ex.series} × {ex.reps} · {ex.lineal ? `lineal ${ex.progresion}` : `RIR ${ex.rir ?? '—'}`} · {ex.descanso}
+        </p>
+        {ex.nota && <Detalle className="mt-2">{ex.nota}</Detalle>}
+      </div>
     </div>
   </div>
 );

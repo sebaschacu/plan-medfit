@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { calcularCSS, tablaRitmos, mmss } from '../../reglas.js';
 import { usePlanCtx, useAccionesCtx } from '../../estado/contextos.js';
+import { Detalle } from '../comunes/ui.jsx';
 
 // ═══════════════ CSS · TEST Y TABLA DE RITMOS ═══════════════
 // Sin este número todos los ritmos del plan son adivinanzas. La tabla se enseña
 // en toda sesión de agua porque en el borde de la piscina no se va calculando.
+const AZUL = '#06b6d4';
+const campo = 'w-full h-[60px] px-3 bg-fondo border border-borde focus:border-[#06b6d4] focus:outline-none text-tinta text-[28px] font-semibold text-center rounded-2xl placeholder:text-mudo';
+
 const PanelCSS = ({ esTest }) => {
   const { css } = usePlanCtx();
   const { setCss: onCSS } = useAccionesCtx();
@@ -15,80 +19,77 @@ const PanelCSS = ({ esTest }) => {
   const tabla = tablaRitmos(activo);
 
   return (
-    <div className="mb-3 rounded-lg border border-cyan-900/40 bg-cyan-950/10 overflow-hidden">
-      <div className="px-3 py-2.5 border-b border-cyan-900/30">
-        <div className="text-[10px] uppercase tracking-wide text-cyan-400 font-bold">
-          {esTest ? 'Test de CSS' : 'Tus ritmos'}
-        </div>
-        {activo != null && (
-          <div className="text-lg font-bold text-cyan-200 mt-0.5" style={{ fontFamily: 'ui-monospace, monospace' }}>
-            CSS {mmss(activo)} <span className="text-xs font-normal text-slate-400">/ 100 m</span>
-          </div>
-        )}
-      </div>
-
+    <div className="mb-3 space-y-3">
       {esTest && (
-        <div className="px-3 py-2.5 space-y-2 border-b border-cyan-900/30">
-          <p className="text-[11px] text-slate-300 leading-relaxed">
-            Apunta los dos tiempos y la app calcula tu CSS. Formato <span className="font-bold">6:40</span> o segundos.
+        <section className="rounded-3xl bg-tarjeta p-5">
+          <div className="rotulo" style={{ color: AZUL }}>Test de CSS</div>
+          <p className="text-[15px] text-tinta2 leading-relaxed mt-1.5">
+            Apunta los dos tiempos y la app calcula tu CSS. Formato <b className="text-tinta">6:40</b> o segundos.
           </p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] uppercase tracking-wide text-slate-500 font-bold w-16">400 m</span>
-            <input value={t400} onChange={e => setT400(e.target.value)} placeholder="6:40" aria-label="Tiempo de los 400 metros"
-              className="w-20 h-8 px-2 bg-[#0f1417] border border-[#2a3540] focus:border-cyan-600 focus:outline-none text-slate-100 text-xs text-center rounded"
-              style={{ fontFamily: 'ui-monospace, monospace' }} />
-            <span className="text-[10px] uppercase tracking-wide text-slate-500 font-bold w-16">200 m</span>
-            <input value={t200} onChange={e => setT200(e.target.value)} placeholder="3:10" aria-label="Tiempo de los 200 metros"
-              className="w-20 h-8 px-2 bg-[#0f1417] border border-[#2a3540] focus:border-cyan-600 focus:outline-none text-slate-100 text-xs text-center rounded"
-              style={{ fontFamily: 'ui-monospace, monospace' }} />
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <label className="block">
+              <span className="block text-sm text-tinta3 mb-1.5">400 m</span>
+              <input value={t400} onChange={e => setT400(e.target.value)} placeholder="6:40" inputMode="numeric" aria-label="Tiempo de los 400 metros" className={campo} />
+            </label>
+            <label className="block">
+              <span className="block text-sm text-tinta3 mb-1.5">200 m</span>
+              <input value={t200} onChange={e => setT200(e.target.value)} placeholder="3:10" inputMode="numeric" aria-label="Tiempo de los 200 metros" className={campo} />
+            </label>
           </div>
-          {calc?.error && <p className="text-[11px] text-red-400">{calc.error}</p>}
-          {calc?.aviso && <p className="text-[11px] text-amber-300">{calc.aviso}</p>}
+          {calc?.error && <p className="text-sm text-red-400 mt-3">{calc.error}</p>}
+          {calc?.aviso && <p className="text-sm text-ambar mt-3">{calc.aviso}</p>}
           {calc?.segPor100 && !calc.error && (
-            <button onClick={() => onCSS(calc.segPor100)}
-              className="w-full py-2 rounded-lg bg-cyan-700 text-white text-[11px] font-bold uppercase">
-              Guardar CSS {mmss(calc.segPor100)}
-            </button>
+            <>
+              <p className="text-sm text-tinta3 mt-3">Ritmo por 100 m = ({t400} − {t200}) ÷ 2 = <b className="text-tinta">{mmss(calc.segPor100)}</b></p>
+              <button onClick={() => onCSS(calc.segPor100)}
+                className="w-full h-[60px] mt-3 rounded-[18px] text-lg font-semibold text-[#0d1215]" style={{ background: AZUL }}>
+                Guardar CSS {mmss(calc.segPor100)}
+              </button>
+            </>
+          )}
+        </section>
+      )}
+
+      <section className="rounded-3xl bg-tarjeta p-5">
+        <div className="flex items-baseline gap-2">
+          <div className="rotulo flex-1">Tus ritmos</div>
+          {activo != null && (
+            <div className="text-[15px] text-tinta2">CSS <b className="text-2xl text-tinta font-semibold">{mmss(activo)}</b> / 100 m</div>
           )}
         </div>
-      )}
-
-      {tabla.length > 0 ? (
-        <div className="px-3 py-2.5">
-          <div className="overflow-x-auto">
-            <table className="w-full text-[11px]" style={{ fontFamily: 'ui-monospace, monospace' }}>
-              <thead>
-                <tr className="text-slate-500 text-[9px] uppercase tracking-wide">
-                  <th className="text-left font-bold pb-1">Ritmo</th>
-                  <th className="text-right font-bold pb-1">50</th>
-                  <th className="text-right font-bold pb-1">100</th>
-                  <th className="text-right font-bold pb-1">200</th>
-                  <th className="text-right font-bold pb-1">400</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tabla.map(r => (
-                  <tr key={r.clave} className={r.clave === 'CSS' ? 'text-cyan-300 font-bold' : 'text-slate-300'}>
-                    <td className="py-0.5">{r.clave}</td>
-                    <td className="text-right">{r.por50}</td>
-                    <td className="text-right">{r.por100}</td>
-                    <td className="text-right">{r.por200}</td>
-                    <td className="text-right">{r.por400}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-[9px] text-slate-600 mt-2 leading-relaxed">
-            {tabla.find(r => r.clave === 'CSS+5')?.uso && 'CSS+5 para aeróbico sostenido · CSS−5 para series cortas. '}
-            Repite el test cada 6-8 semanas: es tu métrica principal.
+        {tabla.length > 0 ? (
+          <>
+            <div role="table" aria-label="Ritmos por distancia" className="mt-3 text-[15px]">
+              <div role="row" className="grid grid-cols-5 text-sm text-tinta3 pb-1.5">
+                <span role="columnheader">Ritmo</span>
+                {['50', '100', '200', '400'].map(m => <span key={m} role="columnheader" className="text-right">{m}</span>)}
+              </div>
+              {tabla.map(r => {
+                const css_ = r.clave === 'CSS';
+                return (
+                  <div role="row" key={r.clave}
+                    className={`grid grid-cols-5 py-2 px-2 -mx-2 rounded-xl ${css_ ? 'text-tinta font-semibold' : 'text-tinta2'}`}
+                    style={css_ ? { background: 'rgba(6,182,212,0.14)' } : undefined}>
+                    <span role="cell">{r.clave}</span>
+                    <span role="cell" className="text-right">{r.por50}</span>
+                    <span role="cell" className="text-right">{r.por100}</span>
+                    <span role="cell" className="text-right">{r.por200}</span>
+                    <span role="cell" className="text-right">{r.por400}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <Detalle className="mt-3" resumen="Cómo usar la tabla">
+              {tabla.find(r => r.clave === 'CSS+5')?.uso && 'CSS+5 para aeróbico sostenido · CSS−5 para series cortas. '}
+              Repite el test cada 6-8 semanas: es tu métrica principal.
+            </Detalle>
+          </>
+        ) : (
+          <p className="text-[15px] text-tinta3 leading-relaxed mt-2">
+            Aún no tienes CSS. Hazte el test en tu primera sesión: sin ese número, los ritmos del plan son adivinanzas.
           </p>
-        </div>
-      ) : (
-        <p className="px-3 py-2.5 text-[11px] text-slate-500 leading-relaxed">
-          Aún no tienes CSS. Hazte el test en tu primera sesión: sin ese número, los ritmos del plan son adivinanzas.
-        </p>
-      )}
+        )}
+      </section>
     </div>
   );
 };

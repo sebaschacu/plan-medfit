@@ -191,24 +191,24 @@ export const GRUPOS_SESION = {
 export const SESION_INFO = {
   // `label` es lo que se VE: el nombre de lo que se entrena. Las claves
   // (gymA, natB2…) son internas y NO se renombran: de ellas cuelga el
-  // localStorage guardado. `corto` es la versión para una celda con dos sesiones.
-  gymC1: { label: 'Pierna fuerza',  corto: 'P. fuerza', color: '#15803d', icon: 'dumbbell', tipo: 'Sentadilla pesada · cero torso', grupo: 'gym' },
-  gymC2: { label: 'Pierna volumen', corto: 'P. volumen', color: '#65a30d', icon: 'dumbbell', tipo: 'Prensa · sin barra a la espalda', grupo: 'gym' },
-  gymA:  { label: 'Empuje',   corto: 'Empuje',   color: '#22c55e', icon: 'dumbbell', tipo: 'Pecho · hombro · tríceps', grupo: 'gym' },
-  gymB:  { label: 'Tracción', corto: 'Tracción', color: '#16a34a', icon: 'dumbbell', tipo: 'Espalda · bíceps', grupo: 'gym' },
-  gymD:  { label: 'Torso',    corto: 'Torso',    color: '#4ade80', icon: 'dumbbell', tipo: 'Empuje + tracción', grupo: 'gym' },
-  calistenia: { label: 'Calistenia', corto: 'Calis', color: '#a855f7', icon: 'home', tipo: 'Complemento · full body', grupo: 'calistenia' },
-  natacion:   { label: 'Natación', corto: 'Nado', color: '#06b6d4', icon: 'waves', tipo: 'Aeróbico', grupo: 'natacion' },
-  natA1: { label: 'Técnica de crawl',   corto: 'Nado', color: '#06b6d4', icon: 'waves', tipo: 'Bloque A · técnica', grupo: 'natacion' },
-  natA2: { label: 'Espalda y pecho',    corto: 'Nado', color: '#06b6d4', icon: 'waves', tipo: 'Bloque A · estilos', grupo: 'natacion' },
-  natA3: { label: 'Estilos combinados', corto: 'Nado', color: '#06b6d4', icon: 'waves', tipo: 'Bloque A · estilos', grupo: 'natacion' },
-  natB1: { label: 'Umbral',         corto: 'Nado', color: '#0891b2', icon: 'waves', tipo: 'Bloque B · crawl', grupo: 'natacion' },
-  natB2: { label: 'Aguas abiertas', corto: 'Nado', color: '#0891b2', icon: 'waves', tipo: 'Bloque B · continuo', grupo: 'natacion' },
-  natB3: { label: 'Ritmo variable', corto: 'Nado', color: '#0891b2', icon: 'waves', tipo: 'Bloque B · crawl', grupo: 'natacion' },
-  natCSS: { label: 'Test CSS', corto: 'Test', color: '#0e7490', icon: 'waves', tipo: 'Test de umbral', grupo: 'natacion' },
-  running:    { label: 'Running', corto: 'Run', color: '#0891b2', icon: 'run', tipo: 'Z2', grupo: 'cardio' },
-  ciclismo:   { label: 'Bici', corto: 'Bici', color: '#0284c7', icon: 'bike', tipo: 'Z2 sin impacto', grupo: 'cardio' },
-  descanso:   { label: 'Descanso', corto: 'Desc.', color: '#64748b', icon: 'moon', tipo: 'Recuperación', grupo: 'descanso' },
+  // localStorage guardado.
+  gymC1: { label: 'Pierna fuerza',  color: '#15803d', icon: 'dumbbell', tipo: 'Sentadilla pesada · cero torso', grupo: 'gym' },
+  gymC2: { label: 'Pierna volumen', color: '#65a30d', icon: 'dumbbell', tipo: 'Prensa · sin barra a la espalda', grupo: 'gym' },
+  gymA:  { label: 'Empuje',     color: '#22c55e', icon: 'dumbbell', tipo: 'Pecho · hombro · tríceps', grupo: 'gym' },
+  gymB:  { label: 'Tracción', color: '#16a34a', icon: 'dumbbell', tipo: 'Espalda · bíceps', grupo: 'gym' },
+  gymD:  { label: 'Torso',       color: '#4ade80', icon: 'dumbbell', tipo: 'Empuje + tracción', grupo: 'gym' },
+  calistenia: { label: 'Calistenia', color: '#a855f7', icon: 'home', tipo: 'Complemento · full body', grupo: 'calistenia' },
+  natacion:   { label: 'Natación', color: '#06b6d4', icon: 'waves', tipo: 'Aeróbico', grupo: 'natacion' },
+  natA1: { label: 'Técnica de crawl',    color: '#06b6d4', icon: 'waves', tipo: 'Bloque A · técnica', grupo: 'natacion' },
+  natA2: { label: 'Espalda y pecho',    color: '#06b6d4', icon: 'waves', tipo: 'Bloque A · estilos', grupo: 'natacion' },
+  natA3: { label: 'Estilos combinados',  color: '#06b6d4', icon: 'waves', tipo: 'Bloque A · estilos', grupo: 'natacion' },
+  natB1: { label: 'Umbral',         color: '#0891b2', icon: 'waves', tipo: 'Bloque B · crawl', grupo: 'natacion' },
+  natB2: { label: 'Aguas abiertas',  color: '#0891b2', icon: 'waves', tipo: 'Bloque B · continuo', grupo: 'natacion' },
+  natB3: { label: 'Ritmo variable', color: '#0891b2', icon: 'waves', tipo: 'Bloque B · crawl', grupo: 'natacion' },
+  natCSS: { label: 'Test CSS', color: '#0e7490', icon: 'waves', tipo: 'Test de umbral', grupo: 'natacion' },
+  running:    { label: 'Running', color: '#0891b2', icon: 'run', tipo: 'Z2', grupo: 'cardio' },
+  ciclismo:   { label: 'Bici', color: '#0284c7', icon: 'bike', tipo: 'Z2 sin impacto', grupo: 'cardio' },
+  descanso:   { label: 'Descanso', color: '#64748b', icon: 'moon', tipo: 'Recuperación', grupo: 'descanso' },
 };
 
 // ═══════════════ TAXONOMÍA DE GRUPOS MUSCULARES (v6) ═══════════════

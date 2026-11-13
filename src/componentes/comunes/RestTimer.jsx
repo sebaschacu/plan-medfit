@@ -1,36 +1,31 @@
 import React from 'react';
-import { Timer, X } from 'lucide-react';
 import { fmtTime } from '../../utiles/formato.js';
 
-// ═══════════════ REST TIMER OVERLAY ═══════════════
-const RestTimer = ({ timer, onSkip, color }) => {
+// ═══════════════ DESCANSO · barra inferior ═══════════════
+// Aparece sola al dar una serie por hecha. Lo único grande es el tiempo.
+// «Corregir» abre la rueda sobre la serie recién guardada.
+const RestTimer = ({ timer, onSkip, color, guardada, onCorregir }) => {
   if (!timer) return null;
   const { secondsLeft, total, name, done } = timer;
   const pct = total > 0 ? Math.max(0, (secondsLeft / total) * 100) : 0;
   const low = secondsLeft <= 5 && secondsLeft > 0;
   return (
-    <div className="fixed bottom-4 left-3 right-3 sm:left-auto sm:right-6 sm:w-72 z-50 rounded-xl overflow-hidden border-2 shadow-2xl"
-      style={{ borderColor: done ? '#22c55e' : color, background: '#151b21' }}>
-      <div className="px-4 py-3">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Timer size={13} color={done ? '#22c55e' : color} />
-            <span className="text-[10px] uppercase tracking-wide font-bold truncate" style={{ color: done ? '#22c55e' : color }}>
-              {done ? 'Descanso listo' : 'Descansando'}
-            </span>
-          </div>
-          <button onClick={onSkip} className="flex items-center gap-1 px-2 py-0.5 border border-[#2a3540] rounded text-slate-400 text-[10px] font-bold">
-            SALTAR <X size={10} />
-          </button>
+    <div className="fixed bottom-4 left-3 right-3 sm:left-auto sm:right-6 sm:w-96 z-40 rounded-3xl bg-elevada px-5 pt-3.5 pb-4 mb-[env(safe-area-inset-bottom)]"
+      role="timer" aria-label="Descanso">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="rotulo" style={done ? { color: '#4ade80' } : undefined}>{done ? 'Descanso listo' : 'Descansando'}</div>
+          <div className={`text-[40px] font-semibold leading-none mt-0.5 ${low ? 'text-ambar' : 'text-tinta'}`}>{fmtTime(secondsLeft)}</div>
         </div>
-        <div className="text-[10px] text-slate-500 truncate mb-1">{name}</div>
-        <div className={`text-4xl font-bold leading-none ${low ? 'text-red-400' : 'text-slate-100'}`} style={{ fontFamily: 'ui-monospace, monospace' }}>
-          {fmtTime(secondsLeft)}
-        </div>
-        <div className="mt-2 h-1 bg-[#0f1417] rounded-full overflow-hidden">
-          <div className="h-full transition-all duration-1000 ease-linear" style={{ width: `${pct}%`, background: done ? '#22c55e' : color }} />
-        </div>
+        {onCorregir && (
+          <button onClick={onCorregir} className="h-12 px-3 text-base font-semibold text-tinta">Corregir</button>
+        )}
+        <button onClick={onSkip} className="h-12 px-5 rounded-2xl bg-tinta text-[#0d1215] text-base font-semibold">Saltar</button>
       </div>
+      <div className="mt-3 h-1.5 bg-fondo rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-1000 ease-linear" style={{ width: `${pct}%`, background: done ? '#4ade80' : color }} />
+      </div>
+      <div className="mt-2 text-sm text-tinta3 truncate">{name}{guardada ? ` · ${guardada}` : ''}</div>
     </div>
   );
 };

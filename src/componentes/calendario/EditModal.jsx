@@ -4,6 +4,7 @@ import { TURNO_INFO, SESION_INFO } from '../../data.js';
 import { useProgresoCtx, usePlanCtx } from '../../estado/contextos.js';
 import { avisoAlFijar } from '../../generador.js';
 import MenuSesiones from './MenuSesiones.jsx';
+import { Hoja, ChipTurno } from '../comunes/ui.jsx';
 
 // ═══════════════ EDIT DAY MODAL ═══════════════
 // `dia`, onSave, onLiberar y onClose vienen de App: el modal es un flag de
@@ -29,105 +30,105 @@ const EditModal = ({ dia, onSave, onLiberar, onClose }) => {
   // elegida y antes de guardar; guardar sigue siendo posible.
   const avisos = cambiaSesion ? avisoAlFijar(calendario, dia.fecha, sesion) : [];
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 bg-black/80" onClick={onClose}>
-      <div className="w-full max-w-md bg-[#151b21] border border-[#2a3540] rounded-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="px-4 py-3 border-b border-[#232c34] flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-bold text-slate-100">Editar día {dia.dia} · {dia.sem}</h3>
-            <p className="text-[10px] text-slate-500 mt-0.5">Se fija este día y se recalcula lo que viene después</p>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-slate-400"><X size={18} /></button>
+    <Hoja onCerrar={onClose} etiqueta={`Editar día ${dia.dia}`}>
+      <div className="px-5 pt-2 pb-3 flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-2xl font-semibold text-tinta">Editar día {dia.dia} · {dia.sem}</h3>
+          <p className="text-sm text-tinta3 mt-0.5">Se fija este día y se recalcula lo que viene después</p>
         </div>
-        <div className="p-4 space-y-4">
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-slate-500 font-bold mb-2">Turno</div>
-            <div className="grid grid-cols-4 gap-1.5">
-              {Object.entries(TURNO_INFO).map(([k, v]) => (
-                <button key={k} onClick={() => setTurno(k)}
-                  className={`py-2 rounded-lg border-2 text-xs font-bold transition-all ${turno === k ? '' : 'border-[#2a3540] text-slate-400'}`}
-                  style={{ borderColor: turno === k ? v.color : undefined, background: turno === k ? v.color + '22' : undefined, color: turno === k ? v.color : undefined }}>
-                  {k}
-                  <div className="text-[8px] font-normal mt-0.5">{v.label}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-slate-500 font-bold mb-2">Sesión</div>
-            <MenuSesiones sesion={sesion} onElegir={setSesion} />
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-slate-500 font-bold mb-2">Festivo</div>
-            <button onClick={() => setFestivo(!festivo)}
-              className={`w-full py-2.5 rounded-lg border-2 text-xs font-bold flex items-center justify-center gap-2 transition-all ${festivo ? 'border-rose-500 bg-rose-500/20 text-rose-300' : 'border-[#2a3540] text-slate-400'}`}>
-              <Star size={14} fill={festivo ? 'currentColor' : 'none'} />
-              {festivo ? 'Es festivo (piscina cerrada)' : 'Marcar como festivo'}
-            </button>
-          </div>
-        </div>
-        <div className="p-4 pt-0 flex flex-col gap-2">
-          {/* Aviso: la sesión elegida solapa con el gym anterior, o rompe S7 */}
-          {avisos.length > 0 && (
-            <div className="px-3 py-2.5 rounded-lg border-l-4 border-amber-500 bg-amber-950/25">
-              <div className="flex items-start gap-2">
-                <AlertTriangle size={15} className="text-amber-400 flex-shrink-0 mt-0.5" />
-                <div className="space-y-1.5">
-                  <p className="text-[11px] font-bold text-amber-200">
-                    {SESION_INFO[sesion]?.label} aquí {avisos.length === 1 ? 'tiene un problema' : `tiene ${avisos.length} problemas`}, pero puedes guardar igual:
-                  </p>
-                  {avisos.map((a, i) => (
-                    <p key={i} className="text-[11px] text-amber-100/90 leading-relaxed">
-                      <span className="font-bold">{a.regla === 'S7' ? 'S7 · ' : 'Solape · '}</span>{a.texto}
-                    </p>
-                  ))}
-                  <p className="text-[10px] text-amber-200/70 leading-relaxed">
-                    Nada se reescribe por este aviso: los días que no edites se quedan como están.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          {/* Aviso: este día ya tiene entrenamiento registrado */}
-          {destruye && (
-            <div className="px-3 py-2.5 rounded-lg border-l-4 border-red-500 bg-red-950/25">
-              <div className="flex items-start gap-2">
-                <AlertTriangle size={15} className="text-red-400 flex-shrink-0 mt-0.5" />
-                <div className="text-[11px] text-red-100 leading-relaxed">
-                  <span className="font-bold">Este día ya tiene entrenamiento registrado</span> ({ejerciciosRegistrados}{' '}
-                  {ejerciciosRegistrados === 1 ? 'ejercicio' : 'ejercicios'}). Cambiarlo de {SESION_INFO[dia.sesion]?.label} a {SESION_INFO[sesion]?.label} dejaría
-                  ese registro apuntando a ejercicios que no existen en la sesión nueva, así que <span className="font-bold">se borrará</span>.
-                  Tus PRs históricos no se tocan.
-                </div>
-              </div>
-              <label className="flex items-center gap-2 mt-2.5 cursor-pointer">
-                <input type="checkbox" checked={asumido} onChange={(e) => setAsumido(e.target.checked)}
-                  className="w-4 h-4 accent-red-500 flex-shrink-0" />
-                <span className="text-[11px] font-bold text-red-200">Entiendo, borra el registro de este día</span>
-              </label>
-            </div>
-          )}
-          {dia.fijado && !dia.fijadoAuto && (
-            <button onClick={() => onLiberar(dia.fecha)}
-              className="w-full py-2 border border-amber-700/50 bg-amber-950/20 text-amber-300 text-[11px] font-bold uppercase rounded-lg flex items-center justify-center gap-1.5">
-              <RotateCcw size={12} /> Soltar este día y dejar que lo genere
-            </button>
-          )}
-          {dia.fijadoAuto && !destruye && (
-            <p className="text-[10px] text-slate-500 leading-relaxed">
-              Este día quedó fijado solo porque tiene entrenamiento registrado. El generador no lo moverá.
-            </p>
-          )}
-        </div>
-        <div className="flex gap-2 p-4 border-t border-[#232c34]">
-          <button onClick={onClose} className="flex-1 py-2.5 border border-[#2a3540] text-slate-300 text-xs font-bold uppercase rounded-lg">Cancelar</button>
-          <button onClick={() => onSave(dia.fecha, turno, sesion, festivo, destruye)} disabled={bloqueado}
-            className={`flex-1 py-2.5 text-white text-xs font-bold uppercase rounded-lg ${
-              bloqueado ? 'bg-slate-700 text-slate-500' : destruye ? 'bg-red-600' : 'bg-emerald-600'}`}>
-            {destruye ? 'Cambiar y borrar' : 'Guardar'}
-          </button>
-        </div>
+        <button onClick={onClose} aria-label="Cerrar" className="w-11 h-11 rounded-full bg-elevada flex items-center justify-center text-tinta2 flex-shrink-0"><X size={20} /></button>
       </div>
-    </div>
+      <div className="px-5 space-y-5">
+        <div>
+          <div className="rotulo mb-2">Turno</div>
+          <div className="grid grid-cols-4 gap-2">
+            {Object.entries(TURNO_INFO).map(([k, v]) => (
+              <button key={k} onClick={() => setTurno(k)} aria-pressed={turno === k}
+                className={`min-h-[64px] rounded-2xl flex flex-col items-center justify-center gap-1 ${turno === k ? '' : 'bg-elevada'}`}
+                style={turno === k ? { background: v.color + '22', boxShadow: `inset 0 0 0 2px ${v.color}` } : undefined}>
+                <ChipTurno turno={k} />
+                <span className="text-sm text-tinta2 leading-tight">{v.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="rotulo mb-2">Sesión</div>
+          <MenuSesiones sesion={sesion} onElegir={setSesion} />
+        </div>
+        <button onClick={() => setFestivo(!festivo)} aria-pressed={festivo}
+          className="w-full min-h-[56px] px-4 rounded-2xl bg-elevada flex items-center gap-3 text-left">
+          <Star size={20} className="text-pink-400 flex-shrink-0" fill={festivo ? 'currentColor' : 'none'} />
+          <span className="flex-1 text-[17px] text-tinta">{festivo ? 'Es festivo (piscina cerrada)' : 'Marcar como festivo'}</span>
+          <span className={`w-12 h-7 rounded-full p-0.5 flex-shrink-0 ${festivo ? 'bg-pink-400' : 'bg-borde'}`} aria-hidden="true">
+            <span className={`block w-6 h-6 rounded-full bg-tinta transition-transform ${festivo ? 'translate-x-5' : ''}`} />
+          </span>
+        </button>
+
+        {/* Aviso: la sesión elegida solapa con el gym anterior, o rompe S7 */}
+        {avisos.length > 0 && (
+          <div className="p-4 rounded-2xl" style={{ background: 'rgba(245,158,11,0.10)' }}>
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle size={18} className="text-ambar flex-shrink-0 mt-0.5" />
+              <div className="space-y-1.5">
+                <p className="text-[15px] font-semibold text-ambar">
+                  {SESION_INFO[sesion]?.label} aquí {avisos.length === 1 ? 'tiene un problema' : `tiene ${avisos.length} problemas`}, pero puedes guardar igual:
+                </p>
+                {avisos.map((a, i) => (
+                  <p key={i} className="text-sm text-[#f3d9a4] leading-relaxed">
+                    <span className="font-semibold">{a.regla === 'S7' ? 'S7 · ' : 'Solape · '}</span>{a.texto}
+                  </p>
+                ))}
+                <p className="text-sm text-[#f3d9a4] leading-relaxed">
+                  Nada se reescribe por este aviso: los días que no edites se quedan como están.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Aviso: este día ya tiene entrenamiento registrado */}
+        {destruye && (
+          <div className="p-4 rounded-2xl bg-red-950/40">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-red-100 leading-relaxed">
+                <span className="font-semibold">Este día ya tiene entrenamiento registrado</span> ({ejerciciosRegistrados}{' '}
+                {ejerciciosRegistrados === 1 ? 'ejercicio' : 'ejercicios'}). Cambiarlo de {SESION_INFO[dia.sesion]?.label} a {SESION_INFO[sesion]?.label} dejaría
+                ese registro apuntando a ejercicios que no existen en la sesión nueva, así que <span className="font-semibold">se borrará</span>.
+                Tus PRs históricos no se tocan.
+              </div>
+            </div>
+            <label className="flex items-center gap-3 mt-3 min-h-[44px] cursor-pointer">
+              <input type="checkbox" checked={asumido} onChange={(e) => setAsumido(e.target.checked)}
+                className="w-5 h-5 accent-red-500 flex-shrink-0" />
+              <span className="text-[15px] font-semibold text-red-200">Entiendo, borra el registro de este día</span>
+            </label>
+          </div>
+        )}
+        {dia.fijado && !dia.fijadoAuto && (
+          <div className="rounded-2xl bg-elevada px-4 py-3">
+            <p className="text-sm text-tinta3">Este día está fijado a mano.</p>
+            <button onClick={() => onLiberar(dia.fecha)}
+              className="h-11 text-[15px] font-semibold text-ambar flex items-center gap-2">
+              <RotateCcw size={16} /> Soltar este día y dejar que lo genere
+            </button>
+          </div>
+        )}
+        {dia.fijadoAuto && !destruye && (
+          <p className="text-sm text-tinta3 leading-relaxed">
+            Este día quedó fijado solo porque tiene entrenamiento registrado. El generador no lo moverá.
+          </p>
+        )}
+      </div>
+      <div className="flex gap-2.5 p-5">
+        <button onClick={onClose} className="flex-1 h-[56px] rounded-2xl bg-elevada text-tinta text-base font-semibold">Cancelar</button>
+        <button onClick={() => onSave(dia.fecha, turno, sesion, festivo, destruye)} disabled={bloqueado}
+          className={`flex-[1.4] h-[56px] rounded-2xl text-base font-semibold ${
+            bloqueado ? 'bg-elevada text-mudo' : destruye ? 'bg-red-600 text-white' : 'bg-tinta text-[#0d1215]'}`}>
+          {destruye ? 'Cambiar y borrar' : 'Guardar y fijar'}
+        </button>
+      </div>
+    </Hoja>
   );
 };
 
