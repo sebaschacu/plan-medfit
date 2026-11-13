@@ -628,8 +628,9 @@ check('Un día sin reps registradas no cuenta como fallo',
   }, SESIONES)['A-1']);
 
 console.log('\n── S4 · posturno según sueño ──');
-check('4h → descanso completo', S4(4).nivel === 'descanso');
+check('4h → sesión reducida (dos tramos: ya no hay descanso obligatorio por sueño)', S4(4).nivel === 'reducida');
 check('5.5h → sesión reducida', S4(5.5).nivel === 'reducida');
+check('6h justas → sesión normal', S4(6).nivel === 'normal');
 check('7h → sesión normal', S4(7).nivel === 'normal');
 check('Sin dato → sin veredicto', S4(null) === null && S4('') === null);
 

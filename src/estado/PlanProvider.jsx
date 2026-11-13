@@ -19,7 +19,7 @@ export function PlanProvider({ children }) {
   const { restTimer, startTimer, skipTimer } = useTemporizador();
   const {
     view, activeFecha, activeSesion, anio, mes,
-    cambiarMes, openDay, abrirSesionDelDia, backToCalendar,
+    cambiarMes, openDay, abrirSesionDelDia, backToCalendar, irA,
   } = useNavegacion({ todayISO, skipTimer });
 
   const {
@@ -169,7 +169,7 @@ export function PlanProvider({ children }) {
 
   const valorAcciones = useMemo(() => ({
     // navegación
-    cambiarMes, openDay, abrirSesionDelDia, backToCalendar,
+    cambiarMes, openDay, abrirSesionDelDia, backToCalendar, irA,
     // plan
     saveEdit, liberarDia, onSecundaria, onComplemento, fijarVariante, soltarVariante,
     onFlexible, onConvertirFlexible, setCss,
@@ -181,7 +181,7 @@ export function PlanProvider({ children }) {
     skipTimer,
     // datos
     onExportar, onImportar,
-  }), [cambiarMes, openDay, abrirSesionDelDia, backToCalendar,
+  }), [cambiarMes, openDay, abrirSesionDelDia, backToCalendar, irA,
     saveEdit, liberarDia, onSecundaria, onComplemento, fijarVariante, soltarVariante,
     onFlexible, onConvertirFlexible, setCss,
     guardarRutina, restaurarRutina,

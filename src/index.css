@@ -2,15 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
-  background: #0f1417;
-  margin: 0; padding: 0; min-height: 100vh;
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+/* Geist, servida desde la propia app para que funcione sin conexión (PWA). */
+@font-face {
+  font-family: 'Geist'; font-style: normal; font-display: swap; font-weight: 100 900;
+  src: url('../node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
-body { overscroll-behavior-y: contain; -webkit-tap-highlight-color: transparent; }
+@font-face {
+  font-family: 'Geist'; font-style: normal; font-display: swap; font-weight: 100 900;
+  src: url('../node_modules/@fontsource-variable/geist/files/geist-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+
+html, body, #root {
+  background: #0d1215;
+  margin: 0; padding: 0; min-height: 100vh;
+}
+#root { padding-top: env(safe-area-inset-top); }
+body {
+  font-family: 'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #e8edf0;
+  /* Cifras de ancho fijo: kg y reps no bailan al cambiar de valor. */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: contain; -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #0f1417; }
-::-webkit-scrollbar-thumb { background: #2a3540; border-radius: 3px; }
+::-webkit-scrollbar-track { background: #0d1215; }
+::-webkit-scrollbar-thumb { background: #2a343c; border-radius: 3px; }
 input[type=text] { -moz-appearance: textfield; }
 input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Foco visible para teclado; el toque no lo dispara. */
+:focus-visible { outline: 2px solid #e8edf0; outline-offset: 2px; }
+
+@layer components {
+  /* Rótulo de sección: 12/16 · 600 · versalitas */
+  .rotulo { @apply text-xs font-semibold uppercase tracking-[0.08em] text-tinta3; }
+  .tarjeta { @apply rounded-3xl bg-tarjeta; }
+  /* Rueda de selección: sin barra de desplazamiento */
+  .sin-barra { scrollbar-width: none; }
+  .sin-barra::-webkit-scrollbar { display: none; }
+}

@@ -53,13 +53,21 @@ export function calcularAvisosReset(progress, sesiones) {
 }
 
 // ─── Regla S4 · el posturno depende de las horas de sueño ───
+// DOS TRAMOS (decisión del usuario, nov 2026). Antes eran tres y por debajo de
+// 5 h mandaba descanso completo; ese descanso obligatorio ya no existe.
+//   menos de 6 h → sesión reducida, sin segunda sesión
+//   6 h o más    → sesión normal
+// En la interfaz son dos botones, que guardan en `__sueno` un valor
+// representativo de cada tramo (SUENO_POCO / SUENO_BIEN). La clave y el tipo
+// (número de horas) no cambian: los respaldos antiguos siguen valiendo.
+export const SUENO_POCO = 5;
+export const SUENO_BIEN = 7;
 export const S4 = (h) => {
   if (h == null || h === '') return null;
   const n = Number(h);
   if (Number.isNaN(n)) return null;
-  if (n < 5) return { nivel: 'descanso', color: '#f87171', borde: 'border-red-500', fondo: 'bg-red-950/25', texto: 'Menos de 5h: hoy es DESCANSO COMPLETO. No es negociable — entrenar con este déficit no te da adaptación, te da fatiga.' };
-  if (n <= 6) return { nivel: 'reducida', color: '#fbbf24', borde: 'border-amber-500', fondo: 'bg-amber-950/25', texto: 'Entre 5 y 6h: sesión REDUCIDA. Dos series por ejercicio y fuera los acarreos. Los compuestos de Parte 1 se mantienen.' };
-  return { nivel: 'normal', color: '#4ade80', borde: 'border-emerald-500', fondo: 'bg-emerald-950/25', texto: 'Más de 6h: sesión NORMAL. Adelante con todo.' };
+  if (n < 6) return { nivel: 'reducida', color: '#f5b54a', texto: 'Menos de 6 h: sesión reducida. Dos series por ejercicio y fuera los acarreos; los compuestos de Parte 1 se mantienen. Hoy no hay segunda sesión.' };
+  return { nivel: 'normal', color: '#4ade80', texto: '6 h o más: sesión normal.' };
 };
 
 // ═══════════════ NATACIÓN · CSS ═══════════════

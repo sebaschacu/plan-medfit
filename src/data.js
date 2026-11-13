@@ -9,7 +9,7 @@ export const TURNO_INFO = {
   L: { label: 'Libre',    color: '#22c55e', bg: '#0d2818', desc: 'Día libre · cualquier hora' },
   C: { label: 'Turno día', color: '#f59e0b', bg: '#2a1f0a', desc: '12h · entrena tarde' },
   N: { label: 'Noche',    color: '#3b82f6', bg: '#0a1a2e', desc: 'Guardia · entrena 7-13h' },
-  P: { label: 'Posturno', color: '#64748b', bg: '#1a1f26', desc: 'Tras dormir ≥5h · tarde' },
+  P: { label: 'Posturno', color: '#64748b', bg: '#1a1f26', desc: 'Tras dormir · tarde' },
 };
 
 // ─── v6.1 · Cupo semanal ───
@@ -189,23 +189,26 @@ export const GRUPOS_SESION = {
 };
 
 export const SESION_INFO = {
-  gymC1: { label: 'Gym C1', color: '#15803d', icon: 'dumbbell', tipo: 'Pierna pesada', grupo: 'gym' },
-  gymC2: { label: 'Gym C2', color: '#65a30d', icon: 'dumbbell', tipo: 'Pierna volumen', grupo: 'gym' },
-  gymA:  { label: 'Gym A',  color: '#22c55e', icon: 'dumbbell', tipo: 'Empuje superior', grupo: 'gym' },
-  gymB:  { label: 'Gym B',  color: '#16a34a', icon: 'dumbbell', tipo: 'Tracción superior', grupo: 'gym' },
-  gymD:  { label: 'Gym D',  color: '#4ade80', icon: 'dumbbell', tipo: 'Torso completo', grupo: 'gym' },
-  calistenia: { label: 'Calistenia', color: '#a855f7', icon: 'home', tipo: 'Full body + gesto', grupo: 'calistenia' },
-  natacion:   { label: 'Natación', color: '#06b6d4', icon: 'waves', tipo: 'Aeróbico', grupo: 'natacion' },
-  natA1: { label: 'Swim A1', color: '#06b6d4', icon: 'waves', tipo: 'Técnica de crawl', grupo: 'natacion' },
-  natA2: { label: 'Swim A2', color: '#06b6d4', icon: 'waves', tipo: 'Espalda y pecho', grupo: 'natacion' },
-  natA3: { label: 'Swim A3', color: '#06b6d4', icon: 'waves', tipo: 'Estilos combinados', grupo: 'natacion' },
-  natB1: { label: 'Swim B1', color: '#0891b2', icon: 'waves', tipo: 'Umbral', grupo: 'natacion' },
-  natB2: { label: 'Swim B2', color: '#0891b2', icon: 'waves', tipo: 'Aguas abiertas', grupo: 'natacion' },
-  natB3: { label: 'Swim B3', color: '#0891b2', icon: 'waves', tipo: 'Ritmo variable', grupo: 'natacion' },
-  natCSS: { label: 'Test CSS', color: '#0e7490', icon: 'waves', tipo: 'Test de umbral', grupo: 'natacion' },
-  running:    { label: 'Running', color: '#0891b2', icon: 'run', tipo: 'Z2', grupo: 'cardio' },
-  ciclismo:   { label: 'Bici', color: '#0284c7', icon: 'run', tipo: 'Z2 sin impacto', grupo: 'cardio' },
-  descanso:   { label: 'Descanso', color: '#64748b', icon: 'moon', tipo: 'Recuperación', grupo: 'descanso' },
+  // `label` es lo que se VE: el nombre de lo que se entrena. Las claves
+  // (gymA, natB2…) son internas y NO se renombran: de ellas cuelga el
+  // localStorage guardado. `corto` es la versión para una celda con dos sesiones.
+  gymC1: { label: 'Pierna fuerza',  corto: 'P. fuerza', color: '#15803d', icon: 'dumbbell', tipo: 'Sentadilla pesada · cero torso', grupo: 'gym' },
+  gymC2: { label: 'Pierna volumen', corto: 'P. volumen', color: '#65a30d', icon: 'dumbbell', tipo: 'Prensa · sin barra a la espalda', grupo: 'gym' },
+  gymA:  { label: 'Empuje',   corto: 'Empuje',   color: '#22c55e', icon: 'dumbbell', tipo: 'Pecho · hombro · tríceps', grupo: 'gym' },
+  gymB:  { label: 'Tracción', corto: 'Tracción', color: '#16a34a', icon: 'dumbbell', tipo: 'Espalda · bíceps', grupo: 'gym' },
+  gymD:  { label: 'Torso',    corto: 'Torso',    color: '#4ade80', icon: 'dumbbell', tipo: 'Empuje + tracción', grupo: 'gym' },
+  calistenia: { label: 'Calistenia', corto: 'Calis', color: '#a855f7', icon: 'home', tipo: 'Complemento · full body', grupo: 'calistenia' },
+  natacion:   { label: 'Natación', corto: 'Nado', color: '#06b6d4', icon: 'waves', tipo: 'Aeróbico', grupo: 'natacion' },
+  natA1: { label: 'Técnica de crawl',   corto: 'Nado', color: '#06b6d4', icon: 'waves', tipo: 'Bloque A · técnica', grupo: 'natacion' },
+  natA2: { label: 'Espalda y pecho',    corto: 'Nado', color: '#06b6d4', icon: 'waves', tipo: 'Bloque A · estilos', grupo: 'natacion' },
+  natA3: { label: 'Estilos combinados', corto: 'Nado', color: '#06b6d4', icon: 'waves', tipo: 'Bloque A · estilos', grupo: 'natacion' },
+  natB1: { label: 'Umbral',         corto: 'Nado', color: '#0891b2', icon: 'waves', tipo: 'Bloque B · crawl', grupo: 'natacion' },
+  natB2: { label: 'Aguas abiertas', corto: 'Nado', color: '#0891b2', icon: 'waves', tipo: 'Bloque B · continuo', grupo: 'natacion' },
+  natB3: { label: 'Ritmo variable', corto: 'Nado', color: '#0891b2', icon: 'waves', tipo: 'Bloque B · crawl', grupo: 'natacion' },
+  natCSS: { label: 'Test CSS', corto: 'Test', color: '#0e7490', icon: 'waves', tipo: 'Test de umbral', grupo: 'natacion' },
+  running:    { label: 'Running', corto: 'Run', color: '#0891b2', icon: 'run', tipo: 'Z2', grupo: 'cardio' },
+  ciclismo:   { label: 'Bici', corto: 'Bici', color: '#0284c7', icon: 'bike', tipo: 'Z2 sin impacto', grupo: 'cardio' },
+  descanso:   { label: 'Descanso', corto: 'Desc.', color: '#64748b', icon: 'moon', tipo: 'Recuperación', grupo: 'descanso' },
 };
 
 // ═══════════════ TAXONOMÍA DE GRUPOS MUSCULARES (v6) ═══════════════
@@ -279,7 +282,7 @@ export const DIAS_SEMANA = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
 
 export const SESIONES = {
   gymA: {
-    nombre: 'Gym A — Empuje superior', subtitulo: 'Pecho · hombro · tríceps · carga real', color: '#22c55e',
+    nombre: 'Empuje', subtitulo: 'Pecho · hombro · tríceps · carga real', color: '#22c55e',
     duracion: '~110 min · 35 series',
     chequeo: 'Banca y press militar son los DOS lifts con progresión lineal del día: van primero y la señal debe salir limpia. N1: 2 series de aproximación antes del primer compuesto de cada patrón. El face pull de la BS1 es obligatorio y no se recorta nunca (E6) — es el contrapeso a 10 series de press. Si fallas las reps dos sesiones seguidas en un lift, bajas el 10% y vuelves a subir (P6).',
     ejercicios: [
@@ -313,7 +316,7 @@ export const SESIONES = {
   },
 
   gymC1: {
-    nombre: 'Gym C1 — Pierna pesada', subtitulo: 'Pierna pesada · CERO torso', color: '#15803d',
+    nombre: 'Pierna fuerza', subtitulo: 'Pierna pesada · CERO torso', color: '#15803d',
     duracion: '~105 min · 31 series',
     chequeo: 'Tres compuestos con progresión lineal: sentadilla +5 kg, Zercher +2.5 kg, RDL +5 kg. N1: 2 series de aproximación antes del primero de cada patrón. Sem 1-3: el Zercher deliberadamente ligero, debe sentirse fácil (L1). Si fallas las reps dos sesiones seguidas, bajas el 10% (P6). Separación mínima con el otro día de pierna: 2-3 días (S7). Con 3 gym por semana la cadencia real es de 1-1.5 sesiones de pierna semanales.',
     ejercicios: [
@@ -343,7 +346,7 @@ export const SESIONES = {
   },
 
   gymD: {
-    nombre: 'Gym D — Torso completo', subtitulo: 'Empuje + tracción · equilibrio', color: '#4ade80',
+    nombre: 'Torso', subtitulo: 'Empuje + tracción · equilibrio', color: '#4ade80',
     duracion: '~90 min · 29 series',
     chequeo: 'Única sesión donde empuje y tracción conviven a propósito: mantiene alta la frecuencia de tus dos puntos débiles. Segunda dosis semanal de banca y de jalón, las dos con progresión lineal. El farmer\'s walk es el único acarreo del día (E9) y va al final por estar limitado por agarre (E5). En la secuencia v6, D queda encajada entre C1 y C2, así que no toca ni A ni B.',
     ejercicios: [
@@ -372,7 +375,7 @@ export const SESIONES = {
   },
 
   gymC2: {
-    nombre: 'Gym C2 — Pierna volumen', subtitulo: 'Pierna volumen · sin barra a la espalda', color: '#65a30d',
+    nombre: 'Pierna volumen', subtitulo: 'Pierna volumen · sin barra a la espalda', color: '#65a30d',
     duracion: '~100 min · 31 series',
     chequeo: 'Sin carga axial: ninguna barra a la espalda. Secuencia deliberada prensa → bear hug → RDL, porque el bear hug necesita erectores frescos. Es el único acarreo del día (E9) y va temprano por estar limitado por postura (E5). Sem 1-3: bear hug deliberadamente ligero (L1). El step-up y la búlgara ALTERNAN por sesión.',
     ejercicios: [
@@ -402,7 +405,7 @@ export const SESIONES = {
   },
 
   gymB: {
-    nombre: 'Gym B — Tracción superior', subtitulo: 'Espalda · bíceps · braquial', color: '#16a34a',
+    nombre: 'Tracción', subtitulo: 'Espalda · bíceps · braquial', color: '#16a34a',
     duracion: '~100 min · 32 series',
     chequeo: 'Jalón y remo con progresión lineal en carga. Cuando llegues a 8 dominadas a peso corporal, cambias a progresión por lastre (E3). SIN correas en el jalón pesado / CON correas en remo y jalón neutro. El suitcase es el único acarreo (E9) y va al final por estar limitado por agarre (E5). El isométrico del curl martillo es tu métrica clave del objetivo: ANOTA EL TIEMPO.',
     ejercicios: [
@@ -435,7 +438,7 @@ export const SESIONES = {
   },
 
   calistenia: {
-    nombre: 'Calistenia Full Body', subtitulo: 'Complemento apilable · no ocupa día propio', color: '#a855f7',
+    nombre: 'Calistenia', subtitulo: 'Complemento apilable · no ocupa día propio', color: '#a855f7',
     duracion: '~45 min',
     chequeo: 'NO es relleno: duplica la frecuencia de tus puntos débiles. Progresa por DIFICULTAD (escalera), no por banda. El bloque de pierna cambia de nivel según la distancia a tu día de pierna. La Parte 3 (práctica de carga real) es el trabajo más específico de todo el plan para tu objetivo — vale más que tres meses de gimnasio.',
     ejercicios: [
@@ -467,7 +470,7 @@ export const SESIONES = {
 
   // ═══ NATACIÓN · BLOQUE A — técnica y estilos (mantiene el nivel de nadador completo) ═══
   natA1: {
-    nombre: 'Swim A1 — Técnica de crawl', subtitulo: '2.000 m · ~52 min', color: '#06b6d4', duracion: '60 min',
+    nombre: 'Técnica de crawl', subtitulo: '2.000 m · ~52 min', color: '#06b6d4', duracion: '60 min',
     distancia: '2.000 m',
     chequeo: 'Con tu nivel, el margen de mejora no está en la técnica gruesa sino en el AGARRE del agua: por eso el catch-up y el puño cerrado. Palas: máximo 500 m por sesión — con 29-32 series de gimnasio con mucho press y tirón, tu hombro ya lleva carga alta y las palas multiplican la fuerza sobre el manguito. Si aparece molestia, lo primero que sale son las palas, nunca el face pull del gimnasio.',
     recortada: 'Palas 6×100 → 4×100 · aeróbico 400 → 300 · calma 200 → 100 (1.600 m)',
@@ -486,7 +489,7 @@ export const SESIONES = {
   },
 
   natA2: {
-    nombre: 'Swim A2 — Espalda y pecho', subtitulo: '2.300 m · ~55 min', color: '#06b6d4', duracion: '60 min',
+    nombre: 'Espalda y pecho', subtitulo: '2.300 m · ~55 min', color: '#06b6d4', duracion: '60 min',
     distancia: '2.300 m',
     chequeo: 'Tu pecho es 6/10 y tu espalda 7/10. Esta es la sesión que evita que se degraden. NO busca convertirlos en 9/10: eso exigiría más frecuencia de la que tienes con 2 sesiones semanales.',
     recortada: 'Un 100 de cada estilo · calentamiento 400 → 300 · aeróbico 300 → 200 (1.700 m)',
@@ -507,7 +510,7 @@ export const SESIONES = {
   },
 
   natA3: {
-    nombre: 'Swim A3 — Estilos combinados', subtitulo: '2.000 m · ~50 min', color: '#06b6d4', duracion: '60 min',
+    nombre: 'Estilos combinados', subtitulo: '2.000 m · ~50 min', color: '#06b6d4', duracion: '60 min',
     distancia: '2.000 m',
     chequeo: 'La mariposa está aquí como variedad y coordinación, NO como objetivo. Pasar de 4/10 a 7/10 exigiría 3-4 sesiones semanales dedicadas; con 2 sesiones totales sería tirar el tiempo. Disfrútala, no la persigas.',
     recortada: 'IM 4×100 → 3×100 · progresivos 8×50 → 6×50 · calma 200 → 100 (1.600 m)',
@@ -524,7 +527,7 @@ export const SESIONES = {
 
   // ═══ NATACIÓN · BLOQUE B — crawl y umbral (base específica para triatlón) ═══
   natB1: {
-    nombre: 'Swim B1 — Umbral', subtitulo: '2.100 m · ~55 min · La más importante para triatlón', color: '#0891b2', duracion: '60 min',
+    nombre: 'Umbral', subtitulo: '2.100 m · ~55 min · La más importante para triatlón', color: '#0891b2', duracion: '60 min',
     distancia: '2.100 m',
     chequeo: 'La serie de 10×100 con solo 15s de descanso es lo que la hace umbral. Si los últimos salen 3-4 s más lentos que los primeros, empezaste demasiado rápido: la CONSISTENCIA importa más que la velocidad. Progresión: cuando hagas los 10 al mismo ritmo sin desmoronarte, sube a 12×100 o baja el descanso a 10s. En recortada NUNCA toques la serie de 10×100: es tu métrica de progreso y si un día haces 10 y otro 8 dejas de poder compararlas.',
     recortada: 'FUERA el bloque de velocidad (4×50) · calentamiento 300 → 200. La serie 10×100 se mantiene íntegra (1.700 m)',
@@ -539,7 +542,7 @@ export const SESIONES = {
   },
 
   natB2: {
-    nombre: 'Swim B2 — Continuo y aguas abiertas', subtitulo: '2.400 m · ~58 min', color: '#0891b2', duracion: '60 min',
+    nombre: 'Aguas abiertas', subtitulo: '2.400 m · ~58 min', color: '#0891b2', duracion: '60 min',
     distancia: '2.400 m',
     chequeo: 'La sesión que MÁS transfiere al triatlón: distancia continua, sin descanso de pared, con orientación. Sighting = levantar los ojos hacia delante sin parar la brazada, como un cocodrilo. En triatlón no hay líneas en el fondo ni paredes; practicarlo en piscina es la única forma de que no te cueste el día de la prueba. Progresión del bloque largo: 800 → 1.000 → 1.200 m.',
     recortada: 'Bloque largo 800 → 600 · fuera las 4×100 finales (1.700 m)',
@@ -555,7 +558,7 @@ export const SESIONES = {
   },
 
   natB3: {
-    nombre: 'Swim B3 — Ritmo variable', subtitulo: '2.200 m · ~55 min', color: '#0891b2', duracion: '60 min',
+    nombre: 'Ritmo variable', subtitulo: '2.200 m · ~55 min', color: '#0891b2', duracion: '60 min',
     distancia: '2.200 m',
     chequeo: 'El ritmo variable te enseña a SENTIR ritmos distintos, no solo a nadar rápido. En triatlón vas a necesitar controlar el ritmo desde el primer metro sin dejarte llevar por la salida. Progresión: 3 bloques → 4 bloques.',
     recortada: '3 bloques → 2 bloques · pull 4×100 → 3×100 (1.700 m)',
@@ -568,7 +571,7 @@ export const SESIONES = {
   },
 
   natCSS: {
-    nombre: 'Test de CSS', subtitulo: 'Hazlo en tu primera sesión', color: '#0e7490', duracion: '60 min',
+    nombre: 'Test CSS', subtitulo: 'Hazlo en tu primera sesión', color: '#0e7490', duracion: '60 min',
     distancia: '1.700 m',
     chequeo: 'SIN ESTE NÚMERO, TODOS LOS RITMOS DEL PLAN SON ADIVINANZAS. CSS (s/100m) = (400 − 200) ÷ (tiempo400 − tiempo200). Ejemplo: 400 m en 6:40 (400 s) y 200 m en 3:10 (190 s) → 200 ÷ 210 = 0.952 m/s → 1:45/100 m. Con tu 25 m libre en 16 s, tu CSS debería caer entre 1:30 y 1:45. Repite el test cada 6-8 semanas sustituyendo una B1: comparten sistema energético, así que no descuadra la rotación.',
     ejercicios: [
@@ -592,7 +595,7 @@ export const SESIONES = {
   },
 
   ciclismo: {
-    nombre: 'Bici Z2', subtitulo: 'Mismo Z2, cero impacto', color: '#0284c7', duracion: '40-55 min',
+    nombre: 'Bici', subtitulo: 'Mismo Z2, cero impacto', color: '#0284c7', duracion: '40-55 min',
     chequeo: 'Misma zona que el running —60-70% FC máx, test de conversación— pero SIN impacto. Es la alternativa para el día flexible: llegas de 12h de pie en turno C y los pies, tibias y sóleo ya vienen castigados; correr encima carga los mismos tejidos. La bici te da el estímulo aeróbico sin ese coste, y de paso cubre el ciclismo que te falta para triatlón. Ojo: el impacto es cero, pero el cuádriceps SÍ trabaja — no la pongas el día después de pierna pesada.',
     ejercicios: [
       { id: 'BIC-1', parte: 1, nombre: 'Calentamiento', series: 1, reps: '8 min', rir: '—', descanso: '—', nota: 'Cadencia cómoda, resistencia baja. Subir pulsaciones poco a poco.', musculos: { primario: [], secundario: [] } },
@@ -602,7 +605,7 @@ export const SESIONES = {
   },
 
   running: {
-    nombre: 'Running Z2', subtitulo: 'Base aeróbica · 40-55 min', color: '#0891b2', duracion: '40-55 min',
+    nombre: 'Running', subtitulo: 'Base aeróbica · 40-55 min', color: '#0891b2', duracion: '40-55 min',
     chequeo: 'NUNCA el día DESPUÉS de pierna (S3): si cae ahí, se cambia por natación. En día N siempre por la mañana o al mediodía (S5), nunca a las 5pm antes de la guardia. Z2 = test de conversación: si no puedes hablar, no es Z2.',
     ejercicios: [
       { id: 'RUN-1', parte: 1, nombre: 'Calentamiento', series: 1, reps: '8 min', rir: '—', descanso: '—', nota: 'Movilidad + caminar a trote.', musculos: { primario: [], secundario: [] } },
@@ -613,7 +616,7 @@ export const SESIONES = {
 
   descanso: {
     nombre: 'Descanso', subtitulo: 'Recuperación', color: '#64748b', duracion: 'Día completo',
-    chequeo: 'El sueño es tu factor limitante real. Si en posturno dormiste menos de 5h, este día es descanso completo (S4). La constancia y el superávit sostenido pesan más que cualquier detalle de la rutina.',
+    chequeo: 'El sueño es tu factor limitante real. La constancia y el superávit sostenido pesan más que cualquier detalle de la rutina.',
     ejercicios: []
   },
 };

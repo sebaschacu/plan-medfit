@@ -11,7 +11,7 @@ export default defineConfig({
       manifest: {
         name: 'Plan Internado', short_name: 'Plan',
         description: 'Entrenamiento por turnos - control diario',
-        theme_color: '#0f1417', background_color: '#0f1417',
+        theme_color: '#0d1215', background_color: '#0d1215',
         display: 'standalone', orientation: 'portrait', scope: '/', start_url: '/',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
