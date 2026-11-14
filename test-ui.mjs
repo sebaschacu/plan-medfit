@@ -712,6 +712,53 @@ ok('Añadir desde el grupo funciona', await p.locator('main').locator('text=/Fle
 ok('Y el ejercicio añadido queda abierto para ajustarlo', await p.locator('main button[aria-expanded="true"]', { hasText: 'Flexiones' }).count() === 1);
 await p.close();
 
+// ══ 10c · CREAR UN EJERCICIO DESDE CERO Y EDITARLO ENTERO ══
+seccion('EDITOR · EJERCICIO NUEVO DESDE CERO');
+p = await nuevaPagina();
+await abrirSesion(p, diaGymE.fecha);
+await p.locator('text=/Editar esta rutina/').first().click(); await p.waitForTimeout(600);
+await p.locator('button', { hasText: 'Añadir ejercicio' }).click(); await p.waitForTimeout(300);
+await p.locator('input[aria-label="Buscar ejercicio"]').fill('Remo en T'); await p.waitForTimeout(300);
+await p.locator('button', { hasText: 'Crear un ejercicio que no está en la lista' }).click(); await p.waitForTimeout(300);
+const btnCrear = p.locator('button', { hasText: /^Crear y añadir$/ });
+ok('El formulario arranca con lo que se estaba buscando', (await p.getByLabel('Nombre del ejercicio nuevo').inputValue()) === 'Remo en T');
+ok('Sin músculo principal no deja crear', await btnCrear.isDisabled());
+await p.locator('button[aria-label="Dorsal: sin elegir"]').click(); await p.waitForTimeout(200);
+await p.locator('button[aria-label="Bíceps: sin elegir"]').click(); await p.waitForTimeout(150);
+await p.locator('button[aria-label="Bíceps: principal"]').click(); await p.waitForTimeout(200);
+ok('Un toque lo hace principal y dos, secundario',
+  await p.locator('button[aria-label="Dorsal: principal"]').count() === 1 && await p.locator('button[aria-label="Bíceps: secundario"]').count() === 1);
+ok('Con nombre y músculo ya deja crear', !(await btnCrear.isDisabled()));
+await p.getByLabel('Repeticiones del ejercicio nuevo').fill('10-12');
+await btnCrear.click(); await p.waitForTimeout(400);
+ok('El ejercicio nuevo entra en la lista, abierto para ajustarlo', await p.locator('main button[aria-expanded="true"]', { hasText: 'Remo en T' }).count() === 1);
+// Todo el ejercicio se puede cambiar: nombre, cómo se registra…
+await p.getByLabel('Nombre del ejercicio', { exact: true }).fill('Remo en T con apoyo');
+await p.locator('button', { hasText: /^Guardar/ }).first().click(); await p.waitForTimeout(800);
+const creado = (await ls(p)).rutina?.gymA?.[0]?.ejercicios.find(e => /Remo en T/.test(e.nombre));
+ok('Se guarda con su nombre, músculos y reps',
+  creado?.nombre === 'Remo en T con apoyo' && creado.reps === '10-12' && creado.musculos.primario[0] === 'dorsal' && creado.musculos.secundario[0] === 'biceps', JSON.stringify(creado));
+ok('Con un id propio que no pisa ninguno del plan', !!creado && !SESIONES.gymA.ejercicios.some(e => e.id === creado.id), creado?.id);
+ok('Y aparece en la sesión', await p.locator('main h3', { hasText: 'Remo en T con apoyo' }).count() === 1);
+await hecha(p, 'Remo en T con apoyo', 1, 400);
+ok('Se registra como cualquier otro', (await ls(p)).prog[diaGymE.fecha]?.[creado.id]?.sets?.[0] === true);
+// Y queda disponible para las demás rutinas
+await p.locator('button[aria-label="Volver al día"]').click(); await p.waitForTimeout(300);
+await pestana(p, 'Rutinas').click(); await p.waitForTimeout(400);
+await p.locator('main button', { hasText: /^Tracción/ }).first().click(); await p.waitForTimeout(500);
+await p.locator('button', { hasText: 'Editar esta rutina' }).click(); await p.waitForTimeout(500);
+await p.locator('button', { hasText: 'Añadir ejercicio' }).click(); await p.waitForTimeout(300);
+await p.locator('input[aria-label="Buscar ejercicio"]').fill('remo en t'); await p.waitForTimeout(400);
+ok('El ejercicio creado se puede añadir a otra rutina', await p.locator('button', { hasText: /Remo en T con apoyo.*Creado por ti/ }).count() === 1);
+// Cambiar cómo se registra un ejercicio del plan
+await p.locator('button', { hasText: /^Cancelar$/ }).first().click(); await p.waitForTimeout(200);
+await p.locator('main button[aria-expanded="false"]', { hasText: 'Curl martillo' }).first().click(); await p.waitForTimeout(300);
+await p.locator('button', { hasText: /^Segundos$/ }).click(); await p.waitForTimeout(200);
+await p.locator('button', { hasText: /^Guardar/ }).first().click(); await p.waitForTimeout(800);
+const curl = (await ls(p)).rutina?.gymB?.[0]?.ejercicios.find(e => /Curl martillo/.test(e.nombre));
+ok('Cambiar el registro a segundos se guarda en el ejercicio', curl?.iso === true && curl.rir === '—', JSON.stringify({ iso: curl?.iso, rir: curl?.rir }));
+await p.close();
+
 // ══ 11 · BICI, BOTÓN ESTABLE Y DESCARGA ══
 seccion('BICI EN EL DÍA FLEXIBLE');
 const agoB = generarMes({ anio: 2026, mes: 7 }).dias;

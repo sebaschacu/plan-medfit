@@ -306,5 +306,16 @@ check(`Todo descanso definido en data.js se convierte a segundos (${descansosRea
   sinParsear.length === 0, sinParsear.join(' · '));
 check('Y ninguno da 0 o negativo', descansosReales.filter(d => d !== '—').every(d => parseRest(d) > 0));
 
+// Ejercicios creados por el usuario: viven en la rutina y se suman al catálogo
+{
+  const base = R.catalogoEjercicios().length;
+  const propio = { id: 'A-x1', nombre: 'Remo en T', parte: 3, series: 3, reps: '8-12', descanso: '90s', rir: '1-2', musculos: { primario: ['dorsal'], secundario: [] } };
+  const rut = R.guardarVersion({}, 'gymA', [...SESIONES.gymA.ejercicios, propio], '2026-09-01', 'test');
+  const cat = R.catalogoEjercicios(rut);
+  check('Un ejercicio creado por el usuario entra en el catálogo', cat.length === base + 1 && cat.some(e => e.nombre === 'Remo en T' && e.propio && e.origen === 'gymA'), `${cat.length} vs ${base}`);
+  check('Y los del plan no se duplican aunque la rutina los repita', cat.filter(e => e.nombre === SESIONES.gymA.ejercicios[0].nombre && e.origen === 'gymA').length === 1);
+  check('Una rutina malformada no rompe el catálogo', R.catalogoEjercicios({ gymA: 'x', gymB: [{ ejercicios: [null, { nombre: 5 }] }] }).length >= base);
+}
+
 console.log(`\n══ TOTAL VERIFICADOR + RUTINA + PROGRESIÓN: ${pruebas - fallos}/${pruebas} ══`);
 process.exit(fallos ? 1 : 0);

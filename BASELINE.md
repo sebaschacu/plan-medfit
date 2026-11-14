@@ -10,8 +10,8 @@ Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 
 | # | Comando | Baseline |
 |---|---|---|
-| 1 · Lógica | `npm test` | 155/155 + 82/82 = **237** (158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4; +15 en la decisión 1; +15 en la decisión 2; +1 en el rediseño D: S4 a dos tramos) |
-| 2a · Interfaz | `npm run test:ui` | **278/278** · 0 errores de página (227 antes del rediseño D; la suite se reescribió para la navegación nueva conservando cada comprobación, +43 nuevas) |
+| 1 · Lógica | `npm test` | 155/155 + 85/85 = **240** (158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4; +15 en la decisión 1; +15 en la decisión 2; +1 en el rediseño D: S4 a dos tramos) |
+| 2a · Interfaz | `npm run test:ui` | **289/289** · 0 errores de página (227 antes del rediseño D; la suite se reescribió para la navegación nueva conservando cada comprobación, +43 nuevas) |
 | 2b · Auditoría | `npm run audit` | **23/23** · 0 errores de página (recorre también Progreso, Rutinas, el editor y Ajustes) |
 | 3 · Lint | `npx oxlint` | **0 avisos / 0 errores** |
 | 4 · Build | `npm run build` | compila · 393 kB (gzip 117) + Geist 29 kB |

@@ -69,11 +69,24 @@ export function huerfanosDelDia(progresoDia = {}, ejerciciosVigentes = []) {
 
 // Catálogo de todos los ejercicios conocidos del plan, para añadir en el editor.
 // Se agrupa por sesión de origen para que se entienda de dónde sale cada uno.
-export function catalogoEjercicios() {
+export function catalogoEjercicios(rutina = {}) {
   const out = [];
   for (const [k, ses] of Object.entries(SESIONES)) {
     for (const ex of ses.ejercicios ?? []) {
       out.push({ ...ex, origen: k, origenNombre: ses.nombre });
+    }
+  }
+  // Los ejercicios creados por el usuario viven dentro de la rutina donde se
+  // crearon. Se suman al catálogo —desde la última versión de cada rutina— para
+  // poder añadirlos también a las demás. Uno por nombre.
+  const nombres = new Set(out.map(e => e.nombre.toLowerCase()));
+  for (const [k, versiones] of Object.entries(rutina ?? {})) {
+    const ultima = Array.isArray(versiones) ? versiones.at(-1) : null;
+    for (const ex of ultima?.ejercicios ?? []) {
+      const n = String(ex?.nombre ?? '').toLowerCase();
+      if (!n || nombres.has(n)) continue;
+      nombres.add(n);
+      out.push({ ...ex, origen: k, origenNombre: SESIONES[k]?.nombre ?? k, propio: true });
     }
   }
   return out;

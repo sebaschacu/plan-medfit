@@ -7,6 +7,7 @@ import { usePlanCtx } from '../../estado/contextos.js';
 import { COLUMNA } from '../../utiles/constantes-ui.js';
 import Musculos from '../comunes/Musculos.jsx';
 import { Punto, Segmentado } from '../comunes/ui.jsx';
+import SelectorMusculos from '../comunes/SelectorMusculos.jsx';
 
 // ═══════════════ EDITOR DE RUTINA ═══════════════
 // Libertad total sobre la sesión, con el verificador informando en vivo.
@@ -44,6 +45,15 @@ const PROGRESIONES = [
   ['doble', 'Doble · RIR', { lineal: false, progresion: undefined }],
 ];
 
+// Qué se anota al hacer el ejercicio. Son las mismas marcas que ya usa la
+// tarjeta de la sesión (acarreo, iso, lineal/RIR): aquí solo se eligen.
+const REGISTROS = [['carga', 'kg × reps'], ['iso', 'Segundos'], ['acarreo', 'Metros + kg'], ['marcar', 'Solo marcar']];
+const registroDe = (ex) => (ex.acarreo ? 'acarreo' : ex.iso ? 'iso' : (ex.lineal || (ex.rir && ex.rir !== '—')) ? 'carga' : 'marcar');
+const cambioDeRegistro = (ex, tipo) => (tipo === 'carga'
+  ? { acarreo: undefined, iso: undefined, rir: ex.rir && ex.rir !== '—' ? ex.rir : '1-2' }
+  : { acarreo: tipo === 'acarreo' ? true : undefined, iso: tipo === 'iso' ? true : undefined, lineal: false, progresion: undefined, rir: '—' });
+const NUEVO = { nombre: '', musculos: { primario: [], secundario: [] }, registro: 'carga', series: 3, reps: '8-12', descanso: '90s' };
+
 const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
   const { todayISO, rutina } = usePlanCtx();
   const editada = estaEditada(sesionKey, todayISO, rutina);
@@ -55,11 +65,13 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
   const [busca, setBusca] = useState('');
   const [abierto, setAbierto] = useState(null);       // índice del ejercicio con el panel abierto
   const [modo, setModo] = useState('editar');         // editar | ordenar
+  const [nuevo, setNuevo] = useState(null);           // el ejercicio que se está creando desde cero
+  const [verMusculos, setVerMusculos] = useState(false);
 
   const info = SESION_INFO[sesionKey];
   const esGym = String(sesionKey).startsWith('gym');
   const res = useMemo(() => verificarSesion(sesionKey, lista), [sesionKey, lista]);
-  const catalogo = useMemo(() => catalogoEjercicios(), []);
+  const catalogo = useMemo(() => catalogoEjercicios(rutina), [rutina]);
   const yaEstan = new Set(lista.map(e => e.id));
   const candidatos = catalogo
     .filter(e => !yaEstan.has(e.id))
@@ -110,6 +122,23 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
     setAnadiendo(false); setBusca('');
     setAbierto(lista.length);
   };
+
+  // Crear un ejercicio que no está en ninguna lista. Entra al final, abierto,
+  // para terminar de ajustarlo (parte, bi-serie, progresión, nota).
+  const crear = () => {
+    const ex = {
+      id: nuevoId(sesionKey, lista), nombre: nuevo.nombre.trim(), parte: 3,
+      series: nuevo.series, reps: nuevo.reps, descanso: nuevo.descanso,
+      musculos: nuevo.musculos, nuevo: true,
+      ...cambioDeRegistro({}, nuevo.registro),
+    };
+    Object.keys(ex).forEach(k => { if (ex[k] === undefined) delete ex[k]; });
+    setLista(l => [...l, ex]);
+    setNuevo(null); setAnadiendo(false); setBusca('');
+    setAbierto(lista.length);
+  };
+  const nombreRepetido = nuevo && lista.some(e => e.nombre.toLowerCase() === nuevo.nombre.trim().toLowerCase());
+  const puedeCrear = nuevo && nuevo.nombre.trim().length > 1 && nuevo.musculos.primario.length > 0 && !nombreRepetido;
 
   const series = lista.filter(e => !e.opcional).reduce((a, e) => a + (typeof e.series === 'number' ? e.series : 0), 0);
   const grupos = gruposBS(lista);
@@ -185,7 +214,7 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
                     </button>
                   </div>
                 ) : (
-                <button onClick={() => setAbierto(open ? null : i)} aria-expanded={open}
+                <button onClick={() => { setAbierto(open ? null : i); setVerMusculos(false); }} aria-expanded={open}
                   className="w-full min-h-[64px] py-3 flex items-center gap-3 text-left">
                   <span className="w-6 text-sm text-mudo flex-shrink-0">{String(i + 1).padStart(2, '0')}</span>
                   <span className="flex-1 min-w-0">
@@ -199,7 +228,26 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
 
                 {open && modo === 'editar' && (
                   <div className="mb-3 p-3 rounded-2xl bg-elevada">
-                    <Musculos musculos={ex.musculos} className="mb-2 px-1" />
+                    <div className="pb-2">
+                      <span className="block text-[15px] text-tinta3 mb-1.5">Nombre</span>
+                      <input value={ex.nombre} onChange={e => editar(i, { nombre: e.target.value })} aria-label="Nombre del ejercicio"
+                        className={`${texto} w-full`} />
+                    </div>
+                    <div className="pb-1">
+                      <button onClick={() => setVerMusculos(v => !v)} aria-expanded={verMusculos}
+                        className="w-full min-h-[44px] flex items-center gap-2 text-left">
+                        <span className="w-24 text-[15px] text-tinta3 flex-shrink-0">Músculos</span>
+                        <span className="flex-1 min-w-0">{(ex.musculos?.primario?.length || ex.musculos?.secundario?.length)
+                          ? <Musculos musculos={ex.musculos} /> : <span className="text-[15px] text-ambar">Sin elegir</span>}</span>
+                        <ChevronDown size={18} className={`text-mudo flex-shrink-0 transition-transform ${verMusculos ? 'rotate-180' : ''}`} />
+                      </button>
+                      {verMusculos && <div className="pt-2 pb-3"><SelectorMusculos musculos={ex.musculos} onCambiar={(m) => editar(i, { musculos: m })} /></div>}
+                    </div>
+                    <Campo label="Se registra">
+                      {REGISTROS.map(([k, l]) => (
+                        <Opcion key={k} on={registroDe(ex) === k} onClick={() => editar(i, cambioDeRegistro(ex, k))}>{l}</Opcion>
+                      ))}
+                    </Campo>
                     <Campo label="Series">
                       <button onClick={() => editar(i, { series: Math.max(0, (ex.series || 0) - 1) })} aria-label={`Menos series de ${ex.nombre}`}
                         className="w-11 h-11 rounded-xl bg-fondo text-tinta2 flex items-center justify-center"><Minus size={18} /></button>
@@ -274,7 +322,54 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
         </section>
 
         {/* Añadir ejercicio */}
-        {anadiendo ? (
+        {nuevo ? (
+          <section className="rounded-3xl bg-tarjeta p-4" aria-label="Crear un ejercicio">
+            <h2 className="text-xl font-semibold text-tinta">Ejercicio nuevo</h2>
+            <div className="mt-3">
+              <span className="block text-[15px] text-tinta3 mb-1.5">Nombre</span>
+              <input value={nuevo.nombre} onChange={e => setNuevo(n => ({ ...n, nombre: e.target.value }))} aria-label="Nombre del ejercicio nuevo"
+                placeholder="Por ejemplo: Remo en T" className={`${texto} w-full h-12`} />
+              {nombreRepetido && <p className="text-sm text-ambar mt-1.5">Ya hay un ejercicio con ese nombre en esta rutina.</p>}
+            </div>
+            <div className="mt-4">
+              <span className="block text-[15px] text-tinta3 mb-2">Músculos que trabaja</span>
+              <SelectorMusculos musculos={nuevo.musculos} onCambiar={(m) => setNuevo(n => ({ ...n, musculos: m }))} />
+            </div>
+            <div className="mt-4">
+              <span className="block text-[15px] text-tinta3 mb-2">Qué se registra</span>
+              <div className="flex flex-wrap gap-2">
+                {REGISTROS.map(([k, l]) => (
+                  <Opcion key={k} on={nuevo.registro === k} onClick={() => setNuevo(n => ({ ...n, registro: k }))}>{l}</Opcion>
+                ))}
+              </div>
+            </div>
+            <div className="mt-3">
+              <Campo label="Series">
+                <button onClick={() => setNuevo(n => ({ ...n, series: Math.max(1, n.series - 1) }))} aria-label="Menos series"
+                  className="w-11 h-11 rounded-xl bg-fondo text-tinta2 flex items-center justify-center"><Minus size={18} /></button>
+                <span className="w-8 text-center text-xl font-semibold text-tinta">{nuevo.series}</span>
+                <button onClick={() => setNuevo(n => ({ ...n, series: n.series + 1 }))} aria-label="Más series"
+                  className="w-11 h-11 rounded-xl bg-fondo text-tinta2 flex items-center justify-center"><Plus size={18} /></button>
+              </Campo>
+              <Campo label="Reps">
+                <input value={nuevo.reps} onChange={e => setNuevo(n => ({ ...n, reps: e.target.value }))} aria-label="Repeticiones del ejercicio nuevo"
+                  placeholder="8-12" className={`${texto} w-28`} />
+              </Campo>
+              <Campo label="Descanso">
+                <input value={nuevo.descanso} onChange={e => setNuevo(n => ({ ...n, descanso: e.target.value }))} aria-label="Descanso del ejercicio nuevo"
+                  placeholder="90s" className={`${texto} w-28`} />
+              </Campo>
+            </div>
+            <p className="text-sm text-tinta3 mt-2">
+              {puedeCrear ? 'Después podrás ajustar su parte, la bi-serie, la progresión y la nota.' : 'Ponle nombre y al menos un músculo principal.'}
+            </p>
+            <div className="flex gap-2.5 mt-3">
+              <button onClick={() => setNuevo(null)} className="flex-1 h-[52px] rounded-2xl bg-elevada text-tinta text-base font-semibold">Cancelar</button>
+              <button onClick={crear} disabled={!puedeCrear}
+                className="flex-[1.6] h-[52px] rounded-2xl bg-tinta text-[#0d1215] text-base font-semibold disabled:opacity-40">Crear y añadir</button>
+            </div>
+          </section>
+        ) : anadiendo ? (
           <section className="rounded-3xl bg-tarjeta p-4">
             <div className="relative">
               <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-tinta3" />
@@ -303,7 +398,7 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
                             className="w-full min-h-[52px] text-left px-3 py-2 rounded-xl bg-fondo flex items-center gap-3">
                             <span className="flex-1 min-w-0">
                               <span className="block text-base text-tinta">{e.nombre}</span>
-                              <span className="block text-sm text-tinta3">{SESION_INFO[e.origen]?.label ?? e.origen}</span>
+                              <span className="block text-sm text-tinta3">{e.propio ? 'Creado por ti · ' : ''}{SESION_INFO[e.origen]?.label ?? e.origen}</span>
                             </span>
                             <Plus size={18} className="text-tinta3 flex-shrink-0" />
                           </button>
@@ -315,6 +410,10 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
               })}
               {!candidatos.length && <p className="text-[15px] text-tinta3 py-2 text-center">Nada que coincida.</p>}
             </div>
+            <button onClick={() => setNuevo({ ...NUEVO, nombre: busca })}
+              className="w-full mt-3 min-h-[52px] rounded-2xl border border-borde text-[15px] font-medium text-tinta flex items-center justify-center gap-2">
+              <Plus size={18} /> Crear un ejercicio que no está en la lista
+            </button>
             <button onClick={() => { setAnadiendo(false); setBusca(''); }}
               className="w-full mt-2 h-11 text-[15px] font-medium text-tinta3">Cancelar</button>
           </section>
