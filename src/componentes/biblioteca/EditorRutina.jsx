@@ -6,7 +6,7 @@ import { catalogoEjercicios, nuevoId, mover, gruposBS, resolverRutina, estaEdita
 import { usePlanCtx } from '../../estado/contextos.js';
 import { COLUMNA } from '../../utiles/constantes-ui.js';
 import Musculos from '../comunes/Musculos.jsx';
-import { Punto } from '../comunes/ui.jsx';
+import { Punto, Segmentado } from '../comunes/ui.jsx';
 
 // ═══════════════ EDITOR DE RUTINA ═══════════════
 // Libertad total sobre la sesión, con el verificador informando en vivo.
@@ -54,6 +54,7 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
   const [anadiendo, setAnadiendo] = useState(false);
   const [busca, setBusca] = useState('');
   const [abierto, setAbierto] = useState(null);       // índice del ejercicio con el panel abierto
+  const [modo, setModo] = useState('editar');         // editar | ordenar
 
   const info = SESION_INFO[sesionKey];
   const esGym = String(sesionKey).startsWith('gym');
@@ -89,7 +90,18 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
     return n;
   }));
   const quitar = (i) => { setLista(l => l.filter((_, j) => j !== i)); setAbierto(null); };
-  const subirBajar = (i, d) => { setLista(l => mover(l, i, d)); setAbierto(a => (a === i ? Math.max(0, Math.min(lista.length - 1, i + d)) : a)); };
+  // Subir o bajar un ejercicio. Dentro de su parte, cambia de sitio con el vecino.
+  // En el borde de la parte no salta por encima de nadie: pasa a la parte de al
+  // lado (queda el último de la anterior o el primero de la siguiente), porque
+  // la sesión se pinta agrupada por partes y un salto de posición no se vería.
+  const subirBajar = (i, d) => {
+    const vecino = lista[i + d];
+    if (!vecino) return;
+    const parteDe = (e) => e.parte ?? 3;
+    if (esGym && parteDe(vecino) !== parteDe(lista[i])) { editar(i, { parte: parteDe(vecino) }); return; }
+    setLista(l => mover(l, i, d));
+    setAbierto(a => (a === i ? i + d : a));
+  };
   const anadir = (ex) => {
     const copia = { ...JSON.parse(JSON.stringify(ex)), parte: 3, bs: undefined };
     delete copia.origen; delete copia.origenNombre;
@@ -144,6 +156,10 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
           </div>
         )}
 
+        {/* Editar abre el panel de cada ejercicio; Ordenar pone flechas en cada fila */}
+        <Segmentado etiqueta="Qué hacer con la lista" valor={modo} onCambiar={(m) => { setModo(m); setAbierto(null); }}
+          opciones={[['editar', 'Editar'], ['ordenar', 'Cambiar el orden']]} />
+
         <section className="rounded-3xl bg-tarjeta px-4">
           {lista.map((ex, i) => {
             const senalado = [...res.duras, ...res.blandas].some(h => h.ejercicios?.includes(ex.id));
@@ -155,6 +171,20 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
             return (
               <div key={ex.id + i} className="border-b border-divisor last:border-0">
                 {cabecera && <h2 className="text-sm font-medium text-tinta3 pt-4">{PARTES[parte].label}</h2>}
+                {modo === 'ordenar' ? (
+                  <div className="min-h-[64px] py-2 flex items-center gap-3">
+                    <span className="w-6 text-sm text-mudo flex-shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="flex-1 min-w-0 text-[17px] font-medium leading-snug text-tinta">{ex.nombre}</span>
+                    <button onClick={() => subirBajar(i, -1)} disabled={i === 0} aria-label={`Subir ${ex.nombre}`}
+                      className="w-12 h-12 rounded-2xl bg-elevada text-tinta flex items-center justify-center flex-shrink-0 disabled:opacity-30">
+                      <ArrowUp size={20} />
+                    </button>
+                    <button onClick={() => subirBajar(i, 1)} disabled={i === lista.length - 1} aria-label={`Bajar ${ex.nombre}`}
+                      className="w-12 h-12 rounded-2xl bg-elevada text-tinta flex items-center justify-center flex-shrink-0 disabled:opacity-30">
+                      <ArrowDown size={20} />
+                    </button>
+                  </div>
+                ) : (
                 <button onClick={() => setAbierto(open ? null : i)} aria-expanded={open}
                   className="w-full min-h-[64px] py-3 flex items-center gap-3 text-left">
                   <span className="w-6 text-sm text-mudo flex-shrink-0">{String(i + 1).padStart(2, '0')}</span>
@@ -165,8 +195,9 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
                   {etiqueta && <span className="h-6 px-2 rounded-lg bg-elevada text-xs font-semibold text-tinta2 inline-flex items-center flex-shrink-0">{etiqueta}</span>}
                   <ChevronDown size={18} className={`text-mudo flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
                 </button>
+                )}
 
-                {open && (
+                {open && modo === 'editar' && (
                   <div className="mb-3 p-3 rounded-2xl bg-elevada">
                     <Musculos musculos={ex.musculos} className="mb-2 px-1" />
                     <Campo label="Series">

@@ -340,14 +340,18 @@ ok('La celda completada mide EXACTAMENTE igual que la no completada',
   `${eGymA.ancho.toFixed(1)}×${eGymA.alto.toFixed(1)} vs ${eSin.ancho.toFixed(1)}×${eSin.alto.toFixed(1)}`);
 
 // Progreso: las cifras del mes y el volumen por músculo
-await pestana(p, 'Progreso').click(); await p.waitForTimeout(600);
-ok('Se abre Progreso', (await titulo(p)) === 'Progreso', await titulo(p));
+// Hoy: la racha y las cifras del mes
+await pestana(p, 'Hoy').click(); await p.waitForTimeout(600);
 const esteMes = await p.evaluate(() => {
   const s = [...document.querySelectorAll('section')].find(x => /Este mes/i.test(x.textContent));
   const m = s?.textContent.match(/Este mes\s*(\d+)\s*de\s*(\d+)/i);
   return m ? [+m[1], +m[2]] : null;
 });
 ok('Cuenta las sesiones hechas del mes', esteMes && esteMes[0] > 0 && esteMes[0] <= esteMes[1], JSON.stringify(esteMes));
+ok('La racha está en Hoy, junto al mes', await p.locator('section[aria-label="Racha y mes"]', { hasText: /Racha\s*\d+/ }).count() === 1);
+await pestana(p, 'Progreso').click(); await p.waitForTimeout(600);
+ok('Se abre Progreso', (await titulo(p)) === 'Progreso', await titulo(p));
+ok('Y la racha ya no se repite en Progreso', await p.locator('section[aria-label="Racha y mes"]').count() === 0);
 ok('Responde a «¿Estás subiendo?»', await p.locator('text=/Estás subiendo/i').count() > 0);
 ok('Enseña la semana del bloque de 8', /Semana\s*\d\s*de\s*8/.test(await p.evaluate(() => document.body.innerText)));
 await p.locator('button', { hasText: 'Volumen por músculo' }).click(); await p.waitForTimeout(400);
@@ -611,6 +615,30 @@ await p.getByRole('button', { name: 'Más series de Press banca con barra' }).cl
 await p.getByLabel('Repeticiones de Press banca con barra').fill('4-6');
 await p.waitForTimeout(300);
 ok('Cambiar series y reps se ve en la fila', await p.locator('main', { hasText: '5 × 4-6' }).count() === 1);
+// Cambiar el orden: flechas en cada fila, sin abrir nada
+{
+  const orden = () => p.evaluate(() => [...document.querySelectorAll('main button[aria-label^="Subir "]')].map(b => b.getAttribute('aria-label').slice(6)));
+  await p.getByRole('tab', { name: 'Cambiar el orden' }).click(); await p.waitForTimeout(300);
+  const o0 = await orden();
+  ok('«Cambiar el orden» pone flechas en todas las filas', o0.length === 12 && o0[0] === 'Press banca con barra', o0.slice(0, 3).join(' · '));
+  ok('El primero no puede subir más', await p.locator('button[aria-label="Subir Press banca con barra"]').isDisabled());
+  await p.locator('button[aria-label="Bajar Press banca con barra"]').click(); await p.waitForTimeout(250);
+  const o1 = await orden();
+  ok('Bajar un ejercicio lo cambia de sitio con el siguiente', o1[0] === o0[1] && o1[1] === o0[0], o1.slice(0, 3).join(' · '));
+  await p.locator('button[aria-label="Subir Press banca con barra"]').click(); await p.waitForTimeout(250);
+  ok('Y subirlo lo devuelve', JSON.stringify(await orden()) === JSON.stringify(o0));
+  // En el borde de su parte no salta a nadie: pasa a la parte de al lado
+  const parteDe = (nom) => p.evaluate(n => { const f = [...document.querySelectorAll('main button[aria-label^="Subir "]')].find(b => b.getAttribute('aria-label') === 'Subir ' + n)?.closest('div.border-b');
+    let h = null; for (let e = f; e && !h; e = e.previousElementSibling) h = e.querySelector('h2'); return h?.textContent ?? null; }, nom);
+  const ultimoP1 = o0[1];
+  const antesParte = await parteDe(ultimoP1);
+  await p.locator(`button[aria-label="Bajar ${ultimoP1}"]`).click(); await p.waitForTimeout(250);
+  ok('Bajar el último de una parte lo pasa a la parte siguiente, sin saltarse a nadie',
+    JSON.stringify(await orden()) === JSON.stringify(o0) && (await parteDe(ultimoP1)) !== antesParte, `${antesParte} → ${await parteDe(ultimoP1)}`);
+  await p.locator(`button[aria-label="Subir ${ultimoP1}"]`).click(); await p.waitForTimeout(250);
+  ok('Y subirlo lo devuelve a la suya', (await parteDe(ultimoP1)) === antesParte);
+  await p.getByRole('tab', { name: 'Editar' }).click(); await p.waitForTimeout(300);
+}
 // Romper una regla: quitar el face pull
 await p.locator('main button[aria-expanded="false"]', { hasText: 'Face pull' }).click(); await p.waitForTimeout(300);
 await p.locator('button[aria-label^="Quitar Face pull"]').click();

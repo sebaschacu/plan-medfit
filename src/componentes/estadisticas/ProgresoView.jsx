@@ -1,12 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronDown, Flame, TrendingUp } from 'lucide-react';
+import { ChevronDown, TrendingUp } from 'lucide-react';
 import { SESIONES, SESION_INFO, CUPO_SEMANAL, DOBLES } from '../../data.js';
 import { historialEjercicio, mmss } from '../../reglas.js';
 import { resolverRutina } from '../../rutina.js';
 import { COLUMNA } from '../../utiles/constantes-ui.js';
 import { contarRender } from '../../utiles/medir.js';
 import { usePlanCtx, useProgresoCtx } from '../../estado/contextos.js';
-import { useResumenMes } from '../../estado/useResumenMes.js';
 import { Punto } from '../comunes/ui.jsx';
 import VolumenMuscular from './VolumenMuscular.jsx';
 
@@ -98,7 +97,6 @@ const ProgresoView = () => {
   contarRender('ProgresoView');
   const { calendario, todayISO, css, rutina } = usePlanCtx();
   const { progress } = useProgresoCtx();
-  const { stats } = useResumenMes();
   const [abierto, setAbierto] = useState(null);
   const [verVolumen, setVerVolumen] = useState(false);
 
@@ -226,25 +224,6 @@ const ProgresoView = () => {
                 <span className="w-10 text-right text-[15px] font-semibold text-tinta">{h}/{t}</span>
               </div>
             ))}
-          </div>
-        </section>
-
-        {/* ─── Racha y mes ─── */}
-        <section className="grid grid-cols-2 gap-3">
-          <div className="rounded-3xl bg-tarjeta p-5">
-            <div className="rotulo">Racha</div>
-            <div className="flex items-center gap-2 mt-1.5">
-              <Flame size={24} className={stats.racha > 0 ? 'text-ambar' : 'text-tenue'} />
-              <span className="text-[32px] font-semibold text-tinta leading-none">{stats.racha}</span>
-            </div>
-            <p className="text-sm text-tinta3 mt-1">{stats.racha === 1 ? 'sesión seguida' : 'sesiones seguidas'}</p>
-          </div>
-          <div className="rounded-3xl bg-tarjeta p-5">
-            <div className="rotulo">Este mes</div>
-            <div className="mt-1.5 text-[32px] font-semibold text-tinta leading-none">
-              {stats.completadas}<span className="text-lg text-tinta3 font-medium"> de {stats.totalEntrenables}</span>
-            </div>
-            <p className="text-sm text-tinta3 mt-1">Gym {stats.cats.gym}/{stats.catsTotal.gym} · Cardio {stats.cats.cardio}/{stats.catsTotal.cardio}</p>
           </div>
         </section>
 

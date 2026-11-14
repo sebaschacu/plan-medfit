@@ -12,6 +12,7 @@ import { Punto, ChipTurno, Detalle, BotonCTA } from '../comunes/ui.jsx';
 import SelectorVariante from './SelectorVariante.jsx';
 import PanelFlexible from './PanelFlexible.jsx';
 import PanelDia from './PanelDia.jsx';
+import RachaYMes from '../comunes/RachaYMes.jsx';
 
 // ═══════════════ EL DÍA ═══════════════
 // Qué toca y con qué se empieza, de un vistazo. Con la fecha de hoy es la
@@ -126,6 +127,9 @@ const DiaView = ({ onVerFicha }) => {
             </div>
           )}
         </section>
+
+        {/* Racha y mes: solo en Hoy, que es donde se miran a diario */}
+        {esHoy && <RachaYMes />}
 
         {/* ─── Avisos del día ─── */}
         {dia.festivo && (
