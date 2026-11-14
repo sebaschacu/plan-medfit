@@ -27,7 +27,7 @@ export default function App() {
   const { view, diaActivo, activeFecha, todayISO } = usePlanCtx();
   const {
     saveEdit: saveEditBase, liberarDia: liberarDiaBase,
-    guardarRutina: guardarRutinaBase, restaurarRutina: restaurarRutinaBase,
+    guardarRutina: guardarRutinaBase, restaurarRutina: restaurarRutinaBase, irA,
   } = useAccionesCtx();
 
   // ─── Flags de pantalla ───
@@ -35,6 +35,7 @@ export default function App() {
   const [fichaSesion, setFichaSesion] = useState(null);         // clave de sesión a consultar
   const [editMode, setEditMode] = useState(false);
   const [editingDay, setEditingDay] = useState(null);
+  const [seccionAjustes, setSeccionAjustes] = useState(null);   // qué pantalla de Ajustes está abierta
 
   // Las mutaciones viven en el Provider; cerrar el modal o el editor es cosa
   // del enrutador.
@@ -45,7 +46,11 @@ export default function App() {
 
   // Cambiar de pestaña cierra lo que hubiera abierto encima.
   const [vistaPrevia, setVistaPrevia] = useState(view);
-  if (vistaPrevia !== view) { setVistaPrevia(view); setFichaSesion(null); setEditandoRutina(null); }
+  // Salir de Ajustes la deja en su menú principal para la próxima vez.
+  if (vistaPrevia !== view) {
+    if (vistaPrevia === 'ajustes') setSeccionAjustes(null);
+    setVistaPrevia(view); setFichaSesion(null); setEditandoRutina(null);
+  }
 
   if (editandoRutina) {
     return (
@@ -75,9 +80,9 @@ export default function App() {
   } else if (view === 'progreso') {
     pantalla = <ProgresoView />;
   } else if (view === 'rutinas') {
-    pantalla = <Biblioteca onAbrir={setFichaSesion} />;
+    pantalla = <Biblioteca onAbrir={setFichaSesion} onNuevoDeporte={() => { setSeccionAjustes('deporte:nuevo'); irA('ajustes'); }} />;
   } else if (view === 'ajustes') {
-    pantalla = <AjustesView />;
+    pantalla = <AjustesView seccion={seccionAjustes} setSeccion={setSeccionAjustes} onEditarRutina={setEditandoRutina} />;
   } else {
     // Calendario. También es el respaldo si el día activo no está en el mes
     // generado (mes cambiado, fecha fuera de rango): mejor que una pantalla vacía.

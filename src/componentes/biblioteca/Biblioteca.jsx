@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Plus } from 'lucide-react';
 import { SESION_INFO, SECUENCIA_GYM, SECUENCIA_NATACION } from '../../data.js';
+import { claveDeporte } from '../../config.js';
 import { generarDesdeAncla, aISO, deISO } from '../../generador.js';
 import { estaEditada } from '../../rutina.js';
 import { COLUMNA, NOMBRES_MES } from '../../utiles/constantes-ui.js';
@@ -37,14 +38,14 @@ const Fila = ({ k, fecha, hoy, editada, onAbrir, sub }) => {
   );
 };
 
-const Biblioteca = ({ onAbrir }) => {
-  const { todayISO, ancla, fijados, festivos, rutina } = usePlanCtx();
+const Biblioteca = ({ onAbrir, onNuevoDeporte }) => {
+  const { todayISO, ancla, fijados, festivos, rutina, config, planCfg } = usePlanCtx();
 
   // Próxima fecha de cada sesión, contando hoy. Se genera desde el ancla, igual
   // que el calendario, para que la fecha coincida con la que se verá allí.
   const proxima = useMemo(() => {
     const hasta = new Date(deISO(todayISO).getTime() + HORIZONTE * 864e5);
-    const { dias } = generarDesdeAncla({ hasta: aISO(hasta), ancla, fijados, festivos });
+    const { dias } = generarDesdeAncla({ hasta: aISO(hasta), ancla, fijados, festivos, config });
     const p = {};
     dias.filter(d => d.fecha >= todayISO).forEach(d => {
       [d.sesion === 'natacion' ? d.variante : d.sesion,
@@ -52,13 +53,17 @@ const Biblioteca = ({ onAbrir }) => {
         .filter(Boolean).forEach(k => { p[k] ??= d.fecha; });
     });
     return p;
-  }, [todayISO, ancla, fijados, festivos]);
+  }, [todayISO, ancla, fijados, festivos, config]);
 
   const fila = (k, sub) => (
     <Fila key={k} k={k} fecha={proxima[k]} hoy={todayISO} sub={sub}
       editada={estaEditada(k, todayISO, rutina)} onAbrir={onAbrir} />
   );
-  const total = Object.keys(SESION_INFO).filter(k => k !== 'natacion' && k !== 'descanso').length;
+  const total = Object.keys(SESION_INFO).filter(k => k !== 'natacion' && k !== 'descanso' && !SESION_INFO[k].archivado).length;
+  // El gym va en el orden de SU rotación (la del plan o la de Ajustes); las
+  // sesiones que el usuario sacó de la rotación siguen aquí, aparte.
+  const fueraGym = SECUENCIA_GYM.filter(k => !planCfg.secGym.includes(k));
+  const deportes = (config.deportes ?? []).filter(d => !d.archivado);
   const bloqueA = SECUENCIA_NATACION.filter(k => k.startsWith('natA'));
   const bloqueB = SECUENCIA_NATACION.filter(k => k.startsWith('natB'));
 
@@ -71,7 +76,13 @@ const Biblioteca = ({ onAbrir }) => {
       <main className={`px-4 ${COLUMNA} pb-28 space-y-3`}>
         <section className="rounded-3xl bg-tarjeta px-5 pt-4 pb-1">
           <div className="rotulo">Gym · rotación</div>
-          <div className="divide-y divide-divisor">{SECUENCIA_GYM.map(k => fila(k))}</div>
+          <div className="divide-y divide-divisor">{planCfg.secGym.map(k => fila(k))}</div>
+          {fueraGym.length > 0 && (
+            <>
+              <div className="text-sm text-tinta3 mt-3">Fuera de la rotación</div>
+              <div className="divide-y divide-divisor">{fueraGym.map(k => fila(k, 'No entra sola en el calendario'))}</div>
+            </>
+          )}
         </section>
 
         <section className="rounded-3xl bg-tarjeta px-5 pt-4 pb-1">
@@ -90,6 +101,18 @@ const Biblioteca = ({ onAbrir }) => {
             {fila('ciclismo')}
             {fila('calistenia', 'Complemento sobre otro día')}
           </div>
+        </section>
+
+        <section className="rounded-3xl bg-tarjeta px-5 pt-4 pb-1">
+          <div className="rotulo">Tus deportes</div>
+          {deportes.length > 0 && <div className="divide-y divide-divisor">{deportes.map(d => fila(claveDeporte(d.id)))}</div>}
+          {onNuevoDeporte && (
+            <button onClick={onNuevoDeporte}
+              className={`w-full min-h-[56px] flex items-center gap-3 text-left text-[17px] text-tinta ${deportes.length ? 'border-t border-divisor' : ''}`}>
+              <span className="w-8 h-8 rounded-xl bg-elevada flex items-center justify-center text-tinta2 flex-shrink-0"><Plus size={18} /></span>
+              {deportes.length ? 'Añadir otro deporte' : 'Añadir un deporte'}
+            </button>
+          )}
         </section>
       </main>
     </div>

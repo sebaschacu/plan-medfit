@@ -186,6 +186,8 @@ export const GRUPOS_SESION = {
   natacion:   { label: 'Natación', icon: 'waves', color: '#06b6d4' },
   cardio:     { label: 'Cardio', icon: 'run', color: '#0891b2' },
   descanso:   { label: 'Descanso', icon: 'moon', color: '#64748b' },
+  // Los deportes que crea el usuario en Ajustes (config.js los registra)
+  deporte:    { label: 'Tus deportes', icon: 'activity', color: '#f472b6' },
 };
 
 export const SESION_INFO = {

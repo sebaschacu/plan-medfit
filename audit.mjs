@@ -104,7 +104,19 @@ for (let i = 0; i < nRutinas; i++) {
 ok(`Abrir las ${nRutinas} rutinas, una ficha y el editor sin errores`, nRutinas >= 15 && errs.length === 0, `${nRutinas} · ${errs.slice(0, 2).join(' | ')}`);
 await pestana('Calendario').click(); await p.waitForTimeout(200);
 await p.locator('header button[aria-label="Ajustes"]').click(); await p.waitForTimeout(200);
-ok('Progreso, Rutinas y Ajustes sin errores', errs.length === 0, errs.slice(0, 2).join(' | '));
+// Las cuatro pantallas del plan: abrir, tocar algo y cancelar
+for (const t of ['Tu semana', 'Turnos', 'Orden de rotación', 'Tus deportes']) {
+  await p.locator('main button', { hasText: t }).first().click(); await p.waitForTimeout(250);
+  if (t === 'Tus deportes') {
+    await p.locator('button', { hasText: 'Crear un deporte' }).click(); await p.waitForTimeout(200);
+    await p.getByRole('tab', { name: 'Automático' }).click().catch(() => {}); await p.waitForTimeout(150);
+    await p.locator('button', { hasText: /^Cancelar$/ }).click(); await p.waitForTimeout(150);
+    await p.locator('header button', { hasText: 'Ajustes' }).click(); await p.waitForTimeout(150);
+  } else {
+    await p.locator('button', { hasText: /^Cancelar$/ }).click(); await p.waitForTimeout(150);
+  }
+}
+ok('Progreso, Rutinas, Ajustes y las pantallas del plan sin errores', errs.length === 0, errs.slice(0, 2).join(' | '));
 await b.close();
 
 console.log(`\n══ AUDITORÍA: ${n-f}/${n} · errores de página: ${errs.length} ══`);

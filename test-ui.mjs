@@ -1297,6 +1297,148 @@ seccion('SESIÓN TERMINADA');
   await p.close();
 }
 
+// ══ 16e · AJUSTES DEL PLAN: SEMANA, TURNOS, ROTACIÓN Y DEPORTES ══
+// Nada se aplica hasta pulsar Guardar en cada pantalla, lo que se guarda es
+// solo lo que cambió, y volver al plan original lo deja todo como estaba.
+seccion('AJUSTES · TU SEMANA');
+const abrirAjuste = async (p, titulo) => { await p.locator('main button', { hasText: titulo }).first().click(); await p.waitForTimeout(400); };
+const guardarAjuste = async (p) => { await p.locator('button', { hasText: /^(Guardar|Crear deporte)$/ }).last().click(); await p.waitForTimeout(600); };
+p = await nuevaPagina();
+const calAntes = await sesionPorDia(p);
+await irAAjustes(p);
+ok('Ajustes empieza por «Tu plan»', await p.locator('text=/Tu plan/i').count() > 0 && await p.locator('main button', { hasText: 'Tu semana' }).count() === 1);
+ok('Quien no toca nada no guarda config', (await ls(p)).config === undefined);
+await abrirAjuste(p, 'Tu semana');
+ok('Abre con lo del plan: 3 gym', await p.locator('[aria-label="Gym: 3"]').count() === 1);
+await p.locator('button[aria-label="Más Gym"]').click(); await p.waitForTimeout(500);
+ok('La vista previa se recalcula antes de guardar', await p.locator('section[aria-label="Así quedaría"]', { hasText: /3\.5\s*Gym/ }).count() === 1);
+ok('Y no guarda nada hasta pulsar Guardar', (await ls(p)).config === undefined);
+await guardarAjuste(p);
+ok('Guardar deja solo lo que cambió', JSON.stringify((await ls(p)).config) === '{"cupo":{"gym":4}}', JSON.stringify((await ls(p)).config));
+ok('Y el apartado se marca como cambiado', await p.locator('main button', { hasText: /Tu semana\s*Cambiado/ }).count() === 1);
+await pestana(p, 'Progreso').click(); await p.waitForTimeout(500);
+ok('Progreso mide la semana contra el cupo nuevo', /Gym\s*\d\/4/.test(await p.evaluate(() => document.body.innerText)));
+await alCalendario(p);
+const calCambiado = await sesionPorDia(p);
+ok('El calendario cambia con el cupo nuevo', JSON.stringify(calCambiado) !== JSON.stringify(calAntes));
+await irAAjustes(p);
+await p.locator('button', { hasText: 'Volver al plan original' }).click(); await p.waitForTimeout(300);
+ok('Volver al plan original pide confirmación', await p.locator('text=/Vuelve todo a lo del plan/').count() === 1);
+await p.locator('button', { hasText: /^Volver al plan$/ }).click(); await p.waitForTimeout(600);
+ok('Y deja la config vacía', (await ls(p)).config === undefined);
+await alCalendario(p);
+ok('Con el calendario de siempre', JSON.stringify(await sesionPorDia(p)) === JSON.stringify(calAntes));
+await p.close();
+
+seccion('AJUSTES · TURNOS');
+p = await nuevaPagina();
+await irAAjustes(p);
+await abrirAjuste(p, 'Turnos');
+ok('Enseña el ciclo del plan: L C N P', await p.locator('ol li').count() === 4);
+ok('Y marca el turno de hoy (1 de agosto, Libre)', (await p.locator('[role=radio][aria-checked="true"]').getAttribute('aria-label')) === 'Hoy es el 1: Libre');
+await p.locator('button[role=switch][aria-label="Gym en Turno día"]').click();
+await p.locator('button[aria-label="Añadir Libre"]').click();
+await p.locator('[role=radio][aria-label="Hoy es el 3: Noche"]').click(); await p.waitForTimeout(300);
+await guardarAjuste(p);
+const cT = (await ls(p)).config;
+ok('Guarda el permiso cambiado y el ciclo con el turno de hoy',
+  cT?.turnos?.C?.gym === true && JSON.stringify(cT?.ciclo?.turnos) === '["L","C","N","P","L"]' && cT.ciclo.hoy?.pos === 2, JSON.stringify(cT));
+await pestana(p, 'Hoy').click(); await p.waitForTimeout(500);
+ok('Hoy pasa a ser Noche', await p.locator('header', { hasText: 'Noche' }).count() === 1);
+await p.close();
+
+seccion('AJUSTES · ORDEN DE ROTACIÓN');
+p = await nuevaPagina();
+await irAAjustes(p);
+await abrirAjuste(p, 'Orden de rotación');
+ok('Sin avisos con el orden del plan', await p.locator('text=/trabajan lo mismo/').count() === 0);
+await p.locator('button[aria-label="Subir Tracción en el gym"]').click(); await p.waitForTimeout(300);
+ok('Poner Tracción justo después de Torso avisa de que trabajan lo mismo', await p.locator('text=/Tracción\\s*va justo después de Torso/').count() === 1);
+await p.locator('button[aria-label="Sacar Pierna volumen de el gym"]').click(); await p.waitForTimeout(300);
+ok('Sacar una sesión la deja «fuera de la rotación»', await p.locator('button[aria-label="Volver a meter Pierna volumen en el gym"]').count() === 1);
+await guardarAjuste(p);
+ok('Guarda el orden nuevo', JSON.stringify((await ls(p)).config?.rotacion?.gym) === '["gymA","gymC1","gymD","gymB"]', JSON.stringify((await ls(p)).config));
+await pestana(p, 'Rutinas').click(); await p.waitForTimeout(500);
+const txtR = await p.evaluate(() => document.body.innerText);
+ok('Rutinas sigue el orden nuevo, con lo que salió aparte', txtR.indexOf('Torso') < txtR.indexOf('Tracción') && txtR.indexOf('Fuera de la rotación') > 0
+  && txtR.indexOf('Pierna volumen') > txtR.indexOf('Fuera de la rotación'));
+await p.close();
+
+seccion('AJUSTES · TUS DEPORTES');
+p = await nuevaPagina();
+await irAAjustes(p);
+await abrirAjuste(p, 'Tus deportes');
+await p.locator('button', { hasText: 'Crear un deporte' }).click(); await p.waitForTimeout(300);
+const btnCrearDep = p.locator('button', { hasText: /^Crear deporte$/ });
+ok('Sin nombre no deja crear', await btnCrearDep.isDisabled());
+await p.getByLabel('Nombre del deporte').fill('Escalada');
+await p.getByRole('tab', { name: 'Automático' }).click(); await p.waitForTimeout(300);
+await p.locator('button[aria-pressed]', { hasText: 'Noche' }).click(); await p.waitForTimeout(400);
+ok('En automático enseña cómo quedaría, con el deporte contado', await p.locator('section[aria-label="Así quedaría"]', { hasText: 'Escalada' }).count() === 1);
+await btnCrearDep.click(); await p.waitForTimeout(600);
+const dep = (await ls(p)).config?.deportes?.[0];
+ok('Se guarda con su modo y sus turnos', dep?.nombre === 'Escalada' && dep.modo === 'auto' && dep.porSemana === 1 && JSON.stringify(dep.turnos) === '["L","N","P"]', JSON.stringify(dep));
+ok('Y aparece en la lista', await p.locator('main button', { hasText: /Escalada\s*Automático/ }).count() === 1);
+await alCalendario(p);
+const conEscalada = Object.values(await sesionPorDia(p)).filter(e => /Escalada/.test(e)).length;
+ok('La app lo reparte sola en el calendario', conEscalada >= 3, conEscalada + ' días');
+// Uno a mano: solo sale donde lo pongas
+await irAAjustes(p);
+await abrirAjuste(p, 'Tus deportes');
+await p.locator('button', { hasText: 'Crear un deporte' }).click(); await p.waitForTimeout(300);
+await p.getByLabel('Nombre del deporte').fill('Yoga');
+await p.locator('button[aria-label="Icono Montaña"]').click();
+await btnCrearDep.click(); await p.waitForTimeout(600);
+await alCalendario(p);
+ok('Uno «a mano» no aparece solo en el calendario', !Object.values(await sesionPorDia(p)).some(e => /Yoga/.test(e)));
+await p.locator('button[aria-label="Modo edición"]').click(); await p.waitForTimeout(300);
+await abrirDia(p, '2026-08-03');
+await elegirSesionEnModal(p, 'Yoga', 'Tus deportes');
+await p.evaluate(() => [...document.querySelector('.fixed.inset-0').querySelectorAll('button')].find(b => /^Guardar/.test(b.textContent.trim()))?.click());
+await p.waitForTimeout(700);
+const idYoga = (await ls(p)).config.deportes.find(d => d.nombre === 'Yoga').id;
+ok('Pero se puede poner en un día desde el calendario', (await ls(p)).fijados?.['2026-08-03']?.sesion === `dep_${idYoga}` && (await sesionPorDia(p))[3] === 'Yoga');
+await p.locator('button[aria-label="Modo edición"]').click(); await p.waitForTimeout(300);
+await abrirDia(p, '2026-08-03');
+ok('El día se llama como el deporte', (await p.locator('main h1').first().textContent()) === 'Yoga');
+await entrarSesion(p);
+await p.locator('button[aria-label^="Hecha la serie 1 de Yoga"]').click(); await p.waitForTimeout(400);
+ok('Y se registra como cualquier sesión', (await ls(p)).prog?.['2026-08-03']?.[`dep_${idYoga}-1`]?.sets?.[0] === true);
+await p.locator('button[aria-label="Volver al día"]').click(); await p.waitForTimeout(300);
+// Rutinas: sale en «Tus deportes», con su ficha y su editor
+await pestana(p, 'Rutinas').click(); await p.waitForTimeout(400);
+ok('Rutinas lista tus deportes', await p.locator('section', { hasText: 'Tus deportes' }).locator('button', { hasText: 'Escalada' }).count() === 1);
+await p.locator('main button', { hasText: /^Escalada/ }).first().click(); await p.waitForTimeout(400);
+await p.locator('button', { hasText: 'Editar esta rutina' }).click(); await p.waitForTimeout(400);
+ok('Y sus ejercicios se editan como los de cualquier rutina', await p.locator('text=/Editar Escalada/').count() === 1);
+await p.locator('button', { hasText: 'Salir sin guardar' }).click(); await p.waitForTimeout(300);
+// Archivar
+await irAAjustes(p).catch(async () => { await alCalendario(p); await irAAjustes(p); });
+if (await p.locator('main button', { hasText: 'Tus deportes' }).count() === 0) { await alCalendario(p); await irAAjustes(p); }
+await abrirAjuste(p, 'Tus deportes');
+await p.locator('main button', { hasText: /Escalada\s*Automático/ }).click(); await p.waitForTimeout(300);
+await p.locator('button', { hasText: 'Archivar este deporte' }).click(); await p.waitForTimeout(200);
+await p.locator('button', { hasText: /^Archivar$/ }).click(); await p.waitForTimeout(600);
+ok('Archivar lo pasa a «Archivados»', await p.locator('section', { hasText: 'Archivados' }).locator('text=Escalada').count() === 1);
+await alCalendario(p);
+ok('Y deja de salir en el calendario', !Object.values(await sesionPorDia(p)).some(e => /Escalada/.test(e)));
+ok('Sin errores de página', errores.length === 0, errores.slice(-1).join(''));
+await p.close();
+
+seccion('AJUSTES · EN EL RESPALDO');
+p = await nuevaPagina({ v: 3, prog: {}, prs: {}, fijados: {}, festivos: [], config: { cupo: { gym: 2 }, deportes: [{ id: 'esc', nombre: 'Escalada', modo: 'auto', porSemana: 1, turnos: ['L', 'P', 'N'] }] } }, { acceptDownloads: true });
+ok('La config guardada se carga al abrir', await p.locator('main button[data-etiqueta*="Escalada"]').count() > 0);
+await irAAjustes(p);
+const [dlC] = await Promise.all([p.waitForEvent('download', { timeout: 8000 }), p.locator('button').filter({ hasText: 'Exportar' }).click()]);
+await dlC.saveAs('/tmp/plan-config.json');
+ok('Exportar la incluye', JSON.parse(fs.readFileSync('/tmp/plan-config.json', 'utf8')).config?.cupo?.gym === 2);
+fs.writeFileSync('/tmp/plan-sin-config.json', JSON.stringify({ v: 3, prog: {}, prs: {}, fijados: {}, festivos: [] }));
+await importar(p, '/tmp/plan-sin-config.json', 800);
+ok('Importar un respaldo sin ajustes vuelve al plan', (await ls(p)).config === undefined);
+await importar(p, '/tmp/plan-config.json', 800);
+ok('E importar uno con ajustes los trae', (await ls(p)).config?.cupo?.gym === 2 && /con tus ajustes del plan/.test(await p.evaluate(() => document.body.innerText)));
+await p.close();
+
 // ══ 17 · UN RESPALDO CON EJERCICIOS MALFORMADOS NO DEJA LA APP EN BLANCO ══
 // `musculos` es metadata que llegó en la v6. Un respaldo anterior, o uno editado
 // a mano, puede traerlo con otra forma o sin `primario`. El volumen por músculo

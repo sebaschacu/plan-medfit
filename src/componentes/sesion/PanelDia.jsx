@@ -4,7 +4,7 @@ import { SESION_INFO, COMPLEMENTOS, DOBLES } from '../../data.js';
 import { combinacionValida, ordenDoble, validarSeparacion } from '../../generador.js';
 import { GYM_PIERNA_UI } from '../../utiles/constantes-ui.js';
 import { contarRender } from '../../utiles/medir.js';
-import { useAccionesCtx } from '../../estado/contextos.js';
+import { usePlanCtx, useAccionesCtx } from '../../estado/contextos.js';
 import NumInput from '../comunes/NumInput.jsx';
 import { Punto } from '../comunes/ui.jsx';
 
@@ -13,15 +13,17 @@ import { Punto } from '../comunes/ui.jsx';
 const PanelDia = ({ dia, reducida = false, nEjerciciosSec = 0 }) => {
   contarRender('PanelDia');
   const { onSecundaria, onComplemento, abrirSesionDelDia: onAbrirSesion } = useAccionesCtx();
+  const { planCfg } = usePlanCtx();
   const [abierto, setAbierto] = useState(false);
   const [sep, setSep] = useState(dia.separacionH ?? '');
-  const puedeDoblar = DOBLES.turnos[dia.turno]?.permite;
-  const infoTurno = DOBLES.turnos[dia.turno];
+  // Qué turnos dejan doblar: lo del plan, o lo que el usuario cambió en Ajustes
+  const puedeDoblar = planCfg.dobles[dia.turno]?.permite;
+  const infoTurno = planCfg.dobles[dia.turno];
   const sec = dia.sesionSecundaria;
 
   // Solo se ofrecen las combinaciones que el plan permite con esta principal
   const opciones = Object.keys(SESION_INFO)
-    .filter(k => k !== 'descanso')
+    .filter(k => k !== 'descanso' && !SESION_INFO[k].archivado)
     .map(k => ({ k, ...combinacionValida(dia.sesion, k) }))
     .filter(o => o.ok);
 
@@ -70,7 +72,7 @@ const PanelDia = ({ dia, reducida = false, nEjerciciosSec = 0 }) => {
               </p>
             )}
             {dia.dobleCondicional && (
-              <p className="text-sm text-ambar">Posturno: {DOBLES.turnos.P.condicion}.</p>
+              <p className="text-sm text-ambar">Posturno: {planCfg.dobles.P?.condicion ?? DOBLES.turnos.P.condicion}.</p>
             )}
             {dia.secundariaManual && (
               <button onClick={() => { onSecundaria(dia.fecha, null, null); setSep(''); }}

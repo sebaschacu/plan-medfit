@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { resolverRutina } from '../rutina.js';
 import { hoyISO } from '../utiles/formato.js';
 import { guardar, descargarJSON, leerRespaldo } from './persistencia.js';
+import { configVacia } from '../config.js';
 import { ContextoPlan, ContextoProgreso, ContextoAcciones } from './contextos.js';
 import { useTemporizador } from './useTemporizador.js';
 import { useNavegacion } from './useNavegacion.js';
@@ -23,9 +24,9 @@ export function PlanProvider({ children }) {
   } = useNavegacion({ todayISO, skipTimer });
 
   const {
-    ancla, fijados, festivos, extras, css,
+    ancla, fijados, festivos, extras, css, config, planCfg,
     calendario, avisos, mesInfo, hayMesAnterior,
-    setAncla, setFijados, setFestivos, setExtras, setCss,
+    setAncla, setFijados, setFestivos, setExtras, setCss, setConfig,
     fijarPorRegistro, saveEdit: saveEditPlan, liberarDia,
     onSecundaria, onComplemento, fijarVariante: fijarVariantePlan, soltarVariante,
     onFlexible, onConvertirFlexible,
@@ -47,9 +48,12 @@ export function PlanProvider({ children }) {
   const saveTimeoutRef = useRef(null);
 
   // Estado serializable: se guardan las ENTRADAS del generador, no su salida.
+  // `config` solo se guarda si el usuario cambió algo en Ajustes: quien no la
+  // toca guarda exactamente lo mismo que antes (lo vigila test-snapshot.mjs).
   const snapshot = useCallback(
-    () => ({ v: 3, ancla, fijados, festivos, extras, css, rutina, prog: progress, prs: prMap }),
-    [ancla, fijados, festivos, extras, css, rutina, progress, prMap]
+    () => ({ v: 3, ancla, fijados, festivos, extras, css, rutina, prog: progress, prs: prMap,
+      ...(configVacia(config) ? {} : { config }) }),
+    [ancla, fijados, festivos, extras, css, rutina, progress, prMap, config]
   );
 
   const doSave = useCallback((datos) => {
@@ -128,15 +132,17 @@ export function PlanProvider({ children }) {
       setRutina(d.rutina);
       setProgress(d.prog);
       setPrMap(d.prs);
+      setConfig(d.config);
       const nDias = Object.keys(d.prog).length;
       const nRut = Object.keys(d.rutina).length;
       avisar(true, `Importado: ${nDias} ${nDias === 1 ? 'día' : 'días'} con registro`
         + (nRut ? `, ${nRut} ${nRut === 1 ? 'rutina editada' : 'rutinas editadas'}` : '')
-        + (d.css != null ? ', CSS incluido' : '') + '.');
+        + (d.css != null ? ', CSS incluido' : '')
+        + (configVacia(d.config) ? '' : ', con tus ajustes del plan') + '.');
     });
   // Los setters son de useState (identidad estable): van en la lista solo para
   // el linter, que al venir de hooks propios ya no sabe que lo son.
-  }, [avisar, setAncla, setFijados, setFestivos, setExtras, setCss, setRutina, setProgress, setPrMap]);
+  }, [avisar, setAncla, setFijados, setFestivos, setExtras, setCss, setRutina, setProgress, setPrMap, setConfig]);
 
   // ─── Derivados de la vista ───
   // Clave real de la sesión que se está viendo (natación resuelve a su variante)
@@ -154,11 +160,11 @@ export function PlanProvider({ children }) {
   // identidad cuando cambia algo de dentro, y solo entonces se re-renderizan
   // sus consumidores.
   const valorPlan = useMemo(() => ({
-    todayISO, ancla, fijados, festivos, extras, css, rutina,
+    todayISO, ancla, fijados, festivos, extras, css, rutina, config, planCfg,
     calendario, avisos, mesInfo, hayMesAnterior,
     view, activeFecha, activeSesion, anio, mes,
     diaActivo, claveVista, ejerciciosVigentes,
-  }), [todayISO, ancla, fijados, festivos, extras, css, rutina,
+  }), [todayISO, ancla, fijados, festivos, extras, css, rutina, config, planCfg,
     calendario, avisos, mesInfo, hayMesAnterior,
     view, activeFecha, activeSesion, anio, mes,
     diaActivo, claveVista, ejerciciosVigentes]);
@@ -172,7 +178,7 @@ export function PlanProvider({ children }) {
     cambiarMes, openDay, abrirSesionDelDia, backToCalendar, irA,
     // plan
     saveEdit, liberarDia, onSecundaria, onComplemento, fijarVariante, soltarVariante,
-    onFlexible, onConvertirFlexible, setCss,
+    onFlexible, onConvertirFlexible, setCss, setConfig,
     // rutinas
     guardarRutina, restaurarRutina,
     // progreso
@@ -183,7 +189,7 @@ export function PlanProvider({ children }) {
     onExportar, onImportar,
   }), [cambiarMes, openDay, abrirSesionDelDia, backToCalendar, irA,
     saveEdit, liberarDia, onSecundaria, onComplemento, fijarVariante, soltarVariante,
-    onFlexible, onConvertirFlexible, setCss,
+    onFlexible, onConvertirFlexible, setCss, setConfig,
     guardarRutina, restaurarRutina,
     toggleSet, registrarSerie, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta,
     skipTimer, onExportar, onImportar]);

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronDown, TrendingUp } from 'lucide-react';
-import { SESIONES, SESION_INFO, CUPO_SEMANAL, DOBLES } from '../../data.js';
+import { SESIONES, SESION_INFO, DOBLES } from '../../data.js';
 import { historialEjercicio, mmss } from '../../reglas.js';
 import { resolverRutina } from '../../rutina.js';
 import { COLUMNA } from '../../utiles/constantes-ui.js';
@@ -95,7 +95,7 @@ const FilaEjercicio = ({ ex, color, hist, abierta, onAbrir }) => {
 
 const ProgresoView = () => {
   contarRender('ProgresoView');
-  const { calendario, todayISO, css, rutina } = usePlanCtx();
+  const { calendario, todayISO, css, rutina, planCfg } = usePlanCtx();
   const { progress } = useProgresoCtx();
   const [abierto, setAbierto] = useState(null);
   const [verVolumen, setVerVolumen] = useState(false);
@@ -125,8 +125,9 @@ const ProgresoView = () => {
       const p = progress[fecha] || {};
       return ejs.length > 0 && ejs.every(ex => { const sc = typeof ex.series === 'number' ? ex.series : 1; return sc > 0 && p[ex.id]?.sets?.length === sc && p[ex.id].sets.every(Boolean); });
     };
-    const grupo = (k) => (String(k).startsWith('gym') ? 'gym' : String(k).startsWith('nat') ? 'natacion' : k === 'running' || k === 'ciclismo' ? 'cardio' : null);
+    const grupo = (k) => (String(k).startsWith('gym') ? 'gym' : String(k).startsWith('nat') ? 'natacion' : k === 'running' || k === 'ciclismo' ? 'cardio' : SESION_INFO[k]?.deporte ? k : null);
     const c = { gym: [0, 0], natacion: [0, 0], cardio: [0, 0], flexible: [0, 0] };
+    planCfg.deportesAuto.forEach(dp => { c[dp.clave] = [0, 0]; });
     semana.forEach(d => {
       const claves = [
         [d.sesion === 'natacion' ? (d.variante ?? 'natacion') : d.sesion, d.flexible],
@@ -135,18 +136,20 @@ const ProgresoView = () => {
       claves.forEach(([k, flex]) => {
         if (!k) return;
         const g = flex ? 'flexible' : grupo(k);
-        if (!g) return;
+        if (!g || !c[g]) return;
         c[g][1]++;
         if (k !== 'descanso' && hecha(d.fecha, k)) c[g][0]++;
       });
     });
     return [
-      ['Gym', c.gym[0], Math.max(c.gym[1], CUPO_SEMANAL.gym), '#22c55e'],
-      ['Natación', c.natacion[0], Math.max(c.natacion[1], CUPO_SEMANAL.natacion), '#06b6d4'],
-      ['Running o bici', c.cardio[0], Math.max(c.cardio[1], CUPO_SEMANAL.running), '#0891b2'],
-      ['Flexible', c.flexible[0], Math.max(c.flexible[1], CUPO_SEMANAL.flexible), '#8a97a1'],
-    ];
-  }, [semana, progress, rutina]);
+      // El objetivo es el cupo de la semana: el del plan o el de Ajustes
+      ['Gym', c.gym[0], Math.max(c.gym[1], planCfg.cupo.gym), '#22c55e'],
+      ['Natación', c.natacion[0], Math.max(c.natacion[1], planCfg.cupo.natacion), '#06b6d4'],
+      ['Running o bici', c.cardio[0], Math.max(c.cardio[1], planCfg.cupo.running), '#0891b2'],
+      ...(planCfg.cupo.flexible ? [['Flexible', c.flexible[0], Math.max(c.flexible[1], planCfg.cupo.flexible), '#8a97a1']] : []),
+      ...planCfg.deportesAuto.map(dp => [dp.nombre, c[dp.clave][0], Math.max(c[dp.clave][1], dp.porSemana), dp.color]),
+    ].filter(([, , t]) => t > 0);
+  }, [semana, progress, rutina, planCfg]);
 
   return (
     <div className="min-h-screen bg-fondo">
@@ -215,7 +218,7 @@ const ProgresoView = () => {
           <div className="space-y-2.5">
             {cupo.map(([label, h, t, c]) => (
               <div key={label} className="flex items-center gap-3">
-                <span className="w-32 text-[15px] text-tinta2">{label}</span>
+                <span className="w-32 text-[15px] text-tinta2 truncate">{label}</span>
                 <span className="flex-1 flex gap-1" aria-hidden="true">
                   {Array.from({ length: t }).map((_, i) => (
                     <span key={i} className="h-2 flex-1 rounded-full" style={{ background: i < h ? c : '#1f272e' }} />

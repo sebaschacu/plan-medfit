@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node test-generador.mjs && node test-validador.mjs",
+    "test": "node test-generador.mjs && node test-validador.mjs && node test-config.mjs",
     "test:ui": "node test-ui.mjs",
     "test:snapshot": "node test-snapshot.mjs",
     "test:renders": "node test-renders.mjs --exigir-app-0",

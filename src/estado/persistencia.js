@@ -6,6 +6,7 @@
 // localStorage de la app ya instalada. test-snapshot.mjs lo vigila.
 
 import { FESTIVOS_DEFAULT } from '../generador.js';
+import { normalizarConfig } from '../config.js';
 
 export const CLAVE = 'plan-internado';
 
@@ -36,6 +37,7 @@ export function estadoGuardado() {
         festivos: Array.isArray(d.festivos) ? d.festivos : null,
         prog: d.prog ?? {},
         prs: d.prs ?? {},
+        config: normalizarConfig(d.config),
       };
       return _guardado;
     }
@@ -120,6 +122,9 @@ export function leerRespaldo(file) {
             rutina: obj(d.rutina) ?? {},
             prog: obj(d.prog) ?? {},
             prs: obj(d.prs) ?? {},
+            // Ajustes del plan. Un respaldo de antes de existir no la trae: se
+            // importa vacía, que es «el plan tal cual».
+            config: normalizarConfig(d.config),
           },
         });
       } catch {

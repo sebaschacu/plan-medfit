@@ -3,6 +3,7 @@ import { Check, Star, AlertTriangle, Pencil, Moon } from 'lucide-react';
 import { TURNO_INFO, SESION_INFO } from '../../data.js';
 import { COLUMNA } from '../../utiles/constantes-ui.js';
 import { hexARgba } from '../../utiles/formato.js';
+import { nombrarClaves } from '../../utiles/nombres.js';
 import { contarRender } from '../../utiles/medir.js';
 import { usePlanCtx, useAccionesCtx } from '../../estado/contextos.js';
 import { useResumenMes } from '../../estado/useResumenMes.js';
@@ -154,7 +155,7 @@ const CalendarView = ({ onEditDay, editMode, setEditMode }) => {
         {avisos?.length > 0 && (
           <div className="mt-4 space-y-2">
             {avisos.map((a, i) => (
-              <Detalle key={i} tono="ambar" icono={<AlertTriangle size={18} />}>{a.texto}</Detalle>
+              <Detalle key={i} tono="ambar" icono={<AlertTriangle size={18} />}>{nombrarClaves(a.texto)}</Detalle>
             ))}
           </div>
         )}

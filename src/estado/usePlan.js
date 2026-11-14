@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { generarMes, infoMes, ANCLA_DEFAULT, FESTIVOS_DEFAULT } from '../generador.js';
 import { estadoGuardado } from './persistencia.js';
+import { normalizarConfig, registrarDeportes, resolverConfig } from '../config.js';
 
 // ═══════════════ EL PLAN ═══════════════
 // Las ENTRADAS del generador y lo que el usuario añade encima. El calendario
@@ -19,10 +20,24 @@ export function usePlan({ anio, mes }) {
   // Va aparte de `fijados` porque no cambia la sesión principal ni la cola de gym.
   const [extras, setExtras] = useState(() => estadoGuardado().extras ?? {});
   const [css, setCss] = useState(() => estadoGuardado().css ?? null);   // segundos por 100 m
+  // Lo que el usuario cambió en Ajustes (cupo, turnos, rotación, deportes).
+  // Vacío = el plan tal cual. Los deportes propios se registran como sesiones
+  // ANTES de pintar nada, para que cualquier pantalla los encuentre.
+  const [config, setConfigEstado] = useState(() => {
+    const c = normalizarConfig(estadoGuardado().config);
+    registrarDeportes(c.deportes);
+    return c;
+  });
+  const setConfig = useCallback((c) => {
+    const n = normalizarConfig(c);
+    registrarDeportes(n.deportes);
+    setConfigEstado(n);
+  }, []);
+  const planCfg = useMemo(() => resolverConfig(config), [config]);
 
   const { dias: generado, avisos } = useMemo(
-    () => generarMes({ anio, mes, ancla, fijados, festivos }),
-    [anio, mes, ancla, fijados, festivos]
+    () => generarMes({ anio, mes, ancla, fijados, festivos, config }),
+    [anio, mes, ancla, fijados, festivos, config]
   );
   // Se fusiona lo que añadió el usuario sobre lo que produjo el generador.
   const calendario = useMemo(() => generado.map(d => {
@@ -155,16 +170,17 @@ export function usePlan({ anio, mes }) {
   }, []);
   // Convertirlo en running es fijar ese día: el generador lo respetará al recalcular
   const onConvertirFlexible = useCallback((fecha, sesion) => {
-    setFijados(prev => ({ ...prev, [fecha]: { ...(prev[fecha] ?? {}), turno: 'C', sesion } }));
-  }, []);
+    const turno = calendario.find(d => d.fecha === fecha)?.turno ?? 'C';
+    setFijados(prev => ({ ...prev, [fecha]: { ...(prev[fecha] ?? {}), turno, sesion } }));
+  }, [calendario]);
 
   return {
     // estado
-    ancla, fijados, festivos, extras, css,
+    ancla, fijados, festivos, extras, css, config, planCfg,
     // derivado
     calendario, avisos, mesInfo, hayMesAnterior,
     // setters directos (los usa importar)
-    setAncla, setFijados, setFestivos, setExtras, setCss,
+    setAncla, setFijados, setFestivos, setExtras, setCss, setConfig,
     // mutaciones
     fijarPorRegistro, saveEdit, liberarDia,
     onSecundaria, onComplemento, fijarVariante, soltarVariante,

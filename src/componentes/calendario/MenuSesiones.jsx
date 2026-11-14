@@ -12,10 +12,11 @@ const MenuSesiones = ({ sesion, onElegir }) => {
     const g = {};
     Object.entries(SESION_INFO).forEach(([k, v]) => {
       if (k === 'natacion') return;   // el tipo genérico no se elige a mano
+      if (v.archivado && k !== sesion) return;   // deporte archivado: solo si ya es el del día
       (g[v.grupo] ??= []).push({ k, ...v });
     });
     return g;
-  }, []);
+  }, [sesion]);
   const grupoActual = SESION_INFO[sesion]?.grupo ?? 'gym';
   const [abierto, setAbierto] = useState(grupoActual);
 
