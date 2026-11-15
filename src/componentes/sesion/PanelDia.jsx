@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronRight, X, Plus, Check } from 'lucide-react';
-import { SESION_INFO, COMPLEMENTOS, DOBLES } from '../../data.js';
+import { SESION_INFO, COMPLEMENTOS, DOBLES, claveSecundaria, familiaDe } from '../../data.js';
 import { combinacionValida, ordenDoble, validarSeparacion } from '../../generador.js';
 import { GYM_PIERNA_UI } from '../../utiles/constantes-ui.js';
 import { contarRender } from '../../utiles/medir.js';
@@ -23,7 +23,9 @@ const PanelDia = ({ dia, reducida = false, nEjerciciosSec = 0 }) => {
 
   // Solo se ofrecen las combinaciones que el plan permite con esta principal
   const opciones = Object.keys(SESION_INFO)
-    .filter(k => k !== 'descanso' && !SESION_INFO[k].archivado)
+    // Las variantes (Tempo, Umbral…) no se eligen aquí: se elige el tipo y la
+    // variante sale de la rotación, o se cambia después dentro de la sesión.
+    .filter(k => k !== 'descanso' && !SESION_INFO[k].archivado && !familiaDe(k))
     .map(k => ({ k, ...combinacionValida(dia.sesion, k) }))
     .filter(o => o.ok);
 
@@ -33,7 +35,7 @@ const PanelDia = ({ dia, reducida = false, nEjerciciosSec = 0 }) => {
   const compCorto = comp.cortaSobre.includes(dia.sesion);
   const valSep = sec ? validarSeparacion(sep === '' ? null : sep, dia.sesion, sec) : null;
   const orden = sec ? ordenDoble(dia.sesion, sec) : null;
-  const claveSec = sec === 'natacion' && dia.varianteSecundaria ? dia.varianteSecundaria : sec;
+  const claveSec = sec ? claveSecundaria(dia) : sec;
 
   return (
     <>
@@ -45,7 +47,7 @@ const PanelDia = ({ dia, reducida = false, nEjerciciosSec = 0 }) => {
               <div className="rotulo">Segunda sesión del día</div>
               <div className="text-[19px] font-semibold text-tinta flex items-center gap-2 mt-0.5">
                 <Punto color={SESION_INFO[claveSec]?.color} />
-                {sec === 'natacion' && claveSec !== sec ? `Natación · ${SESION_INFO[claveSec].label}` : SESION_INFO[sec].label}
+                {claveSec !== sec ? `${SESION_INFO[sec].label} · ${SESION_INFO[claveSec].label}` : SESION_INFO[sec].label}
               </div>
               {nEjerciciosSec > 0 && <div className="text-sm text-tinta3 mt-0.5">{nEjerciciosSec} bloques · tocar para abrirla</div>}
             </div>

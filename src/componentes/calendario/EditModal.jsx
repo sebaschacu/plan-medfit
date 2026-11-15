@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Star, AlertTriangle, RotateCcw } from 'lucide-react';
-import { TURNO_INFO, SESION_INFO } from '../../data.js';
+import { TURNO_INFO, SESION_INFO, clavePrincipal } from '../../data.js';
 import { useProgresoCtx, usePlanCtx } from '../../estado/contextos.js';
 import { avisoAlFijar } from '../../generador.js';
 import MenuSesiones from './MenuSesiones.jsx';
@@ -15,13 +15,16 @@ const EditModal = ({ dia, onSave, onLiberar, onClose }) => {
   // Las horas de sueño (__sueno) no son un ejercicio: no cuentan como registro.
   const ejerciciosRegistrados = Object.keys(progress[dia.fecha] || {}).filter(k => !k.startsWith('__')).length;
   const [turno, setTurno] = useState(dia.turno);
-  const [sesion, setSesion] = useState(dia.sesion);
+  // Natación y running se ven por su variante (Umbral, Tempo…): es lo que el
+  // menú puede marcar. Si no se cambia, se guarda el tipo tal cual.
+  const actual = clavePrincipal(dia);
+  const [sesion, setSesion] = useState(actual);
   const [festivo, setFestivo] = useState(!!dia.festivo);
   const [asumido, setAsumido] = useState(false);
 
   // Cambiar de sesión un día que ya tiene entrenamiento registrado dejaría ese
   // registro apuntando a ejercicios de otra sesión. Se avisa y se exige confirmar.
-  const cambiaSesion = sesion !== dia.sesion;
+  const cambiaSesion = sesion !== actual;
   const destruye = cambiaSesion && ejerciciosRegistrados > 0;
   const bloqueado = destruye && !asumido;
   // Fijar a mano se salta las reglas del generador, que solo puede proteger
@@ -93,7 +96,7 @@ const EditModal = ({ dia, onSave, onLiberar, onClose }) => {
               <AlertTriangle size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-red-100 leading-relaxed">
                 <span className="font-semibold">Este día ya tiene entrenamiento registrado</span> ({ejerciciosRegistrados}{' '}
-                {ejerciciosRegistrados === 1 ? 'ejercicio' : 'ejercicios'}). Cambiarlo de {SESION_INFO[dia.sesion]?.label} a {SESION_INFO[sesion]?.label} dejaría
+                {ejerciciosRegistrados === 1 ? 'ejercicio' : 'ejercicios'}). Cambiarlo de {SESION_INFO[actual]?.label} a {SESION_INFO[sesion]?.label} dejaría
                 ese registro apuntando a ejercicios que no existen en la sesión nueva, así que <span className="font-semibold">se borrará</span>.
                 Tus PRs históricos no se tocan.
               </div>
@@ -122,7 +125,7 @@ const EditModal = ({ dia, onSave, onLiberar, onClose }) => {
       </div>
       <div className="flex gap-2.5 p-5">
         <button onClick={onClose} className="flex-1 h-[56px] rounded-2xl bg-elevada text-tinta text-base font-semibold">Cancelar</button>
-        <button onClick={() => onSave(dia.fecha, turno, sesion, festivo, destruye)} disabled={bloqueado}
+        <button onClick={() => onSave(dia.fecha, turno, cambiaSesion ? sesion : dia.sesion, festivo, destruye)} disabled={bloqueado}
           className={`flex-[1.4] h-[56px] rounded-2xl text-base font-semibold ${
             bloqueado ? 'bg-elevada text-mudo' : destruye ? 'bg-red-600 text-white' : 'bg-tinta text-[#0d1215]'}`}>
           {destruye ? 'Cambiar y borrar' : 'Guardar y fijar'}

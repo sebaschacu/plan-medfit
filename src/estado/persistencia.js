@@ -10,6 +10,30 @@ import { normalizarConfig } from '../config.js';
 
 export const CLAVE = 'plan-internado';
 
+// ─── Running de antes de las variantes ───
+// Hasta que el running tuvo sesiones propias (Rodaje, Tempo…), todo día de
+// running era la sesión genérica y se registraba con RUN-1..3. Ese registro
+// solo se ve si el día sigue resolviendo a la genérica, así que esos días se
+// fijan con la variante 'running'. Solo toca días con registro RUN-*: quien
+// no tenga ninguno guarda exactamente lo mismo que antes.
+export function protegerRunningAntiguo(fijados = {}, prog = {}) {
+  let out = fijados;
+  for (const [fecha, p] of Object.entries(prog ?? {})) {
+    if (!p || typeof p !== 'object' || !Object.keys(p).some(k => k.startsWith('RUN-'))) continue;
+    const f = out[fecha];
+    if (!f?.sesion) continue;
+    if (f.sesion === 'running') {
+      if (!f.variante) out = { ...out, [fecha]: { ...f, variante: 'running' } };
+    } else if (!f.varianteSecundaria) {
+      out = { ...out, [fecha]: { ...f, varianteSecundaria: 'running' } };
+    }
+  }
+  return out;
+}
+
+// Ritmo umbral de running: segundos por km, entre 2:30 y 9:00. Otra cosa = sin dato.
+const umbralValido = (x) => (typeof x === 'number' && x >= 150 && x <= 540 ? x : null);
+
 // ─── Carga del estado guardado ───
 // Se lee UNA vez y de forma síncrona, para usarla en inicializadores lazy de
 // useState. Antes esto vivía en un useEffect con seis setState: la app pintaba
@@ -30,9 +54,10 @@ export function estadoGuardado() {
     if (d.v === 3) {
       _guardado = {
         ancla: d.ancla ?? null,
-        fijados: d.fijados ?? {},
+        fijados: protegerRunningAntiguo(d.fijados ?? {}, d.prog ?? {}),
         extras: d.extras ?? {},
         css: d.css ?? null,
+        umbralRun: umbralValido(d.umbralRun),
         rutina: d.rutina ?? {},
         festivos: Array.isArray(d.festivos) ? d.festivos : null,
         prog: d.prog ?? {},
@@ -115,10 +140,11 @@ export function leerRespaldo(file) {
           ok: true,
           datos: {
             ancla: d.ancla || null,
-            fijados: obj(d.fijados) ?? {},
+            fijados: protegerRunningAntiguo(obj(d.fijados) ?? {}, obj(d.prog) ?? {}),
             festivos: Array.isArray(d.festivos) ? d.festivos : FESTIVOS_DEFAULT,
             extras: obj(d.extras) ?? {},
             css: typeof d.css === 'number' && d.css > 0 ? d.css : null,   // seg/100 m
+            umbralRun: umbralValido(d.umbralRun),                          // seg/km
             rutina: obj(d.rutina) ?? {},
             prog: obj(d.prog) ?? {},
             prs: obj(d.prs) ?? {},

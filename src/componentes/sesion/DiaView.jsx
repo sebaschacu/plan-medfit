@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight, Settings, Star, Clock, Moon, AlertTriangle, ChevronRight } from 'lucide-react';
-import { SESION_INFO, SESIONES, GRUPOS_SESION as GRUPOS, PISCINA_DURACION_MIN } from '../../data.js';
+import { SESION_INFO, SESIONES, GRUPOS_SESION as GRUPOS, PISCINA_DURACION_MIN, clavePrincipal, claveSecundaria } from '../../data.js';
 import { S4, SUENO_POCO, SUENO_BIEN, ultimaSesion, sugerirCarga } from '../../reglas.js';
 import { resolverRutina } from '../../rutina.js';
 import { VACIO, COLUMNA, NOMBRES_MES } from '../../utiles/constantes-ui.js';
@@ -24,7 +24,7 @@ const diaSemana = (f) => DIAS[new Date(f + 'T00:00:00Z').getUTCDay()];
 const mesCorto = (f) => NOMBRES_MES[Number(f.slice(5, 7)) - 1].slice(0, 3).toLowerCase();
 
 // Nombre de lo que toca un día: la natación dice además cuál de las suyas.
-const claveDe = (d) => (d.sesion === 'natacion' && d.variante ? d.variante : d.sesion);
+const claveDe = clavePrincipal;
 const nSeries = (ex) => (typeof ex.series === 'number' ? ex.series : 1);
 
 const DiaView = ({ onVerFicha }) => {
@@ -56,7 +56,7 @@ const DiaView = ({ onVerFicha }) => {
 
   const proximos = calendario.filter(d => d.fecha > activeFecha).slice(0, 2);
   const sec = dia.sesionSecundaria;
-  const claveSec = sec === 'natacion' && dia.varianteSecundaria ? dia.varianteSecundaria : sec;
+  const claveSec = claveSecundaria(dia);
   const listaSec = sec ? resolverRutina(claveSec, activeFecha, rutina) : [];
 
   return (
@@ -198,7 +198,7 @@ const DiaView = ({ onVerFicha }) => {
                     <ChipTurno turno={d.turno} />
                     <Punto color={SESION_INFO[k]?.color} />
                     <span className="flex-1 min-w-0 truncate text-tinta">
-                      {d.sesion === 'natacion' && d.variante ? `Natación · ${SESION_INFO[k]?.label}` : (d.flexible ? 'Día flexible' : SESION_INFO[k]?.label)}
+                      {k !== d.sesion ? `${SESION_INFO[d.sesion]?.label} · ${SESION_INFO[k]?.label}` : (d.flexible ? 'Día flexible' : SESION_INFO[k]?.label)}
                       {d.sesionSecundaria ? ` + ${SESION_INFO[d.sesionSecundaria]?.label}` : ''}
                     </span>
                   </div>
@@ -223,6 +223,6 @@ const DiaView = ({ onVerFicha }) => {
   );
 };
 
-const esAguaOCardio = (k) => String(k).startsWith('nat') || k === 'running' || k === 'ciclismo';
+const esAguaOCardio = (k) => String(k).startsWith('nat') || String(k).startsWith('run') || k === 'ciclismo';
 
 export default DiaView;

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { Punto } from '../comunes/ui.jsx';
-import { SESION_INFO, SECUENCIA_NATACION, SECUENCIA_GYM } from '../../data.js';
+import { SESION_INFO, SECUENCIA_GYM, VARIANTES_DE, claveReal } from '../../data.js';
 import { useAccionesCtx, usePlanCtx } from '../../estado/contextos.js';
 import { avisoAlFijar } from '../../generador.js';
 
 // ═══════════════ SELECTOR DE VARIANTE DENTRO DEL DÍA ═══════════════
-// El tipo (gym / natación) se elige en configuración; CUÁL de la cola toca se ve
+// El tipo (gym / natación / running) se elige en configuración; CUÁL de la cola toca se ve
 // y se cambia aquí. Fijar una a mano no adelanta la cola: la que tocaba se hace
 // en la siguiente sesión (ver POLITICA_FIJADO en generador.js).
 const SelectorVariante = ({ dia, secundaria = false, registrados = 0 }) => {
@@ -15,19 +15,21 @@ const SelectorVariante = ({ dia, secundaria = false, registrados = 0 }) => {
   const [abierto, setAbierto] = useState(false);
   const [porConfirmar, setPorConfirmar] = useState(null);   // clave elegida pendiente de confirmar
   const [porAvisar, setPorAvisar] = useState(null);         // { clave, avisos } · solape o S7 al fijar
-  const esNat = (secundaria ? dia.sesionSecundaria : dia.sesion) === 'natacion';
-  const esGym = String(secundaria ? dia.sesionSecundaria : dia.sesion).startsWith('gym');
-  if (!esNat && !esGym) return null;
+  const tipo = secundaria ? dia.sesionSecundaria : dia.sesion;
+  // Natación y running eligen VARIANTE dentro de su tipo; el gym, la sesión.
+  const conVariantes = !!VARIANTES_DE[tipo];
+  const esGym = String(tipo).startsWith('gym');
+  if (!conVariantes && !esGym) return null;
 
-  const opciones = esNat ? [...SECUENCIA_NATACION, 'natCSS'] : SECUENCIA_GYM;
-  const actual = esNat
-    ? (secundaria ? dia.varianteSecundaria : dia.variante)
-    : (secundaria ? dia.sesionSecundaria : dia.sesion);
-  const fijadaPorMi = esNat
+  const opciones = conVariantes ? VARIANTES_DE[tipo] : SECUENCIA_GYM;
+  const actual = conVariantes
+    ? claveReal(tipo, secundaria ? dia.varianteSecundaria : dia.variante)
+    : tipo;
+  const fijadaPorMi = conVariantes
     ? !!(secundaria ? dia.varianteFijadaSecundaria : dia.varianteFijada)
     : !!dia.fijado && !dia.fijadoAuto;
-  const sugerida = esNat ? (secundaria ? dia.sugeridaSecundaria : dia.sugerida) : dia.sugeridaGym;
-  // Los avisos solo aplican al gym: la natación no tiene patrones que solapen
+  const sugerida = conVariantes ? (secundaria ? dia.sugeridaSecundaria : dia.sugerida) : dia.sugeridaGym;
+  // Los avisos solo aplican al gym: natación y running no tienen patrones que solapen
   // ni entra en S7. La secundaria tampoco se mira aquí — un gym doblado ya pasa
   // por el guardarraíl del generador, que sí ve esa colocación.
   const avisosDe = (k) => (esGym && !secundaria) ? avisoAlFijar(calendario, dia.fecha, k) : [];

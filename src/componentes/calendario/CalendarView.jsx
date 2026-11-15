@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Check, Star, AlertTriangle, Pencil, Moon } from 'lucide-react';
-import { TURNO_INFO, SESION_INFO } from '../../data.js';
+import { TURNO_INFO, SESION_INFO, clavePrincipal, claveSecundaria } from '../../data.js';
 import { COLUMNA } from '../../utiles/constantes-ui.js';
 import { hexARgba } from '../../utiles/formato.js';
 import { nombrarClaves } from '../../utiles/nombres.js';
@@ -15,18 +15,20 @@ import BarraCalendario from './BarraCalendario.jsx';
 // (el nombre y el tinte) y cómo va (hecho, a medias, con aviso).
 const DIAS_LARGOS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const diaCorto = (f) => DIAS_LARGOS[new Date(f + 'T00:00:00Z').getUTCDay()];
-const claveDe = (d) => (d.sesion === 'natacion' ? (d.variante ?? 'natacion') : d.sesion);
+const claveDe = clavePrincipal;
 // Lo que cabe en una celda: el nombre partido en dos líneas, nunca a mitad de palabra.
 const CELDA = {
   gymA: 'Empuje', gymB: 'Tracción', gymD: 'Torso', gymC1: 'Pierna\nfuerza', gymC2: 'Pierna\nvolumen',
   natA1: 'Técnica\ncrawl', natA2: 'Espalda\ny pecho', natA3: 'Estilos', natB1: 'Umbral',
   natB2: 'Aguas\nabiertas', natB3: 'Ritmo\nvariable', natCSS: 'Test\nCSS', natacion: 'Nado',
   running: 'Running', ciclismo: 'Bici', calistenia: 'Calis.',
+  runA1: 'Rodaje\nsuave', runA2: 'Fondo\nlargo', runA3: 'Cuestas', runB1: 'Tempo',
+  runB2: 'Series\numbral', runB3: 'Series\n4×4', runTest: 'Test\n30 min',
 };
 // La segunda sesión, en una palabra.
 const SEGUNDA = { running: 'Run', ciclismo: 'Bici', calistenia: 'Calis.' };
-const segundaDe = (k) => SEGUNDA[k] ?? (String(k).startsWith('nat') ? 'Nado' : CELDA[k]?.split('\n')[0] ?? SESION_INFO[k]?.label);
-const claveSecDe = (d) => (d.sesionSecundaria === 'natacion' ? (d.varianteSecundaria ?? 'natacion') : d.sesionSecundaria);
+const segundaDe = (k) => SEGUNDA[k] ?? (String(k).startsWith('nat') ? 'Nado' : String(k).startsWith('run') ? 'Run' : CELDA[k]?.split('\n')[0] ?? SESION_INFO[k]?.label);
+const claveSecDe = claveSecundaria;
 
 const CalendarView = ({ onEditDay, editMode, setEditMode }) => {
   contarRender('CalendarView');

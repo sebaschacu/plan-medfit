@@ -3,6 +3,7 @@ import { resolverRutina } from '../rutina.js';
 import { hoyISO } from '../utiles/formato.js';
 import { guardar, descargarJSON, leerRespaldo } from './persistencia.js';
 import { configVacia } from '../config.js';
+import { claveReal, clavePrincipal } from '../data.js';
 import { ContextoPlan, ContextoProgreso, ContextoAcciones } from './contextos.js';
 import { useTemporizador } from './useTemporizador.js';
 import { useNavegacion } from './useNavegacion.js';
@@ -24,9 +25,9 @@ export function PlanProvider({ children }) {
   } = useNavegacion({ todayISO, skipTimer });
 
   const {
-    ancla, fijados, festivos, extras, css, config, planCfg,
+    ancla, fijados, festivos, extras, css, umbralRun, config, planCfg,
     calendario, avisos, mesInfo, hayMesAnterior,
-    setAncla, setFijados, setFestivos, setExtras, setCss, setConfig,
+    setAncla, setFijados, setFestivos, setExtras, setCss, setUmbralRun, setConfig,
     fijarPorRegistro, saveEdit: saveEditPlan, liberarDia,
     onSecundaria, onComplemento, fijarVariante: fijarVariantePlan, soltarVariante,
     onFlexible, onConvertirFlexible,
@@ -48,12 +49,14 @@ export function PlanProvider({ children }) {
   const saveTimeoutRef = useRef(null);
 
   // Estado serializable: se guardan las ENTRADAS del generador, no su salida.
-  // `config` solo se guarda si el usuario cambió algo en Ajustes: quien no la
-  // toca guarda exactamente lo mismo que antes (lo vigila test-snapshot.mjs).
+  // `config` solo se guarda si el usuario cambió algo en Ajustes, y `umbralRun`
+  // solo cuando hay test de running: quien no los toca guarda exactamente lo
+  // mismo que antes (lo vigila test-snapshot.mjs).
   const snapshot = useCallback(
     () => ({ v: 3, ancla, fijados, festivos, extras, css, rutina, prog: progress, prs: prMap,
-      ...(configVacia(config) ? {} : { config }) }),
-    [ancla, fijados, festivos, extras, css, rutina, progress, prMap, config]
+      ...(configVacia(config) ? {} : { config }),
+      ...(umbralRun == null ? {} : { umbralRun }) }),
+    [ancla, fijados, festivos, extras, css, rutina, progress, prMap, config, umbralRun]
   );
 
   const doSave = useCallback((datos) => {
@@ -129,6 +132,7 @@ export function PlanProvider({ children }) {
       setFestivos(d.festivos);
       setExtras(d.extras);
       setCss(d.css);
+      setUmbralRun(d.umbralRun);
       setRutina(d.rutina);
       setProgress(d.prog);
       setPrMap(d.prs);
@@ -138,17 +142,18 @@ export function PlanProvider({ children }) {
       avisar(true, `Importado: ${nDias} ${nDias === 1 ? 'día' : 'días'} con registro`
         + (nRut ? `, ${nRut} ${nRut === 1 ? 'rutina editada' : 'rutinas editadas'}` : '')
         + (d.css != null ? ', CSS incluido' : '')
+        + (d.umbralRun != null ? ', ritmo de running incluido' : '')
         + (configVacia(d.config) ? '' : ', con tus ajustes del plan') + '.');
     });
   // Los setters son de useState (identidad estable): van en la lista solo para
   // el linter, que al venir de hooks propios ya no sabe que lo son.
-  }, [avisar, setAncla, setFijados, setFestivos, setExtras, setCss, setRutina, setProgress, setPrMap, setConfig]);
+  }, [avisar, setAncla, setFijados, setFestivos, setExtras, setCss, setUmbralRun, setRutina, setProgress, setPrMap, setConfig]);
 
   // ─── Derivados de la vista ───
-  // Clave real de la sesión que se está viendo (natación resuelve a su variante)
+  // Clave real de la sesión que se está viendo (natación y running resuelven a su variante)
   const claveVista = useMemo(() => diaActivo && (activeSesion
-    ? (activeSesion === 'natacion' ? (diaActivo.varianteSecundaria ?? 'natacion') : activeSesion)
-    : (diaActivo.sesion === 'natacion' ? (diaActivo.variante ?? 'natacion') : diaActivo.sesion)),
+    ? claveReal(activeSesion, diaActivo.varianteSecundaria)
+    : clavePrincipal(diaActivo)),
   [diaActivo, activeSesion]);
   const ejerciciosVigentes = useMemo(
     () => claveVista ? resolverRutina(claveVista, activeFecha, rutina) : null,
@@ -160,11 +165,11 @@ export function PlanProvider({ children }) {
   // identidad cuando cambia algo de dentro, y solo entonces se re-renderizan
   // sus consumidores.
   const valorPlan = useMemo(() => ({
-    todayISO, ancla, fijados, festivos, extras, css, rutina, config, planCfg,
+    todayISO, ancla, fijados, festivos, extras, css, umbralRun, rutina, config, planCfg,
     calendario, avisos, mesInfo, hayMesAnterior,
     view, activeFecha, activeSesion, anio, mes,
     diaActivo, claveVista, ejerciciosVigentes,
-  }), [todayISO, ancla, fijados, festivos, extras, css, rutina, config, planCfg,
+  }), [todayISO, ancla, fijados, festivos, extras, css, umbralRun, rutina, config, planCfg,
     calendario, avisos, mesInfo, hayMesAnterior,
     view, activeFecha, activeSesion, anio, mes,
     diaActivo, claveVista, ejerciciosVigentes]);
@@ -178,7 +183,7 @@ export function PlanProvider({ children }) {
     cambiarMes, openDay, abrirSesionDelDia, backToCalendar, irA,
     // plan
     saveEdit, liberarDia, onSecundaria, onComplemento, fijarVariante, soltarVariante,
-    onFlexible, onConvertirFlexible, setCss, setConfig,
+    onFlexible, onConvertirFlexible, setCss, setUmbralRun, setConfig,
     // rutinas
     guardarRutina, restaurarRutina,
     // progreso
@@ -189,7 +194,7 @@ export function PlanProvider({ children }) {
     onExportar, onImportar,
   }), [cambiarMes, openDay, abrirSesionDelDia, backToCalendar, irA,
     saveEdit, liberarDia, onSecundaria, onComplemento, fijarVariante, soltarVariante,
-    onFlexible, onConvertirFlexible, setCss, setConfig,
+    onFlexible, onConvertirFlexible, setCss, setUmbralRun, setConfig,
     guardarRutina, restaurarRutina,
     toggleSet, registrarSerie, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta,
     skipTimer, onExportar, onImportar]);

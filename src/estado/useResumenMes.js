@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react';
-import { SESIONES } from '../data.js';
+import { SESIONES, clavePrincipal, claveSecundaria } from '../data.js';
 import { resolverRutina } from '../rutina.js';
 import { usePlanCtx, useProgresoCtx } from './contextos.js';
 
@@ -14,8 +14,8 @@ export function useResumenMes() {
     // Un día puede tener principal + secundaria + complementos: para estar
     // "completo" tienen que estarlo todos. Cada uno se marca por separado.
     const claves = [
-      d.sesion === 'natacion' ? (d.variante ?? 'natacion') : d.sesion,
-      d.sesionSecundaria === 'natacion' ? (d.varianteSecundaria ?? 'natacion') : d.sesionSecundaria,
+      clavePrincipal(d),
+      claveSecundaria(d),
       ...(d.complementos ?? []),
     ].filter(Boolean);
     const ejercicios = claves.flatMap(k => resolverRutina(k, d.fecha, rutina));

@@ -108,7 +108,7 @@ check('Avisa de dos seguidas que trabajan lo mismo, también al dar la vuelta',
   JSON.stringify(solapesDeRotacion(['gymB', 'gymC1', 'gymA', 'gymC2', 'gymD'], solapanGym)) === '[["gymD","gymB"]]');
 check('El orden del plan no tiene ninguna', solapesDeRotacion(SECUENCIA_GYM, solapanGym).length === 0);
 const nat2 = gen({ rotacion: { natacion: ['natB2', 'natA1'] } }).dias;
-const vars = nat2.flatMap(d => [d.variante, d.varianteSecundaria]).filter(Boolean);
+const vars = nat2.flatMap(d => [d.sesion === 'natacion' && d.variante, d.sesionSecundaria === 'natacion' && d.varianteSecundaria]).filter(Boolean);
 check('Natación: solo las elegidas, más el test CSS', vars.every(v => ['natB2', 'natA1', 'natCSS'].includes(v)) && vars[0] === 'natCSS');
 check('Y el test se repite aunque Umbral no esté en la rotación', vars.filter(v => v === 'natCSS').length >= 3, vars.filter(v => v === 'natCSS').length + ' tests');
 

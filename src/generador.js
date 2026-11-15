@@ -19,7 +19,7 @@
 // cardio si el turno y las reglas de seguridad lo permiten. Eso reconcilia las
 // dos filas de la tabla y reproduce el ejemplo del plan.
 
-import { NATACION_CSS, PISCINA, VENTANA_PISCINA, CUPO_SEMANAL,
+import { NATACION_CSS, RUNNING_TEST, VARIANTES_DE, PISCINA, VENTANA_PISCINA, CUPO_SEMANAL,
   PRIORIDAD_TURNO, S7_PIERNA, DOBLES, GYM_PIERNA, GYM_TORSO, GYM_SOLAPAN, ORDEN_DOBLE, CARDIO_FLEXIBLE,
   CARDIO_CUPO, CARDIO_POR_DEFECTO_FLEXIBLE, SESION_INFO } from './data.js';
 import { resolverConfig, CONFIG_PLAN } from './config.js';
@@ -278,6 +278,7 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
   const admiteCardio = (turno) => admite(turno, 'cardio', C.prioridad);
   const SEC_GYM = C.secGym;
   const SEC_NAT = C.secNat;
+  const SEC_RUN = C.secRun;
   const DOBLES_TURNOS = C.dobles;
   const franjas = (fecha, turno, fest) => franjasCompatibles(fecha, turno, fest, C.ventana);
   const inicio = deISO(ancla.fecha);
@@ -293,6 +294,10 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
   let natHechas = 0;                  // sesiones de natación hechas
   let natUltimoTest = 0;              // cuándo se hizo el último test de CSS
   let natTestHecho = false;           // ¿se ha llegado a hacer el test alguna vez?
+  let runIdx = ancla.runIdx ?? 0;     // posición en la rotación de running
+  let runHechas = 0;                  // carreras hechas (las genéricas antiguas no cuentan)
+  let runUltimoTest = 0;              // cuándo se hizo el último test de 30 min
+  let runTestHecho = false;
   let gymSeguidos = 0;                // S1 — nunca más de 4 gym consecutivos
   let ultimaPierna = null;            // S7 — separación mínima entre días de pierna
   let ultimoGym = null;               // clave del último gym colocado — guardarraíl de solapes
@@ -373,6 +378,7 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
           d.franja = mejorFranja(franjas(d.fecha, d.turno, festivos));
           d.varianteFijada = fij.variante;
         }
+        if (d.sesion === 'running') d.varianteFijada = fij.variante;
       } else libres.push(d);
       // La variante fijada de la SECUNDARIA se lee siempre: el día puede tener
       // gym como principal y natación doblada, y entonces el bloque de arriba
@@ -822,10 +828,21 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
         texto: `Semana del ${ds[0].dia}: ${dp.nombre} no cupo. No quedan días libres en los turnos que elegiste, ni un día donde doblarlo.` });
     }
 
-    // ── 5b. VARIANTE DE NATACIÓN · sellado CRONOLÓGICO ──
+    // ── 5b. VARIANTE DE NATACIÓN Y RUNNING · sellado CRONOLÓGICO ──
     // Las natación se COLOCAN por prioridad de turno (L antes que N antes que P),
     // no por fecha. Si la rotación avanzara en ese orden, A1→B1→A2… saldría
     // desordenada en el calendario. Se sella aquí, ya con la semana decidida.
+    // El running igual: sus días salen de varios pasos (cupo, cambios por S3,
+    // dobles, flexible), así que la variante se decide al final, por fecha.
+    // Una variante fijada solo vale si es de esa familia: una segunda sesión
+    // cambiada a mano puede dejar colgada la de otra.
+    const deFamilia = (ses, v) => (v && VARIANTES_DE[ses]?.includes(v) ? v : undefined);
+    const varianteRunning = () => {
+      if (!runTestHecho) return RUNNING_TEST.clave;
+      const v = SEC_RUN[((runIdx % SEC_RUN.length) + SEC_RUN.length) % SEC_RUN.length];
+      if (v === C.runTestSustituye && runHechas - runUltimoTest >= RUNNING_TEST.cadaCarreras) return RUNNING_TEST.clave;
+      return v;
+    };
     [...ds].sort((a, b) => a.fecha.localeCompare(b.fecha)).forEach(d => {
       const sellar = (fijada) => {
         const debida = varianteNatacion();
@@ -838,14 +855,34 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
         natHechas++;
         return v;
       };
+      const sellarRun = (fijada) => {
+        // La genérica de antes de las variantes: un día ya registrado con ella
+        // la conserva y no cuenta en la rotación.
+        if (fijada === 'running') return 'running';
+        const debida = varianteRunning();
+        const v = fijada ?? debida;
+        if (v === RUNNING_TEST.clave) { runUltimoTest = runHechas; runTestHecho = true; }
+        else if (!fijada || fijada === debida || POLITICA_FIJADO === 'resincroniza') runIdx++;
+        runHechas++;
+        return v;
+      };
       if (d.sesion === 'natacion' && !d.variante) {
         d.sugerida = varianteNatacion();      // la que tocaba, para marcarla en la UI
-        d.variante = sellar(d.varianteFijada);
+        d.variante = sellar(deFamilia('natacion', d.varianteFijada));
+      }
+      if (d.sesion === 'running' && !d.variante) {
+        d.sugerida = varianteRunning();
+        d.variante = sellarRun(d.varianteFijada === 'running' ? 'running' : deFamilia('running', d.varianteFijada));
       }
       // La secundaria también admite variante fijada, igual que la principal.
       if (d.sesionSecundaria === 'natacion' && !d.varianteSecundaria) {
         d.sugeridaSecundaria = varianteNatacion();
-        d.varianteSecundaria = sellar(d.varianteFijadaSecundaria);
+        d.varianteSecundaria = sellar(deFamilia('natacion', d.varianteFijadaSecundaria));
+      }
+      if (d.sesionSecundaria === 'running' && !d.varianteSecundaria) {
+        d.sugeridaSecundaria = varianteRunning();
+        const f = d.varianteFijadaSecundaria;
+        d.varianteSecundaria = sellarRun(f === 'running' ? 'running' : deFamilia('running', f));
       }
     });
 

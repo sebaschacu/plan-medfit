@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowUp, ArrowDown, X, Plus, RotateCcw, AlertTriangle } from 'lucide-react';
-import { SESION_INFO, SECUENCIA_GYM, SECUENCIA_NATACION } from '../../data.js';
+import { SESION_INFO, SECUENCIA_GYM, SECUENCIA_NATACION, SECUENCIA_RUNNING } from '../../data.js';
 import { solapanGym } from '../../generador.js';
 import { usePlanCtx, useAccionesCtx } from '../../estado/contextos.js';
 import { conCampo, solapesDeRotacion } from '../../config.js';
@@ -8,7 +8,7 @@ import { Punto } from '../comunes/ui.jsx';
 import { Pantalla, VistaPrevia } from './piezas.jsx';
 
 // ═══════════════ ORDEN DE ROTACIÓN ═══════════════
-// Qué sesión viene después de cuál, en el gym y en la piscina. La cola nunca
+// Qué sesión viene después de cuál, en el gym, la piscina y el running. La cola nunca
 // se reinicia: cambiar el orden cambia lo que toca a partir de ahora.
 const Lista = ({ titulo, orden, todas, onCambiar, nombre }) => {
   const fuera = todas.filter(k => !orden.includes(k));
@@ -53,10 +53,13 @@ const AjustesRotacion = ({ onVolver }) => {
   const { setConfig } = useAccionesCtx();
   const [gym, setGym] = useState(() => [...planCfg.secGym]);
   const [nat, setNat] = useState(() => [...planCfg.secNat]);
-  const borrador = conCampo(config, 'rotacion', { gym, natacion: nat });
+  const [run, setRun] = useState(() => [...planCfg.secRun]);
+  const borrador = conCampo(config, 'rotacion', { gym, natacion: nat, running: run });
   const solapes = solapesDeRotacion(gym, solapanGym);
-  const esPlan = JSON.stringify(gym) === JSON.stringify(SECUENCIA_GYM) && JSON.stringify(nat) === JSON.stringify(SECUENCIA_NATACION);
+  const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const esPlan = igual(gym, SECUENCIA_GYM) && igual(nat, SECUENCIA_NATACION) && igual(run, SECUENCIA_RUNNING);
   const sinUmbral = !nat.includes('natB1');
+  const sinTempo = !run.includes('runB1');
 
   return (
     <Pantalla titulo="Orden de rotación" subtitulo="Qué sesión viene después de cuál. La lista se repite sin fin."
@@ -79,9 +82,13 @@ const AjustesRotacion = ({ onVolver }) => {
       <p className="text-sm text-tinta3 leading-relaxed px-1">
         El Test CSS va primero y se repite cada 6-8 semanas en lugar de {sinUmbral ? `${SESION_INFO[nat[0]].label}, porque Umbral no está en la rotación` : 'un Umbral'}.
       </p>
+      <Lista titulo="Running" nombre="el running" orden={run} todas={SECUENCIA_RUNNING} onCambiar={setRun} />
+      <p className="text-sm text-tinta3 leading-relaxed px-1">
+        El Test 30 min va primero y se repite cada ~12 carreras antes de {sinTempo ? `${SESION_INFO[run[0]].label}, porque Tempo no está en la rotación` : 'un Tempo'}.
+      </p>
       <VistaPrevia config={borrador} />
       {!esPlan && (
-        <button onClick={() => { setGym([...SECUENCIA_GYM]); setNat([...SECUENCIA_NATACION]); }}
+        <button onClick={() => { setGym([...SECUENCIA_GYM]); setNat([...SECUENCIA_NATACION]); setRun([...SECUENCIA_RUNNING]); }}
           className="w-full h-12 text-[15px] font-medium text-ambar flex items-center justify-center gap-2">
           <RotateCcw size={16} /> Volver al orden del plan
         </button>

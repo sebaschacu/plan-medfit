@@ -133,6 +133,38 @@ export function tablaRitmos(segPor100) {
   });
 }
 
+// ═══════════════ RUNNING · RITMO UMBRAL ═══════════════
+// Test de 30 min: el ritmo medio de 30 min a tope sostenible se aproxima a tu
+// ritmo umbral. Ritmo (seg/km) = 1.800 s ÷ km recorridos.
+// Acepta "6.2", "6,2" o metros ("6200").
+export const aKm = (txt) => {
+  if (txt == null || txt === '') return null;
+  const n = Number(String(txt).trim().replace(',', '.'));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n > 100 ? n / 1000 : n;     // más de 100 = lo escribió en metros
+};
+
+export function calcularUmbralRun(distancia) {
+  const km = aKm(distancia);
+  if (km == null) return null;
+  const segPorKm = 1800 / km;
+  if (segPorKm < 150 || segPorKm > 540) {
+    return { segPorKm, km, aviso: 'Ese ritmo queda fuera de lo plausible (entre 2:30 y 9:00 por km): revisa la distancia.' };
+  }
+  return { segPorKm, km };
+}
+
+// Tabla de zonas a partir del ritmo umbral. Cada fila da un rango por km,
+// del extremo rápido al lento.
+export function tablaZonasRun(segPorKm, zonas) {
+  if (segPorKm == null || !Number.isFinite(segPorKm)) return [];
+  return zonas.map(z => ({
+    ...z,
+    rapido: mmss(segPorKm * z.desde),
+    lento: mmss(segPorKm * z.hasta),
+  }));
+}
+
 // ═══════════════ HISTORIAL Y SUGERENCIA DE CARGA ═══════════════
 // El progreso se indexa por FECHA y dentro por ID de ejercicio. Buscar por ID en
 // todo el histórico hace que el historial siga al ejercicio aunque cambie de

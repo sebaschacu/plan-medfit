@@ -12,6 +12,9 @@ const MenuSesiones = ({ sesion, onElegir }) => {
     const g = {};
     Object.entries(SESION_INFO).forEach(([k, v]) => {
       if (k === 'natacion') return;   // el tipo genérico no se elige a mano
+      // El running genérico tampoco: se elige su variante (Rodaje, Tempo…).
+      // Solo sale si es lo que ya tiene el día (registros de antes de las variantes).
+      if (k === 'running' && sesion !== 'running') return;
       if (v.archivado && k !== sesion) return;   // deporte archivado: solo si ya es el del día
       (g[v.grupo] ??= []).push({ k, ...v });
     });

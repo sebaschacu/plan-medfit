@@ -18,7 +18,7 @@
 //               duracion, nota, archivado }]
 
 import { CUPO_SEMANAL, PRIORIDAD_TURNO, VENTANA_PISCINA, DOBLES, SECUENCIA_GYM, SECUENCIA_NATACION,
-  NATACION_CSS, SESION_INFO, SESIONES } from './data.js';
+  SECUENCIA_RUNNING, RUNNING_TEST, NATACION_CSS, SESION_INFO, SESIONES } from './data.js';
 
 export const LETRAS_TURNO = ['L', 'C', 'N', 'P'];
 export const CICLO_DEFAULT = ['L', 'C', 'N', 'P'];
@@ -83,8 +83,10 @@ export function normalizarConfig(c) {
     const limpia = (lista, validas) => (Array.isArray(lista) ? [...new Set(lista.filter(k => validas.includes(k)))] : []);
     const g = limpia(c.rotacion.gym, SECUENCIA_GYM);
     const n = limpia(c.rotacion.natacion, SECUENCIA_NATACION);
+    const r = limpia(c.rotacion.running, SECUENCIA_RUNNING);
     if (g.length) rot.gym = g;
     if (n.length) rot.natacion = n;
+    if (r.length) rot.running = r;
     if (Object.keys(rot).length) out.rotacion = rot;
   }
   if (Array.isArray(c.deportes)) {
@@ -180,6 +182,9 @@ export function resolverConfig(c = {}) {
   // El test de CSS sustituye a un Umbral; si el Umbral no está en la rotación,
   // a la primera de las que quedan.
   const cssSustituye = secNat.includes(NATACION_CSS.sustituye) ? NATACION_CSS.sustituye : secNat[0];
+  // Lo mismo en running: el test de 30 min va antes de un Tempo, o de la primera.
+  const secRun = cfg.rotacion?.running ?? SECUENCIA_RUNNING;
+  const runTestSustituye = secRun.includes(RUNNING_TEST.sustituye) ? RUNNING_TEST.sustituye : secRun[0];
   const deportes = (cfg.deportes ?? []).filter(d => !d.archivado);
 
   return {
@@ -187,7 +192,7 @@ export function resolverConfig(c = {}) {
     cupo: { gym: cupo.gym, natacion: cupo.natacion, running: cupo.cardio, flexible: cupo.flexible },
     turnos, prioridad, ventana, dobles,
     ciclo, cicloHoy: cfg.ciclo?.hoy ?? null,
-    secGym, secNat, cssSustituye,
+    secGym, secNat, cssSustituye, secRun, runTestSustituye,
     // El día flexible vive en el turno que no admite nada (C en el plan). Si el
     // usuario abre ese turno a todo, el flexible sigue en C.
     turnoFlexible: 'C',
@@ -239,6 +244,7 @@ export function conCampo(config, campo, valor) {
     const r = {};
     if (valor?.gym && !mismo(valor.gym, SECUENCIA_GYM)) r.gym = valor.gym;
     if (valor?.natacion && !mismo(valor.natacion, SECUENCIA_NATACION)) r.natacion = valor.natacion;
+    if (valor?.running && !mismo(valor.running, SECUENCIA_RUNNING)) r.running = valor.running;
     valor = r;
     delPlan = Object.keys(r).length === 0;
   } else if (campo === 'deportes') delPlan = !valor?.length;

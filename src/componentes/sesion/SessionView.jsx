@@ -12,6 +12,7 @@ import { Detalle, BotonCTA } from '../comunes/ui.jsx';
 import ExerciseCard from './ExerciseCard.jsx';
 import HojaSerie from './HojaSerie.jsx';
 import PanelCSS from './PanelCSS.jsx';
+import PanelRitmosRun from './PanelRitmosRun.jsx';
 
 // ═══════════════ SESIÓN ═══════════════
 // Solo los ejercicios. Lo que es del DÍA (sueño, segunda sesión, cambiar la
@@ -62,7 +63,9 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
   // Ni la natación ni el running tienen la estructura Parte 1/2/3 del gimnasio:
   // son bloques de una sesión aeróbica y esas etiquetas ahí no significan nada.
   const esAgua = String(sesionKey).startsWith('nat');
-  const mostrarPartes = grupos.length > 1 && !esAgua && sesionKey !== 'running';
+  const esRun = String(sesionKey).startsWith('run');
+  const mostrarPartes = grupos.length > 1 && !esAgua && !esRun;
+  const unidad = esAgua || esRun || sesionKey === 'ciclismo' ? 'bloques' : 'ejercicios';
   const s4 = diaData.turno === 'P' ? S4(dayProg.__sueno) : null;
   // E11: bi-series que hoy se hacen por separado (nota del día, no de la rutina)
   const bsSueltas = Array.isArray(dayProg[E11.clave]) ? dayProg[E11.clave] : [];
@@ -136,7 +139,7 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
               </button>
               <div className="text-sm text-tinta3">
                 <span className="font-semibold" style={{ color }}>{GRUPOS[info?.grupo]?.label ?? info?.label}</span>
-                {total > 0 && <> · {completed}/{total} ejercicios{done ? ' · completo' : ''}</>}
+                {total > 0 && <> · {completed}/{total} {unidad}{done ? ' · completo' : ''}</>}
               </div>
             </div>
             {anyProgress && (
@@ -171,6 +174,8 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
 
         {/* CSS · calculadora en el test, tabla de ritmos en toda sesión de agua */}
         {esAgua && <PanelCSS esTest={sesionKey === 'natCSS'} />}
+        {/* Running · test de 30 min y zonas, en toda carrera */}
+        {esRun && <PanelRitmosRun esTest={sesionKey === 'runTest'} />}
 
         {/* Registro de ejercicios que YA NO están en la rutina. No se borra nunca:
             se enseña aparte para que nada desaparezca en silencio. */}
@@ -230,7 +235,7 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
               </span>
               <div>
                 <h3 className="text-2xl font-semibold text-tinta leading-tight">Sesión completada</h3>
-                <p className="text-sm text-tinta3">{total} ejercicios · {listaEj.reduce((a, e) => a + nSeries(e), 0)} series</p>
+                <p className="text-sm text-tinta3">{total} {unidad} · {listaEj.reduce((a, e) => a + nSeries(e), 0)} series</p>
               </div>
             </div>
             {listaEj.some(e => e.lineal) && (

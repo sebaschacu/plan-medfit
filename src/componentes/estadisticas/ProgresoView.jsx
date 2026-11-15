@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronDown, TrendingUp } from 'lucide-react';
-import { SESIONES, SESION_INFO, DOBLES } from '../../data.js';
+import { SESIONES, SESION_INFO, DOBLES, clavePrincipal, claveSecundaria, familiaDe } from '../../data.js';
 import { historialEjercicio, mmss } from '../../reglas.js';
 import { resolverRutina } from '../../rutina.js';
 import { COLUMNA } from '../../utiles/constantes-ui.js';
@@ -125,13 +125,13 @@ const ProgresoView = () => {
       const p = progress[fecha] || {};
       return ejs.length > 0 && ejs.every(ex => { const sc = typeof ex.series === 'number' ? ex.series : 1; return sc > 0 && p[ex.id]?.sets?.length === sc && p[ex.id].sets.every(Boolean); });
     };
-    const grupo = (k) => (String(k).startsWith('gym') ? 'gym' : String(k).startsWith('nat') ? 'natacion' : k === 'running' || k === 'ciclismo' ? 'cardio' : SESION_INFO[k]?.deporte ? k : null);
+    const grupo = (k) => (String(k).startsWith('gym') ? 'gym' : String(k).startsWith('nat') ? 'natacion' : k === 'running' || k === 'ciclismo' || familiaDe(k) === 'running' ? 'cardio' : SESION_INFO[k]?.deporte ? k : null);
     const c = { gym: [0, 0], natacion: [0, 0], cardio: [0, 0], flexible: [0, 0] };
     planCfg.deportesAuto.forEach(dp => { c[dp.clave] = [0, 0]; });
     semana.forEach(d => {
       const claves = [
-        [d.sesion === 'natacion' ? (d.variante ?? 'natacion') : d.sesion, d.flexible],
-        [d.sesionSecundaria === 'natacion' ? (d.varianteSecundaria ?? 'natacion') : d.sesionSecundaria, false],
+        [clavePrincipal(d), d.flexible],
+        [claveSecundaria(d), false],
       ];
       claves.forEach(([k, flex]) => {
         if (!k) return;

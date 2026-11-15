@@ -133,6 +133,50 @@ export const NATACION_CSS = {
   estimado: { min: '1:30', max: '1:45' },
 };
 
+// ─── Running · rotación de sesiones ───
+// Igual que la natación: dos bloques que se alternan. A es suave (base aeróbica,
+// resistencia y un toque de velocidad corta que no cansa); B es la calidad
+// (umbral y VO2máx). Con ~1 carrera por semana, la mitad de las SESIONES son de
+// calidad, pero por TIEMPO casi todo el running sigue siendo suave: calentamiento,
+// recuperaciones y vuelta a la calma suman más minutos que los bloques fuertes.
+// La clave del día sigue siendo 'running': solo cambia a qué variante resuelve.
+export const SECUENCIA_RUNNING = ['runA1', 'runB1', 'runA2', 'runB2', 'runA3', 'runB3'];
+
+// El test de 30 min va primero y se repite cada ~12 carreras, colándose antes
+// de un Tempo (mismo sistema energético). El Tempo no se pierde: va en la
+// siguiente carrera, igual que el Umbral de natación tras el test de CSS.
+export const RUNNING_TEST = {
+  clave: 'runTest',
+  sustituye: 'runB1',
+  cadaCarreras: 12,
+};
+
+// Variantes válidas de cada sesión que resuelve a una variante. La clave del
+// tipo ('running') vale como variante: es la sesión genérica de siempre, la que
+// conservan los días registrados antes de que existieran las variantes.
+export const VARIANTES_DE = {
+  natacion: [...SECUENCIA_NATACION, 'natCSS'],
+  running: [...SECUENCIA_RUNNING, RUNNING_TEST.clave],
+};
+// Clave real de lo que se entrena: natación y running resuelven a su variante;
+// el resto es su propia clave. Una variante de otra familia no cuenta (puede
+// quedar colgada si se cambió la segunda sesión a mano).
+export const claveReal = (sesion, variante) =>
+  (variante && VARIANTES_DE[sesion]?.includes(variante)) ? variante : sesion;
+// A qué tipo pertenece una variante ('runB1' → 'running'); null si no es variante.
+export const familiaDe = (k) => Object.keys(VARIANTES_DE).find(f => VARIANTES_DE[f].includes(k)) ?? null;
+export const clavePrincipal = (d) => claveReal(d.sesion, d.variante);
+export const claveSecundaria = (d) => (d.sesionSecundaria ? claveReal(d.sesionSecundaria, d.varianteSecundaria) : null);
+
+// Zonas de running, en múltiplos de tu ritmo umbral (seg/km del test de 30 min).
+// Ritmo más alto = más lento. Si no hay test, se va por sensaciones.
+export const ZONAS_RUN = [
+  { clave: 'Suave',   desde: 1.15, hasta: 1.30, habla: 'Frases completas sin esfuerzo', rpe: '3-4', uso: 'Rodajes, fondo largo, calentar y recuperar' },
+  { clave: 'Tempo',   desde: 1.02, hasta: 1.06, habla: 'Frases cortas',                  rpe: '6-7', uso: 'Tempo continuo' },
+  { clave: 'Umbral',  desde: 0.99, hasta: 1.01, habla: 'Frases cortas, ya cuesta',       rpe: '7',   uso: 'Series de umbral' },
+  { clave: 'VO2máx',  desde: 0.90, hasta: 0.94, habla: 'Solo palabras sueltas',          rpe: '8-9', uso: 'Series 4×4' },
+];
+
 // Máximo de palas por sesión. Con 29-32 series de gimnasio con mucho press y
 // mucho tirón, el hombro ya lleva carga alta y las palas multiplican la fuerza
 // sobre el manguito. Si aparece molestia, lo primero que sale son las palas —
@@ -209,7 +253,14 @@ export const SESION_INFO = {
   natB3: { label: 'Ritmo variable', color: '#0891b2', icon: 'waves', tipo: 'Bloque B · crawl', grupo: 'natacion' },
   natCSS: { label: 'Test CSS', color: '#0e7490', icon: 'waves', tipo: 'Test de umbral', grupo: 'natacion' },
   running:    { label: 'Running', color: '#0891b2', icon: 'run', tipo: 'Z2', grupo: 'cardio' },
-  ciclismo:   { label: 'Bici', color: '#0284c7', icon: 'bike', tipo: 'Z2 sin impacto', grupo: 'cardio' },
+  runA1:  { label: 'Rodaje suave', color: '#0891b2', icon: 'run', tipo: 'Bloque A · con aceleraciones', grupo: 'cardio' },
+  runA2:  { label: 'Fondo largo',  color: '#0891b2', icon: 'run', tipo: 'Bloque A · resistencia', grupo: 'cardio' },
+  runA3:  { label: 'Cuestas',      color: '#0891b2', icon: 'run', tipo: 'Bloque A · velocidad corta', grupo: 'cardio' },
+  runB1:  { label: 'Tempo',        color: '#0369a1', icon: 'run', tipo: 'Bloque B · umbral continuo', grupo: 'cardio' },
+  runB2:  { label: 'Series de umbral', color: '#0369a1', icon: 'run', tipo: 'Bloque B · umbral en bloques', grupo: 'cardio' },
+  runB3:  { label: 'Series 4×4',   color: '#0369a1', icon: 'run', tipo: 'Bloque B · VO2máx', grupo: 'cardio' },
+  runTest: { label: 'Test 30 min', color: '#075985', icon: 'run', tipo: 'Test de umbral', grupo: 'cardio' },
+  ciclismo:  { label: 'Bici', color: '#0284c7', icon: 'bike', tipo: 'Z2 sin impacto', grupo: 'cardio' },
   descanso:   { label: 'Descanso', color: '#64748b', icon: 'moon', tipo: 'Recuperación', grupo: 'descanso' },
 };
 
@@ -613,6 +664,88 @@ export const SESIONES = {
       { id: 'RUN-1', parte: 1, nombre: 'Calentamiento', series: 1, reps: '8 min', rir: '—', descanso: '—', nota: 'Movilidad + caminar a trote.', musculos: { primario: [], secundario: [] } },
       { id: 'RUN-2', parte: 2, nombre: 'Z2 continuo', series: 1, reps: '30-45 min', rir: '—', descanso: '—', nota: '60-70% FC máx. Si no puedes hablar, no es Z2.', musculos: { primario: [], secundario: [] } },
       { id: 'RUN-3', parte: 3, nombre: 'Vuelta a la calma', series: 1, reps: '5 min', rir: '—', descanso: '—', nota: 'Trote suave a caminata.', musculos: { primario: [], secundario: [] } },
+    ]
+  },
+
+  // ═══ RUNNING · BLOQUE A — suave (base aeróbica, resistencia y velocidad corta) ═══
+  // Intensidad sin reloj: test del habla y esfuerzo percibido (RPE 1-10). Con
+  // el test de 30 min hecho, la tabla de ritmos da además el ritmo por km.
+  runA1: {
+    nombre: 'Rodaje suave', subtitulo: '40-50 min · suave + 6 aceleraciones', color: '#0891b2', duracion: '40-50 min',
+    chequeo: 'La base de todo: así de suave debería ir la mayor parte de tu running. Tienes que poder hablar en frases completas; si no puedes, baja el ritmo aunque te parezca lentísimo. Las aceleraciones NO son sprints: son 20 s rápidos y sueltos para trabajar la técnica y la velocidad sin cansarte. Nunca el día después de pierna (S3).',
+    recortada: 'Rodaje 30 → 20 min · aceleraciones 6 → 4 (30 min)',
+    ejercicios: [
+      { id: 'RA1-1', parte: 1, nombre: 'Calentamiento', series: 1, reps: '10 min', rir: '—', descanso: '—', nota: '3 min caminando rápido y 7 min de trote muy suave. Antes de arrancar: balanceos de pierna y skipping suave.', musculos: { primario: [], secundario: [] } },
+      { id: 'RA1-2', parte: 2, nombre: 'Rodaje suave', series: 1, reps: '25-30 min', rir: '—', descanso: '—', nota: 'Ritmo Suave. Hablas en frases completas, esfuerzo 3-4 de 10.', musculos: { primario: [], secundario: [] } },
+      { id: 'RA1-3', parte: 2, nombre: 'Aceleraciones', series: 6, reps: '20 s', rir: '—', descanso: '60-90 s caminando', nota: 'Rápido pero relajado, esfuerzo 7-8 de 10. Pasos cortos y rápidos, pie debajo de la cadera, brazos sueltos. Si te tensas, vas demasiado fuerte.', nuevo: true, musculos: { primario: [], secundario: [] } },
+      { id: 'RA1-4', parte: 'finisher', nombre: 'Vuelta a la calma', series: 1, reps: '5 min', rir: '—', descanso: '—', nota: 'Trote muy suave hasta caminar.', musculos: { primario: [], secundario: [] } },
+    ]
+  },
+
+  runA2: {
+    nombre: 'Fondo largo', subtitulo: '50-70 min · todo suave', color: '#0891b2', duracion: '50-70 min',
+    chequeo: 'La sesión que construye la resistencia: más tiempo, no más rápido. Todo en Suave, test del habla. Progresión: 5 min más cada vez que te toque, hasta 70 min. Sube poco a poco: los saltos grandes de volumen (más de un 30 % de una semana a otra) se han asociado con más lesiones por sobrecarga en corredores principiantes. Si es posturno o dormiste menos de 6 h, haz la recortada.',
+    recortada: 'Fondo 45 → 30 min (40 min en total)',
+    ejercicios: [
+      { id: 'RA2-1', parte: 1, nombre: 'Calentamiento', series: 1, reps: '5-10 min', rir: '—', descanso: '—', nota: 'Caminar rápido y trote muy suave.', musculos: { primario: [], secundario: [] } },
+      { id: 'RA2-2', parte: 2, nombre: 'Fondo continuo', series: 1, reps: '45-60 min', rir: '—', descanso: '—', nota: 'Ritmo Suave todo el rato. Si a mitad ya no puedes hablar, baja: lo que cuenta es el tiempo. Lleva agua si pasa de 60 min.', nuevo: true, musculos: { primario: [], secundario: [] } },
+      { id: 'RA2-3', parte: 'finisher', nombre: 'Vuelta a la calma', series: 1, reps: '5 min', rir: '—', descanso: '—', nota: 'Caminar.', musculos: { primario: [], secundario: [] } },
+    ]
+  },
+
+  runA3: {
+    nombre: 'Cuestas', subtitulo: '40-45 min · suave + 8 subidas cortas', color: '#0891b2', duracion: '40-45 min',
+    chequeo: 'Velocidad y fuerza en la zancada con poco desgaste: subidas MUY cortas, fuertes, y bajada caminando hasta recuperar del todo. La pendiente frena la velocidad y reduce el impacto, por eso es la forma más segura de correr rápido. Sin cuesta cerca: un puente, una rampa o escaleras; si no hay nada, haz 8 aceleraciones de 15 s en llano.',
+    recortada: 'Rodaje 20 → 15 min · subidas 8 → 6 (30 min)',
+    ejercicios: [
+      { id: 'RA3-1', parte: 1, nombre: 'Calentamiento', series: 1, reps: '10 min', rir: '—', descanso: '—', nota: 'Trote muy suave. Termina con 2 aceleraciones de 15 s en llano.', musculos: { primario: [], secundario: [] } },
+      { id: 'RA3-2', parte: 2, nombre: 'Rodaje suave', series: 1, reps: '15-20 min', rir: '—', descanso: '—', nota: 'Ritmo Suave, hasta llegar a la cuesta.', musculos: { primario: [], secundario: [] } },
+      { id: 'RA3-3', parte: 2, nombre: 'Subidas cortas', series: 8, reps: '10-12 s', rir: '—', descanso: '2 min bajando a pie', nota: 'Fuerte, esfuerzo 9 de 10, pero con buena técnica: rodillas arriba, brazos activos, mirada al frente. Recuperación COMPLETA: si la siguiente sale más lenta, para.', nuevo: true, musculos: { primario: [], secundario: [] } },
+      { id: 'RA3-4', parte: 'finisher', nombre: 'Vuelta a la calma', series: 1, reps: '5-10 min', rir: '—', descanso: '—', nota: 'Trote muy suave hasta caminar.', musculos: { primario: [], secundario: [] } },
+    ]
+  },
+
+  // ═══ RUNNING · BLOQUE B — calidad (umbral y VO2máx) ═══
+  runB1: {
+    nombre: 'Tempo', subtitulo: '45-50 min · 20 min cómodamente duro', color: '#0369a1', duracion: '45-50 min',
+    chequeo: 'Sube tu umbral: el ritmo más rápido que aguantas mucho rato. "Cómodamente duro": hablas en frases cortas, esfuerzo 6-7 de 10. Ve PAREJO: si el final sale más lento que el principio, empezaste demasiado rápido. Progresión: 20 → 25 → 30 min. Nunca el día después de pierna (S3).',
+    recortada: 'Tempo 20 → 15 min · calentamiento 15 → 10 (35 min)',
+    ejercicios: [
+      { id: 'RB1-1', parte: 1, nombre: 'Calentamiento', series: 1, reps: '15 min', rir: '—', descanso: '—', nota: 'Trote suave. Termina con 3 aceleraciones de 15 s.', musculos: { primario: [], secundario: [] } },
+      { id: 'RB1-2', parte: 2, nombre: 'Tempo continuo', series: 1, reps: '20 min', rir: '—', descanso: '—', nota: 'Ritmo Tempo. Frases cortas, esfuerzo 6-7. Si tienes reloj, anota el ritmo medio: es tu métrica de progreso.', nuevo: true, musculos: { primario: [], secundario: [] } },
+      { id: 'RB1-3', parte: 'finisher', nombre: 'Vuelta a la calma', series: 1, reps: '10 min', rir: '—', descanso: '—', nota: 'Trote muy suave.', musculos: { primario: [], secundario: [] } },
+    ]
+  },
+
+  runB2: {
+    nombre: 'Series de umbral', subtitulo: '50 min · 4 × 6 min', color: '#0369a1', duracion: '50 min',
+    chequeo: 'El mismo estímulo que el Tempo, partido en bloques con un minuto de trote: haces más minutos de calidad con menos fatiga. Todas las series al mismo ritmo; la última debe salir igual que la primera. Progresión: 4 × 6 → 5 × 6 → 3 × 10 min.',
+    recortada: '4 series → 3 · calentamiento 15 → 10 (38 min)',
+    ejercicios: [
+      { id: 'RB2-1', parte: 1, nombre: 'Calentamiento', series: 1, reps: '15 min', rir: '—', descanso: '—', nota: 'Trote suave. Termina con 3 aceleraciones de 15 s.', musculos: { primario: [], secundario: [] } },
+      { id: 'RB2-2', parte: 2, nombre: 'Series de umbral', series: 4, reps: '6 min', rir: '—', descanso: '1 min trotando', nota: 'Ritmo Umbral, esfuerzo 7 de 10. Frases cortas y ya cuesta. Iguales de principio a fin.', nuevo: true, musculos: { primario: [], secundario: [] } },
+      { id: 'RB2-3', parte: 'finisher', nombre: 'Vuelta a la calma', series: 1, reps: '8-10 min', rir: '—', descanso: '—', nota: 'Trote muy suave.', musculos: { primario: [], secundario: [] } },
+    ]
+  },
+
+  runB3: {
+    nombre: 'Series 4×4', subtitulo: '45 min · 4 × 4 min fuerte', color: '#0369a1', duracion: '45 min',
+    chequeo: 'La sesión que más sube el VO2máx: 4 series de 4 min al 90-95 % de tu frecuencia máxima con 3 min de trote suave entre medias (protocolo 4×4 de Helgerud). Es la más dura del plan: solo con buen sueño. Si es posturno o dormiste menos de 6 h, cámbiala por un Rodaje suave. Progresión: primero que las 4 salgan parejas; luego, un poco más rápido.',
+    recortada: '4 series → 3 (38 min)',
+    ejercicios: [
+      { id: 'RB3-1', parte: 1, nombre: 'Calentamiento', series: 1, reps: '12 min', rir: '—', descanso: '—', nota: 'Trote suave. Termina con 3 aceleraciones de 15 s.', musculos: { primario: [], secundario: [] } },
+      { id: 'RB3-2', parte: 2, nombre: 'Series fuertes', series: 4, reps: '4 min', rir: '—', descanso: '3 min trote suave', nota: 'Ritmo VO2máx, esfuerzo 8-9 de 10. Solo puedes decir palabras sueltas. Los primeros 60-90 s se sienten fáciles: no aceleres de más.', nuevo: true, musculos: { primario: [], secundario: [] } },
+      { id: 'RB3-3', parte: 'finisher', nombre: 'Vuelta a la calma', series: 1, reps: '8-10 min', rir: '—', descanso: '—', nota: 'Trote muy suave hasta caminar.', musculos: { primario: [], secundario: [] } },
+    ]
+  },
+
+  runTest: {
+    nombre: 'Test 30 min', subtitulo: 'Da tu ritmo umbral y tus zonas', color: '#075985', duracion: '55 min',
+    chequeo: 'Corre 30 min lo más rápido que puedas mantener PAREJO, en llano y con GPS. Apunta la distancia: la app saca tu ritmo umbral (30 min ÷ km) y de ahí todas tus zonas. Es una prueba de campo, no de laboratorio: da una buena aproximación, no un número exacto. Si llevas más de un mes sin correr, haz antes 2-3 Rodajes suaves. Se repite cada ~12 carreras, antes de un Tempo.',
+    ejercicios: [
+      { id: 'RT-1', parte: 1, nombre: 'Calentamiento', series: 1, reps: '15 min', rir: '—', descanso: '—', nota: 'Trote suave. Termina con 3 aceleraciones de 15 s y 2 min caminando.', musculos: { primario: [], secundario: [] } },
+      { id: 'RT-2', parte: 2, nombre: 'TEST · 30 min', series: 1, reps: '30 min', rir: '—', descanso: '—', nota: 'Esfuerzo máximo SOSTENIBLE: los primeros 5 min deben sentirse controlados. ANOTA LA DISTANCIA al terminar.', nuevo: true, musculos: { primario: [], secundario: [] } },
+      { id: 'RT-3', parte: 'finisher', nombre: 'Vuelta a la calma', series: 1, reps: '10 min', rir: '—', descanso: '—', nota: 'Trote muy suave hasta caminar.', musculos: { primario: [], secundario: [] } },
     ]
   },
 

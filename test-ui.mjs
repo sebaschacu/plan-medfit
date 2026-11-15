@@ -7,7 +7,9 @@
 import { chromium } from 'playwright';
 import fs from 'fs';
 import { generarMes } from './src/generador.js';
-import { SESIONES } from './src/data.js';
+import { SESIONES, SESION_INFO as INFO_RUN, VARIANTES_DE } from './src/data.js';
+// Lo que puede enseñar una celda de running: la genérica o cualquiera de sus variantes.
+const ETIQUETAS_RUN = ['Running', ...VARIANTES_DE.running.map(k => INFO_RUN[k].label)];
 
 const URL = 'http://localhost:4173/';
 // Las pruebas trabajan sobre el MES DEL ANCLA (agosto 2026), y "hoy" se FIJA
@@ -589,7 +591,8 @@ if (puedeConvertir) {
     (await ls(p)).fijados?.[diaFlex.fecha]?.sesion === 'running',
     JSON.stringify((await ls(p)).fijados));
   await alCalendario(p);
-  ok('Y el calendario lo muestra', (await sesionPorDia(p))[diaFlex.dia] === 'Running',
+  // El running resuelve a su variante (Rodaje suave, Tempo…): la celda dice cuál.
+  ok('Y el calendario lo muestra', ETIQUETAS_RUN.includes((await sesionPorDia(p))[diaFlex.dia]),
     (await sesionPorDia(p))[diaFlex.dia]);
 }
 await p.close();
@@ -844,7 +847,7 @@ if (biciDef?.cardioPorDefecto) {
   ok('Pulsar correr fija el día a running', (await ls(p)).fijados?.[FECHA_BICI_DEF]?.sesion === 'running',
     JSON.stringify((await ls(p)).fijados?.[FECHA_BICI_DEF]));
   await alCalendario(p);
-  ok('Y el calendario lo refleja', (await sesionPorDia(p))[biciDef.dia] === 'Running', (await sesionPorDia(p))[biciDef.dia]);
+  ok('Y el calendario lo refleja', ETIQUETAS_RUN.includes((await sesionPorDia(p))[biciDef.dia]), (await sesionPorDia(p))[biciDef.dia]);
   await p.close();
 
   // La otra salida: no me apetece, hoy descanso
@@ -1476,6 +1479,77 @@ for (let i = 0; i < Math.abs(mesesDesdeHoy); i++) { await p.locator(`button[aria
 ok('Un día de la semana rota se puede abrir', gymA4 && (await abrirDia(p, gymA4.fecha), await p.locator('text=/ejercicios/i').count() > 0));
 await p.close();
 
+
+// ══ RUNNING · SESIONES PROPIAS ══
+seccion('RUNNING');
+{
+  const runDia = ago.find(d => d.sesion === 'running');          // la primera carrera: el test
+  const runSec = ago.find(d => d.sesionSecundaria === 'running');
+  p = await nuevaPagina();
+  const celdas = await sesionPorDia(p);
+  ok('La celda dice qué carrera es, no «Running»', celdas[runDia.dia]?.startsWith(INFO_RUN[runDia.variante].label), celdas[runDia.dia]);
+  ok('También cuando la carrera va de segunda sesión', !!runSec && celdas[runSec.dia]?.includes(`+ ${INFO_RUN[runSec.varianteSecundaria].label}`), runSec && celdas[runSec.dia]);
+  ok('La primera carrera del plan es el test de 30 min', runDia.variante === 'runTest');
+  await abrirDia(p, runDia.fecha);
+  ok('El día enseña la sesión de running', await p.locator('h1', { hasText: SESIONES.runTest.nombre }).count() === 1);
+  await p.locator('button', { hasText: 'Cambiar la sesión de hoy' }).click(); await p.waitForTimeout(300);
+  const txtSel = await p.evaluate(() => document.body.innerText);
+  ok('El selector ofrece las 7 de running', VARIANTES_DE.running.every(k => txtSel.includes(INFO_RUN[k].label)));
+  ok('Y marca la que toca', await p.locator('button', { hasText: 'Test 30 min' }).filter({ hasText: 'toca' }).count() === 1);
+  await p.locator('button', { hasText: /^Series 4×4/ }).last().click(); await p.waitForTimeout(600);
+  const fRun = (await ls(p)).fijados?.[runDia.fecha];
+  ok('Elegir Series 4×4 fija la variante sin cambiar el tipo del día', fRun?.sesion === 'running' && fRun?.variante === 'runB3', JSON.stringify(fRun));
+  ok('Y el día pasa a ser esa sesión', await p.locator('h1', { hasText: SESIONES.runB3.nombre }).count() === 1);
+  await p.locator('button', { hasText: 'Cambiar la sesión de hoy' }).click(); await p.waitForTimeout(300);
+  await p.locator('button', { hasText: 'Volver a la que toca por rotación' }).click(); await p.waitForTimeout(600);
+  ok('«Volver a la que toca» suelta el día', !(await ls(p)).fijados?.[runDia.fecha]);
+  await entrarSesion(p);
+  ok('En una carrera sale el panel de zonas', await p.locator('[aria-label="Zonas de running"]').count() === 1);
+  ok('Sin test, las zonas van por sensaciones', await p.locator('text=/Aún no tienes ritmo umbral/').count() === 1
+    && await p.locator('[aria-label="Zonas de running"]', { hasText: 'RPE 3-4' }).count() === 1);
+  ok('Sin las partes del gym: una carrera son bloques', await p.locator('text=/Parte 1 · Series rectas/').count() === 0);
+  await p.getByLabel('Kilómetros en 30 minutos').fill('6.2'); await p.waitForTimeout(300);
+  ok('Calcula el ritmo umbral (6,2 km → 4:50 / km)', await p.locator('button', { hasText: 'Guardar ritmo 4:50 / km' }).count() === 1);
+  await p.locator('button', { hasText: 'Guardar ritmo 4:50 / km' }).click(); await p.waitForTimeout(600);
+  ok('Se guarda en segundos por km', (await ls(p)).umbralRun === 290, String((await ls(p)).umbralRun));
+  ok('Y las zonas pasan a ritmos por km (Suave 5:34–6:17)', await p.locator('[aria-label="Zonas de running"]', { hasText: '5:34–6:17' }).count() === 1);
+  await p.getByLabel('Kilómetros en 30 minutos').fill('15'); await p.waitForTimeout(300);
+  ok('Un ritmo imposible avisa y no deja guardarlo', await p.locator('text=/fuera de lo plausible/').count() === 1
+    && await p.locator('button', { hasText: /^Guardar ritmo/ }).count() === 0);
+  await p.close();
+
+  // Editar el día: elegir una variante guarda el TIPO con esa variante
+  p = await nuevaPagina();
+  await p.locator('button[aria-label="Modo edición"]').click(); await p.waitForTimeout(300);
+  await abrirDia(p, runDia.fecha);
+  await elegirSesionEnModal(p, 'Tempo', 'Cardio');
+  await p.evaluate(() => [...document.querySelector('.fixed.inset-0').querySelectorAll('button')].find(x => /^Guardar/.test(x.textContent.trim()))?.click());
+  await p.waitForTimeout(700);
+  const fT = (await ls(p)).fijados?.[runDia.fecha];
+  ok('Elegir Tempo al editar el día lo guarda como running + Tempo', fT?.sesion === 'running' && fT?.variante === 'runB1', JSON.stringify(fT));
+  ok('El calendario lo enseña', (await sesionPorDia(p))[runDia.dia]?.startsWith('Tempo'), (await sesionPorDia(p))[runDia.dia]);
+  await p.close();
+
+  // Rutinas y Ajustes
+  p = await nuevaPagina({ v: 3, prs: {}, fijados: {}, extras: {}, css: null, prog: {}, rutina: {}, umbralRun: 300 });
+  ok('Un umbral guardado se lee al arrancar', (await ls(p)).umbralRun === 300);
+  await pestana(p, 'Rutinas').click(); await p.waitForTimeout(500);
+  const txtRut = await p.evaluate(() => document.body.innerText);
+  ok('Rutinas tiene su apartado de Running con los dos bloques y el test',
+    /Running\s+Bloque A · suave/i.test(txtRut) && txtRut.includes('Bloque B · calidad') && txtRut.includes('Cada ~12 carreras'));
+  await p.locator('button', { hasText: 'Series 4×4' }).first().click(); await p.waitForTimeout(500);
+  ok('Abre la ficha de una carrera', await p.locator('h1', { hasText: SESIONES.runB3.nombre }).count() === 1
+    && await p.locator('text=/Helgerud/').count() === 1);
+  await p.close();
+  p = await nuevaPagina();
+  await irAAjustes(p);
+  await abrirAjuste(p, 'Orden de rotación');
+  ok('La rotación de running se puede ordenar', await p.locator('button[aria-label="Subir Tempo en el running"]').count() === 1);
+  await p.locator('button[aria-label="Sacar Cuestas de el running"]').click(); await p.waitForTimeout(300);
+  await guardarAjuste(p);
+  ok('Y se guarda solo lo que cambió', JSON.stringify((await ls(p)).config?.rotacion) === '{"running":["runA1","runB1","runA2","runB2","runB3"]}', JSON.stringify((await ls(p)).config));
+  await p.close();
+}
 
 console.log('\n=== Errores de página: ' + (errores.length || 'ninguno') + ' ===');
 if (errores.length) console.log(errores.slice(0, 5).join('\n'));

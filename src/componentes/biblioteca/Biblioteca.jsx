@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
-import { SESION_INFO, SECUENCIA_GYM, SECUENCIA_NATACION } from '../../data.js';
+import { SESION_INFO, SECUENCIA_GYM, SECUENCIA_NATACION, SECUENCIA_RUNNING, clavePrincipal, claveSecundaria } from '../../data.js';
 import { claveDeporte } from '../../config.js';
 import { generarDesdeAncla, aISO, deISO } from '../../generador.js';
 import { estaEditada } from '../../rutina.js';
@@ -10,7 +10,7 @@ import { Punto } from '../comunes/ui.jsx';
 
 // ═══════════════ RUTINAS ═══════════════
 // Qué trae cada sesión y cuándo vuelve a tocar. El gym va en el orden de la
-// rotación, que es como se vive; la natación en sus dos bloques.
+// rotación, que es como se vive; la natación y el running en sus dos bloques.
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const HORIZONTE = 60;   // días hacia delante en los que se busca la próxima fecha
 
@@ -48,8 +48,7 @@ const Biblioteca = ({ onAbrir, onNuevoDeporte }) => {
     const { dias } = generarDesdeAncla({ hasta: aISO(hasta), ancla, fijados, festivos, config });
     const p = {};
     dias.filter(d => d.fecha >= todayISO).forEach(d => {
-      [d.sesion === 'natacion' ? d.variante : d.sesion,
-        d.sesionSecundaria === 'natacion' ? d.varianteSecundaria : d.sesionSecundaria]
+      [clavePrincipal(d), claveSecundaria(d)]
         .filter(Boolean).forEach(k => { p[k] ??= d.fecha; });
     });
     return p;
@@ -66,6 +65,8 @@ const Biblioteca = ({ onAbrir, onNuevoDeporte }) => {
   const deportes = (config.deportes ?? []).filter(d => !d.archivado);
   const bloqueA = SECUENCIA_NATACION.filter(k => k.startsWith('natA'));
   const bloqueB = SECUENCIA_NATACION.filter(k => k.startsWith('natB'));
+  const runA = SECUENCIA_RUNNING.filter(k => k.startsWith('runA'));
+  const runB = SECUENCIA_RUNNING.filter(k => k.startsWith('runB'));
 
   return (
     <div className="min-h-screen bg-fondo">
@@ -95,9 +96,20 @@ const Biblioteca = ({ onAbrir, onNuevoDeporte }) => {
         </section>
 
         <section className="rounded-3xl bg-tarjeta px-5 pt-4 pb-1">
+          <div className="rotulo">Running</div>
+          <div className="text-sm text-tinta3 mt-2">Bloque A · suave</div>
+          <div className="divide-y divide-divisor">{runA.map(k => fila(k, ''))}</div>
+          <div className="text-sm text-tinta3 mt-3">Bloque B · calidad</div>
+          <div className="divide-y divide-divisor">{runB.map(k => fila(k, ''))}</div>
+          <div className="border-t border-divisor mt-1 divide-y divide-divisor">
+            {fila('runTest', 'Cada ~12 carreras')}
+            {fila('running', 'Carrera que añades tú')}
+          </div>
+        </section>
+
+        <section className="rounded-3xl bg-tarjeta px-5 pt-4 pb-1">
           <div className="rotulo">Cardio y otros</div>
           <div className="divide-y divide-divisor">
-            {fila('running')}
             {fila('ciclismo')}
             {fila('calistenia', 'Complemento sobre otro día')}
           </div>

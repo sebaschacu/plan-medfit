@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { generarMes, infoMes, ANCLA_DEFAULT, FESTIVOS_DEFAULT } from '../generador.js';
 import { estadoGuardado } from './persistencia.js';
 import { normalizarConfig, registrarDeportes, resolverConfig } from '../config.js';
+import { familiaDe, VARIANTES_DE } from '../data.js';
 
 // ═══════════════ EL PLAN ═══════════════
 // Las ENTRADAS del generador y lo que el usuario añade encima. El calendario
@@ -20,6 +21,8 @@ export function usePlan({ anio, mes }) {
   // Va aparte de `fijados` porque no cambia la sesión principal ni la cola de gym.
   const [extras, setExtras] = useState(() => estadoGuardado().extras ?? {});
   const [css, setCss] = useState(() => estadoGuardado().css ?? null);   // segundos por 100 m
+  // Ritmo umbral de running (seg/km), del test de 30 min. null = sin test.
+  const [umbralRun, setUmbralRun] = useState(() => estadoGuardado().umbralRun ?? null);
   // Lo que el usuario cambió en Ajustes (cupo, turnos, rotación, deportes).
   // Vacío = el plan tal cual. Los deportes propios se registran como sesiones
   // ANTES de pintar nada, para que cualquier pantalla los encuentre.
@@ -77,11 +80,13 @@ export function usePlan({ anio, mes }) {
           [dia.fecha]: {
             turno: dia.turno,
             sesion: dia.sesion,
-            // La VARIANTE también se fija: la natación es un tipo que resuelve a
-            // natA1, natB1… Si solo se guardara el tipo, un cambio en la rotación
-            // podría darle otra variante a un día ya entrenado y dejar su registro
-            // (B1-3, B2-2…) apuntando a ejercicios que no están en la nueva.
+            // La VARIANTE también se fija: natación y running son tipos que
+            // resuelven a natA1, runB2… Si solo se guardara el tipo, un cambio
+            // en la rotación podría darle otra variante a un día ya entrenado y
+            // dejar su registro (B1-3, RB2-2…) apuntando a ejercicios que no
+            // están en la nueva. Vale también para la segunda sesión.
             ...(dia.variante ? { variante: dia.variante } : {}),
+            ...(dia.varianteSecundaria && VARIANTES_DE[dia.sesionSecundaria] ? { varianteSecundaria: dia.varianteSecundaria } : {}),
             auto: true,
           },
         });
@@ -89,8 +94,11 @@ export function usePlan({ anio, mes }) {
 
   // ─── Editar día: FIJAR + recalcular lo que viene ───
   // El calendario se regenera solo, porque es un useMemo sobre `fijados`.
+  // Elegir una variante (Tempo, Umbral…) fija su TIPO con esa variante: el día
+  // sigue contando como running o natación para el cupo y para S3.
   const saveEdit = useCallback((fecha, turno, sesion, festivo) => {
-    setFijados(prev => ({ ...prev, [fecha]: { turno, sesion } }));
+    const fam = familiaDe(sesion);
+    setFijados(prev => ({ ...prev, [fecha]: fam ? { turno, sesion: fam, variante: sesion } : { turno, sesion } }));
     setFestivos(prev => festivo
       ? (prev.includes(fecha) ? prev : [...prev, fecha])
       : prev.filter(f => f !== fecha));
@@ -136,9 +144,9 @@ export function usePlan({ anio, mes }) {
     if (!dia) return;
     setFijados(prev => {
       const act = prev[fecha] ?? { turno: dia.turno, sesion: dia.sesion };
-      // Natación: el TIPO no cambia, cambia la variante. Gym: cambia la sesión.
-      const esNat = (secundaria ? dia.sesionSecundaria : dia.sesion) === 'natacion';
-      if (esNat) {
+      // Natación y running: el TIPO no cambia, cambia la variante. Gym: cambia la sesión.
+      const conVariantes = !!VARIANTES_DE[secundaria ? dia.sesionSecundaria : dia.sesion];
+      if (conVariantes) {
         return { ...prev, [fecha]: { ...act, turno: dia.turno, sesion: dia.sesion,
           [secundaria ? 'varianteSecundaria' : 'variante']: clave } };
       }
@@ -176,11 +184,11 @@ export function usePlan({ anio, mes }) {
 
   return {
     // estado
-    ancla, fijados, festivos, extras, css, config, planCfg,
+    ancla, fijados, festivos, extras, css, umbralRun, config, planCfg,
     // derivado
     calendario, avisos, mesInfo, hayMesAnterior,
     // setters directos (los usa importar)
-    setAncla, setFijados, setFestivos, setExtras, setCss, setConfig,
+    setAncla, setFijados, setFestivos, setExtras, setCss, setUmbralRun, setConfig,
     // mutaciones
     fijarPorRegistro, saveEdit, liberarDia,
     onSecundaria, onComplemento, fijarVariante, soltarVariante,

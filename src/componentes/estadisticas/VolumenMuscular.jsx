@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { MUSCULOS, CAT_MUSCULO, RANGO_VOLUMEN } from '../../data.js';
+import { MUSCULOS, CAT_MUSCULO, RANGO_VOLUMEN, clavePrincipal, claveSecundaria } from '../../data.js';
 import { resolverRutina } from '../../rutina.js';
 import { mesDeISO } from '../../utiles/formato.js';
 import { usePlanCtx, useProgresoCtx } from '../../estado/contextos.js';
@@ -55,8 +55,8 @@ const VolumenMuscular = () => {
 
     semana.forEach(d => {
       const claves = [
-        d.sesion === 'natacion' ? (d.variante ?? 'natacion') : d.sesion,
-        d.sesionSecundaria === 'natacion' ? (d.varianteSecundaria ?? 'natacion') : d.sesionSecundaria,
+        clavePrincipal(d),
+        claveSecundaria(d),
         ...(d.complementos ?? []),
       ].filter(Boolean);
       const pDia = progress[d.fecha] || {};
