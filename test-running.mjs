@@ -6,7 +6,7 @@
 // cuelgan el cupo de cardio y la regla S3); lo que cambia es la variante.
 import { generarDesdeAncla, deISO, combinacionValida } from './src/generador.js';
 import { normalizarConfig, conCampo } from './src/config.js';
-import { SESIONES, SESION_INFO, SECUENCIA_RUNNING, RUNNING_TEST, VARIANTES_DE, ZONAS_RUN, GYM_PIERNA,
+import { SESIONES, SESION_INFO, SECUENCIA_RUNNING, RUNNING_SESIONES, RUNNING_TEST, VARIANTES_DE, ZONAS_RUN, GYM_PIERNA,
   claveReal, clavePrincipal, claveSecundaria, familiaDe } from './src/data.js';
 import { calcularUmbralRun, tablaZonasRun, mmss } from './src/reglas.js';
 import { protegerRunningAntiguo } from './src/estado/persistencia.js';
@@ -35,7 +35,10 @@ for (const k of VARS) {
   check(`${k} existe, con nombre, chequeo y al menos 3 bloques`, !!s && !!i && !!s.chequeo && s.ejercicios.length >= 3, k);
 }
 check('Todas son del grupo Cardio y con icono de correr', VARS.every(k => SESION_INFO[k].grupo === 'cardio' && SESION_INFO[k].icon === 'run'));
-check('Las seis de la rotación traen versión recortada', SECUENCIA_RUNNING.every(k => SESIONES[k].recortada));
+check('Las seis sesiones traen versión recortada', RUNNING_SESIONES.every(k => SESIONES[k].recortada));
+check('La rotación son las 4 indispensables: Rodaje suave → Tempo → Fondo largo → Series 4×4',
+  SECUENCIA_RUNNING.map(k => SESION_INFO[k].label).join(' → ') === 'Rodaje suave → Tempo → Fondo largo → Series 4×4');
+check('Series de umbral y Cuestas siguen disponibles para un día suelto', VARS.includes('runB2') && VARS.includes('runA3') && !!SESIONES.runB2 && !!SESIONES.runA3);
 const ids = Object.values(SESIONES).flatMap(s => s.ejercicios.map(e => e.id));
 check('Ningún ID de ejercicio se repite en todo el plan', new Set(ids).size === ids.length);
 check('La genérica de siempre sigue existiendo con sus RUN-1..3 (historial antiguo)',
@@ -46,7 +49,7 @@ check('El 4×4 son 4 series de 4 min con 3 min de recuperación (Helgerud)',
   SESIONES.runB3.ejercicios.some(e => e.series === 4 && e.reps === '4 min' && /3 min/.test(e.descanso)));
 check('El test pide anotar la distancia', SESIONES.runTest.ejercicios.some(e => /ANOTA LA DISTANCIA/.test(e.nota)));
 check('Toda sesión dice cómo medir la intensidad sin reloj (habla o esfuerzo)',
-  SECUENCIA_RUNNING.every(k => SESIONES[k].ejercicios.some(e => /hablar|hablas|palabras|frases|esfuerzo/i.test(e.nota))));
+  RUNNING_SESIONES.every(k => SESIONES[k].ejercicios.some(e => /hablar|hablas|palabras|frases|esfuerzo/i.test(e.nota))));
 
 // ═══ 2 · EL GENERADOR ═══
 seccion('EL GENERADOR');
@@ -62,7 +65,7 @@ check('La primera carrera del plan es el test de 30 min', runs[0]?.v === RUNNING
 
 const sinTest = runs.filter(r => r.v !== RUNNING_TEST.clave).map(r => r.v);
 const enOrden = sinTest.every((v, i) => v === SECUENCIA_RUNNING[i % SECUENCIA_RUNNING.length]);
-check('Fuera de los tests, la rotación sigue A1 → B1 → A2 → B2 → A3 → B3 sin saltos', enOrden, sinTest.slice(0, 14).join(' '));
+check('Fuera de los tests, la rotación sigue su orden sin saltos', enOrden, sinTest.slice(0, 14).join(' '));
 
 const idxTests = runs.map((r, i) => (r.v === RUNNING_TEST.clave ? i : -1)).filter(i => i >= 0);
 const huecos = idxTests.slice(1).map((x, i) => x - idxTests[i]);
@@ -130,6 +133,8 @@ seccion('AJUSTES · ROTACIÓN DE RUNNING');
 const solo = carreras(generarDesdeAncla({ hasta: HASTA, config: { rotacion: { running: ['runA2', 'runB3'] } } }).dias).map(r => r.v);
 check('Con una rotación propia solo salen las elegidas, más el test', solo.every(v => ['runA2', 'runB3', RUNNING_TEST.clave].includes(v)) && solo[0] === RUNNING_TEST.clave, solo.slice(0, 8).join(' '));
 check('Y el test se repite aunque Tempo no esté', solo.filter(v => v === RUNNING_TEST.clave).length >= 3);
+check('Se puede volver a meter una que no está en la rotación del plan (Cuestas)',
+  JSON.stringify(normalizarConfig({ rotacion: { running: [...SECUENCIA_RUNNING, 'runA3'] } }).rotacion?.running) === JSON.stringify([...SECUENCIA_RUNNING, 'runA3']));
 check('normalizarConfig limpia claves que no son de running', JSON.stringify(normalizarConfig({ rotacion: { running: ['runB2', 'gymA', 'runB2', 'x'] } }).rotacion) === '{"running":["runB2"]}');
 check('Guardar el orden del plan no deja nada en la config', !conCampo({}, 'rotacion', { running: [...SECUENCIA_RUNNING] }).rotacion);
 check('Guardar otro orden sí', JSON.stringify(conCampo({}, 'rotacion', { running: ['runB1', 'runA1'] }).rotacion) === '{"running":["runB1","runA1"]}');

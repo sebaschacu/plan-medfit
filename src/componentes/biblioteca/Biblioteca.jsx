@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
-import { SESION_INFO, SECUENCIA_GYM, SECUENCIA_NATACION, SECUENCIA_RUNNING, clavePrincipal, claveSecundaria } from '../../data.js';
+import { SESION_INFO, SECUENCIA_GYM, SECUENCIA_NATACION, RUNNING_SESIONES, clavePrincipal, claveSecundaria } from '../../data.js';
 import { claveDeporte } from '../../config.js';
 import { generarDesdeAncla, aISO, deISO } from '../../generador.js';
 import { estaEditada } from '../../rutina.js';
@@ -65,8 +65,8 @@ const Biblioteca = ({ onAbrir, onNuevoDeporte }) => {
   const deportes = (config.deportes ?? []).filter(d => !d.archivado);
   const bloqueA = SECUENCIA_NATACION.filter(k => k.startsWith('natA'));
   const bloqueB = SECUENCIA_NATACION.filter(k => k.startsWith('natB'));
-  const runA = SECUENCIA_RUNNING.filter(k => k.startsWith('runA'));
-  const runB = SECUENCIA_RUNNING.filter(k => k.startsWith('runB'));
+  // El running, como el gym: en el orden de su rotación, y aparte las que no entran.
+  const fueraRun = RUNNING_SESIONES.filter(k => !planCfg.secRun.includes(k));
 
   return (
     <div className="min-h-screen bg-fondo">
@@ -96,13 +96,14 @@ const Biblioteca = ({ onAbrir, onNuevoDeporte }) => {
         </section>
 
         <section className="rounded-3xl bg-tarjeta px-5 pt-4 pb-1">
-          <div className="rotulo">Running</div>
-          <div className="text-sm text-tinta3 mt-2">Bloque A · suave</div>
-          <div className="divide-y divide-divisor">{runA.map(k => fila(k, ''))}</div>
-          <div className="text-sm text-tinta3 mt-3">Bloque B · calidad</div>
-          <div className="divide-y divide-divisor">{runB.map(k => fila(k, ''))}</div>
-          <div className="border-t border-divisor mt-1 divide-y divide-divisor">
+          <div className="rotulo">Running · rotación</div>
+          <div className="divide-y divide-divisor">{planCfg.secRun.map(k => fila(k))}</div>
+          <div className="border-t border-divisor divide-y divide-divisor">
             {fila('runTest', 'Cada ~12 carreras')}
+          </div>
+          <div className="text-sm text-tinta3 mt-3">Para un día suelto</div>
+          <div className="divide-y divide-divisor">
+            {fueraRun.map(k => fila(k))}
             {fila('running', 'Carrera que añades tú')}
           </div>
         </section>

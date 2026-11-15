@@ -133,14 +133,21 @@ export const NATACION_CSS = {
   estimado: { min: '1:30', max: '1:45' },
 };
 
-// ─── Running · rotación de sesiones ───
-// Igual que la natación: dos bloques que se alternan. A es suave (base aeróbica,
-// resistencia y un toque de velocidad corta que no cansa); B es la calidad
-// (umbral y VO2máx). Con ~1 carrera por semana, la mitad de las SESIONES son de
-// calidad, pero por TIEMPO casi todo el running sigue siendo suave: calentamiento,
-// recuperaciones y vuelta a la calma suman más minutos que los bloques fuertes.
+// ─── Running · sesiones y rotación ───
+// Dos bloques, como la natación. A es suave (base aeróbica, resistencia y un
+// toque de velocidad corta que no cansa); B es la calidad (umbral y VO2máx).
 // La clave del día sigue siendo 'running': solo cambia a qué variante resuelve.
-export const SECUENCIA_RUNNING = ['runA1', 'runB1', 'runA2', 'runB2', 'runA3', 'runB3'];
+export const RUNNING_SESIONES = ['runA1', 'runA2', 'runA3', 'runB1', 'runB2', 'runB3'];
+
+// La rotación lleva las CUATRO indispensables (elegidas con Sebastián):
+// Rodaje suave → Tempo → Fondo largo → Series 4×4. Con ~1 carrera por semana,
+// cada una vuelve cada ~4 semanas en vez de cada 6, y se progresa antes en
+// cada una. Fuera quedan Series de umbral (casi el mismo estímulo que el Tempo)
+// y Cuestas (las aceleraciones y el gym de pierna ya lo cubren): siguen en
+// Rutinas para un día suelto, y se pueden volver a meter en Ajustes.
+// La mitad de las SESIONES son de calidad, pero por TIEMPO casi todo el running
+// sigue siendo suave: calentar, recuperar y volver a la calma suman más minutos.
+export const SECUENCIA_RUNNING = ['runA1', 'runB1', 'runA2', 'runB3'];
 
 // El test de 30 min va primero y se repite cada ~12 carreras, colándose antes
 // de un Tempo (mismo sistema energético). El Tempo no se pierde: va en la
@@ -156,7 +163,7 @@ export const RUNNING_TEST = {
 // conservan los días registrados antes de que existieran las variantes.
 export const VARIANTES_DE = {
   natacion: [...SECUENCIA_NATACION, 'natCSS'],
-  running: [...SECUENCIA_RUNNING, RUNNING_TEST.clave],
+  running: [...RUNNING_SESIONES, RUNNING_TEST.clave],
 };
 // Clave real de lo que se entrena: natación y running resuelven a su variante;
 // el resto es su propia clave. Una variante de otra familia no cuenta (puede

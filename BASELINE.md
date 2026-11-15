@@ -10,10 +10,10 @@ Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 
 | # | Comando | Baseline |
 |---|---|---|
-| 1 · Lógica | `npm test` | 155/155 + 85/85 + 62/62 + 57/57 = **359** (158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4; +15 en la decisión 1; +15 en la decisión 2; +1 en el rediseño D: S4 a dos tramos; +57 con las sesiones de running) |
+| 1 · Lógica | `npm test` | 155/155 + 85/85 + 62/62 + 60/60 = **362** (158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4; +15 en la decisión 1; +15 en la decisión 2; +1 en el rediseño D: S4 a dos tramos; +60 con las sesiones de running) |
 | 1b · Configuración | `node test-config.mjs` (dentro de `npm test`) | **62/62** · con la config vacía el calendario es idéntico al del plan; cada ajuste hace lo que dice; S1, S3, S7 y turnos aguantan cualquier config |
-| 1c · Running | `node test-running.mjs` (dentro de `npm test`) | **57/57** · cada carrera resuelve a una variante sin cambiar la clave del día; rotación A1→B1→A2→B2→A3→B3 con test de 30 min cada ~12 carreras; S3 intacta; los días registrados antes de las variantes conservan la sesión genérica |
-| 2a · Interfaz | `npm run test:ui` | **351/351** · 0 errores de página (227 antes del rediseño D; la suite se reescribió para la navegación nueva conservando cada comprobación, +43 nuevas; +23 con el running) |
+| 1c · Running | `node test-running.mjs` (dentro de `npm test`) | **60/60** · cada carrera resuelve a una variante sin cambiar la clave del día; rotación de las 4 indispensables (Rodaje suave → Tempo → Fondo largo → Series 4×4) con test de 30 min cada ~12 carreras; S3 intacta; los días registrados antes de las variantes conservan la sesión genérica |
+| 2a · Interfaz | `npm run test:ui` | **352/352** · 0 errores de página (227 antes del rediseño D; la suite se reescribió para la navegación nueva conservando cada comprobación, +43 nuevas; +24 con el running) |
 | 2b · Auditoría | `npm run audit` | **23/23** · 0 errores de página (recorre también Progreso, Rutinas, el editor y Ajustes) |
 | 3 · Lint | `npx oxlint` | **0 avisos / 0 errores** |
 | 4 · Build | `npm run build` | compila · 393 kB (gzip 117) + Geist 29 kB |

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowUp, ArrowDown, X, Plus, RotateCcw, AlertTriangle } from 'lucide-react';
-import { SESION_INFO, SECUENCIA_GYM, SECUENCIA_NATACION, SECUENCIA_RUNNING } from '../../data.js';
+import { SESION_INFO, SECUENCIA_GYM, SECUENCIA_NATACION, SECUENCIA_RUNNING, RUNNING_SESIONES } from '../../data.js';
 import { solapanGym } from '../../generador.js';
 import { usePlanCtx, useAccionesCtx } from '../../estado/contextos.js';
 import { conCampo, solapesDeRotacion } from '../../config.js';
@@ -82,7 +82,7 @@ const AjustesRotacion = ({ onVolver }) => {
       <p className="text-sm text-tinta3 leading-relaxed px-1">
         El Test CSS va primero y se repite cada 6-8 semanas en lugar de {sinUmbral ? `${SESION_INFO[nat[0]].label}, porque Umbral no está en la rotación` : 'un Umbral'}.
       </p>
-      <Lista titulo="Running" nombre="el running" orden={run} todas={SECUENCIA_RUNNING} onCambiar={setRun} />
+      <Lista titulo="Running" nombre="el running" orden={run} todas={RUNNING_SESIONES} onCambiar={setRun} />
       <p className="text-sm text-tinta3 leading-relaxed px-1">
         El Test 30 min va primero y se repite cada ~12 carreras antes de {sinTempo ? `${SESION_INFO[run[0]].label}, porque Tempo no está en la rotación` : 'un Tempo'}.
       </p>

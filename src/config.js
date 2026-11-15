@@ -18,7 +18,7 @@
 //               duracion, nota, archivado }]
 
 import { CUPO_SEMANAL, PRIORIDAD_TURNO, VENTANA_PISCINA, DOBLES, SECUENCIA_GYM, SECUENCIA_NATACION,
-  SECUENCIA_RUNNING, RUNNING_TEST, NATACION_CSS, SESION_INFO, SESIONES } from './data.js';
+  SECUENCIA_RUNNING, RUNNING_SESIONES, RUNNING_TEST, NATACION_CSS, SESION_INFO, SESIONES } from './data.js';
 
 export const LETRAS_TURNO = ['L', 'C', 'N', 'P'];
 export const CICLO_DEFAULT = ['L', 'C', 'N', 'P'];
@@ -83,7 +83,7 @@ export function normalizarConfig(c) {
     const limpia = (lista, validas) => (Array.isArray(lista) ? [...new Set(lista.filter(k => validas.includes(k)))] : []);
     const g = limpia(c.rotacion.gym, SECUENCIA_GYM);
     const n = limpia(c.rotacion.natacion, SECUENCIA_NATACION);
-    const r = limpia(c.rotacion.running, SECUENCIA_RUNNING);
+    const r = limpia(c.rotacion.running, RUNNING_SESIONES);
     if (g.length) rot.gym = g;
     if (n.length) rot.natacion = n;
     if (r.length) rot.running = r;

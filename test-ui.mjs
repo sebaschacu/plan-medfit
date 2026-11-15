@@ -1535,8 +1535,10 @@ seccion('RUNNING');
   ok('Un umbral guardado se lee al arrancar', (await ls(p)).umbralRun === 300);
   await pestana(p, 'Rutinas').click(); await p.waitForTimeout(500);
   const txtRut = await p.evaluate(() => document.body.innerText);
-  ok('Rutinas tiene su apartado de Running con los dos bloques y el test',
-    /Running\s+Bloque A · suave/i.test(txtRut) && txtRut.includes('Bloque B · calidad') && txtRut.includes('Cada ~12 carreras'));
+  const iRun = txtRut.search(/Running · rotación/i), iSuelto = txtRut.indexOf('Para un día suelto');
+  ok('Rutinas enseña la rotación de running (4) y aparte las de un día suelto',
+    iRun > 0 && iSuelto > iRun && ['Rodaje suave', 'Tempo', 'Fondo largo', 'Series 4×4'].every(t => txtRut.indexOf(t, iRun) < iSuelto)
+    && ['Series de umbral', 'Cuestas'].every(t => txtRut.indexOf(t, iSuelto) > iSuelto) && txtRut.includes('Cada ~12 carreras'));
   await p.locator('button', { hasText: 'Series 4×4' }).first().click(); await p.waitForTimeout(500);
   ok('Abre la ficha de una carrera', await p.locator('h1', { hasText: SESIONES.runB3.nombre }).count() === 1
     && await p.locator('text=/Helgerud/').count() === 1);
@@ -1545,9 +1547,11 @@ seccion('RUNNING');
   await irAAjustes(p);
   await abrirAjuste(p, 'Orden de rotación');
   ok('La rotación de running se puede ordenar', await p.locator('button[aria-label="Subir Tempo en el running"]').count() === 1);
-  await p.locator('button[aria-label="Sacar Cuestas de el running"]').click(); await p.waitForTimeout(300);
+  ok('Las que no están en la rotación se pueden volver a meter', await p.locator('button[aria-label="Volver a meter Cuestas en el running"]').count() === 1);
+  await p.locator('button[aria-label="Volver a meter Cuestas en el running"]').click(); await p.waitForTimeout(300);
+  await p.locator('button[aria-label="Sacar Fondo largo de el running"]').click(); await p.waitForTimeout(300);
   await guardarAjuste(p);
-  ok('Y se guarda solo lo que cambió', JSON.stringify((await ls(p)).config?.rotacion) === '{"running":["runA1","runB1","runA2","runB2","runB3"]}', JSON.stringify((await ls(p)).config));
+  ok('Y se guarda solo lo que cambió', JSON.stringify((await ls(p)).config?.rotacion) === '{"running":["runA1","runB1","runB3","runA3"]}', JSON.stringify((await ls(p)).config));
   await p.close();
 }
 
