@@ -16,19 +16,41 @@
 //     ]
 //   }
 
-import { SESIONES } from './data.js';
+import { SESIONES, PLAN_BOGOTA } from './data.js';
+import { SESIONES_V6 } from './planV6.js';
 import { aplicarCambios } from './alternativas.js';
 
-// Ejercicios vigentes de una sesión en una fecha dada.
+// ─── La base cambia con el plan ───
+// El plan también tiene versiones con fecha: hasta el 29 de noviembre de 2026
+// las sesiones de gym son las del v6 (planV6.js); desde el 30, las del v7. Un
+// día de agosto sigue enseñando lo que se hizo, con sus ids.
+export function planBase(sesionKey, fecha) {
+  return sesionBase(sesionKey, fecha)?.ejercicios ?? [];
+}
+
+// La sesión entera (nombre, chequeo, duración…) del plan que rige ese día.
+export function sesionBase(sesionKey, fecha) {
+  if (fecha && fecha < PLAN_BOGOTA.desde && SESIONES_V6[sesionKey]) return SESIONES_V6[sesionKey];
+  return SESIONES[sesionKey];
+}
+
+// Ejercicios vigentes de una sesión en una fecha dada: la versión más reciente
+// que ya rija ese día, sea del usuario o del plan. Una edición de octubre vale
+// hasta que llega el plan de Bogotá; una edición hecha en Bogotá, desde ese día.
 export function resolverRutina(sesionKey, fecha, rutina = {}) {
-  const base = SESIONES[sesionKey]?.ejercicios ?? [];
+  const base = planBase(sesionKey, fecha);
   const versiones = rutina[sesionKey];
   if (!Array.isArray(versiones) || !versiones.length) return base;
   const vigente = versiones
     .filter(v => !fecha || v.desde <= fecha)
     .sort((a, b) => a.desde.localeCompare(b.desde))
     .at(-1);
-  return vigente?.ejercicios ?? base;
+  if (!vigente) return base;
+  // El plan nuevo pisa las ediciones anteriores a él (solo en las sesiones que cambió).
+  const cambioDePlan = SESIONES_V6[sesionKey] ? PLAN_BOGOTA.desde : null;
+  const hoy = fecha ?? '9999-12-31';
+  if (cambioDePlan && vigente.desde < cambioDePlan && hoy >= cambioDePlan) return base;
+  return vigente.ejercicios;
 }
 
 // Lo que se hace ESE día: la rutina vigente con los cambios de solo hoy
@@ -38,7 +60,7 @@ export const ejerciciosDelDia = (sesionKey, fecha, rutina, progresoDia) =>
 
 // ¿Esta sesión está editada respecto al plan, en esta fecha?
 export function estaEditada(sesionKey, fecha, rutina = {}) {
-  const base = SESIONES[sesionKey]?.ejercicios ?? [];
+  const base = planBase(sesionKey, fecha);
   const actual = resolverRutina(sesionKey, fecha, rutina);
   return JSON.stringify(actual.map(e => e.id)) !== JSON.stringify(base.map(e => e.id))
     || JSON.stringify(actual) !== JSON.stringify(base);
@@ -61,7 +83,7 @@ export function guardarVersion(rutina, sesionKey, ejercicios, desde, motivo) {
 
 // Vuelve al plan original a partir de una fecha (no borra el historial anterior).
 export function restaurarPlan(rutina, sesionKey, desde) {
-  const base = SESIONES[sesionKey]?.ejercicios ?? [];
+  const base = planBase(sesionKey, desde);   // el plan que rige en esa fecha
   return guardarVersion(rutina, sesionKey, JSON.parse(JSON.stringify(base)), desde, 'Vuelta al plan original');
 }
 
@@ -80,6 +102,16 @@ export function catalogoEjercicios(rutina = {}) {
   for (const [k, ses] of Object.entries(SESIONES)) {
     for (const ex of ses.ejercicios ?? []) {
       out.push({ ...ex, origen: k, origenNombre: ses.nombre });
+    }
+  }
+  // Los del plan anterior (Barranquilla) que ya no están en el de Bogotá
+  // siguen siendo ejercicios válidos: se pueden volver a añadir. Uno por nombre.
+  const vistos = new Set(out.map(e => e.nombre.toLowerCase()));
+  for (const [k, ses] of Object.entries(SESIONES_V6)) {
+    for (const ex of ses.ejercicios) {
+      if (vistos.has(ex.nombre.toLowerCase())) continue;
+      vistos.add(ex.nombre.toLowerCase());
+      out.push({ ...ex, origen: k, origenNombre: `${ses.nombre} · plan anterior` });
     }
   }
   // Los ejercicios creados por el usuario viven dentro de la rutina donde se

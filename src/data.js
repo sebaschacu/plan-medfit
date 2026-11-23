@@ -27,8 +27,8 @@ export const CUPO_SEMANAL = {
 };
 
 // ─── v6.1 · Sesiones dobles ───
-export const GYM_PIERNA = ['gymC1', 'gymC2'];
-export const GYM_TORSO = ['gymA', 'gymB', 'gymD'];
+export const GYM_PIERNA = ['gymC1', 'gymC2', 'gymPA', 'gymPB'];
+export const GYM_TORSO = ['gymA', 'gymB', 'gymD', 'gymTA', 'gymTB', 'gymE'];
 
 // ─── v7.1 · Pares de gym que SOLAPAN si van seguidos ───
 // Dos sesiones consecutivas con el mismo patrón principal castigan dos veces la
@@ -41,6 +41,9 @@ export const GYM_SOLAPAN = [
   ['gymA', 'gymD'],     // banca
   ['gymB', 'gymD'],     // dominada
   ['gymC1', 'gymC2'],   // pierna
+  // v7 · Opción A: los dos torsos comparten pecho y espalda; las dos piernas, pierna.
+  ['gymTA', 'gymTB'],
+  ['gymPA', 'gymPB'],
 ];
 
 export const DOBLES = {
@@ -109,6 +112,47 @@ export const PRIORIDAD_TURNO = {
 // Ninguna transición consecutiva solapa músculos. NUNCA se reinicia.
 export const SECUENCIA_GYM = ['gymA', 'gymC1', 'gymD', 'gymC2', 'gymB'];
 
+// ─── v7 · Bogotá · las dos rutinas de gym ───
+// Opción A (por defecto): Torso / Pierna. La 5.ª (gymE) no está en la cola: es
+// opcional y la elige el usuario en el día. Opción B: la cola de siempre.
+export const SECUENCIA_TORSO_PIERNA = ['gymTA', 'gymPA', 'gymTB', 'gymPB'];
+export const RUTINAS_GYM = {
+  A: { label: 'Torso / Pierna', desc: '4 sesiones + 1 opcional de brazos y hombros', secuencia: SECUENCIA_TORSO_PIERNA, extra: ['gymE'] },
+  B: { label: 'Empuje · Tracción · Pierna', desc: 'Tus cinco sesiones de siempre, con los ejercicios del plan de Bogotá', secuencia: SECUENCIA_GYM, extra: [] },
+};
+
+// Cardio de Bogotá: bici (o remo), alternando zona 2 y 4×4. Empieza por zona 2:
+// las primeras semanas en la altura, mejor sin intervalos fuertes.
+export const SECUENCIA_BICI = ['biciZ2', 'bici4x4'];
+
+// ─── Los dos planes y desde cuándo rige cada uno ───
+// El calendario no se reescribe hacia atrás: hasta el 29 de noviembre de 2026
+// rige el plan v6 (Barranquilla); desde el lunes 30, el v7 (Bogotá).
+//   cupo     → por semana; `running` es el cupo de CARDIO (nombre interno)
+//   cardio   → qué sesión llena ese cupo
+//   s3       → running/bici nunca el día después de pierna ni con pierna el mismo día
+//   piscina  → horario de la piscina (franjas); null = sin horario fijo
+//   descarga → semana 8 de cada bloque de descarga (P4)
+export const PLAN_V6 = {
+  version: 'v6', desde: '0000-01-01',
+  cupo: { gym: 3, natacion: 2, running: 1, flexible: 1 },
+  cardio: 'running', s3: true, piscina: true, descarga: true,
+};
+export const PLAN_BOGOTA = {
+  version: 'v7', desde: '2026-11-30',
+  cupo: { gym: 4, natacion: 0, running: 2, flexible: 1 },
+  cardio: 'ciclismo', s3: false, piscina: false, descarga: false,
+};
+export const planDe = (fecha) => (fecha && fecha < PLAN_BOGOTA.desde ? PLAN_V6 : PLAN_BOGOTA);
+// Las sesiones de gym que se ofrecen en los menús de un día: las del plan de esa
+// fecha, y en Bogotá solo las de la rutina activa (más la 5.ª opcional).
+export const gymOfrecido = (k, fecha, opcion = 'A') => {
+  if (!String(k).startsWith('gym')) return true;
+  const r = RUTINAS_GYM[opcion] ?? RUTINAS_GYM.A;
+  const visibles = fecha && fecha < PLAN_BOGOTA.desde ? SECUENCIA_GYM : [...r.secuencia, ...r.extra];
+  return visibles.includes(k);
+};
+
 
 // ─── v6.1 · Natación · rotación de sesiones ───
 // Dos bloques con propósitos distintos que no compiten: A mantiene el nivel de
@@ -164,6 +208,7 @@ export const RUNNING_TEST = {
 export const VARIANTES_DE = {
   natacion: [...SECUENCIA_NATACION, 'natCSS'],
   running: [...RUNNING_SESIONES, RUNNING_TEST.clave],
+  ciclismo: [...SECUENCIA_BICI],
 };
 // Clave real de lo que se entrena: natación y running resuelven a su variante;
 // el resto es su propia clave. Una variante de otra familia no cuenta (puede
@@ -245,6 +290,11 @@ export const SESION_INFO = {
   // `label` es lo que se VE: el nombre de lo que se entrena. Las claves
   // (gymA, natB2…) son internas y NO se renombran: de ellas cuelga el
   // localStorage guardado.
+  gymTA: { label: 'Torso A',   color: '#22c55e', icon: 'dumbbell', tipo: 'Pecho y espalda', grupo: 'gym' },
+  gymPA: { label: 'Pierna A',  color: '#15803d', icon: 'dumbbell', tipo: 'Cuádriceps y fuerza', grupo: 'gym' },
+  gymTB: { label: 'Torso B',   color: '#4ade80', icon: 'dumbbell', tipo: 'Hombro, pecho alto y espalda', grupo: 'gym' },
+  gymPB: { label: 'Pierna B',  color: '#65a30d', icon: 'dumbbell', tipo: 'Glúteo y parte trasera', grupo: 'gym' },
+  gymE:  { label: 'Brazos y hombros', color: '#16a34a', icon: 'dumbbell', tipo: '5.ª sesión opcional', grupo: 'gym' },
   gymC1: { label: 'Pierna fuerza',  color: '#15803d', icon: 'dumbbell', tipo: 'Sentadilla pesada · cero torso', grupo: 'gym' },
   gymC2: { label: 'Pierna volumen', color: '#65a30d', icon: 'dumbbell', tipo: 'Prensa · sin barra a la espalda', grupo: 'gym' },
   gymA:  { label: 'Empuje',     color: '#22c55e', icon: 'dumbbell', tipo: 'Pecho · hombro · tríceps', grupo: 'gym' },
@@ -268,6 +318,8 @@ export const SESION_INFO = {
   runB3:  { label: 'Series 4×4',   color: '#0369a1', icon: 'run', tipo: 'Bloque B · VO2máx', grupo: 'cardio' },
   runTest: { label: 'Test 30 min', color: '#075985', icon: 'run', tipo: 'Test de umbral', grupo: 'cardio' },
   ciclismo:  { label: 'Bici', color: '#0284c7', icon: 'bike', tipo: 'Z2 sin impacto', grupo: 'cardio' },
+  bici4x4:   { label: 'Bici 4×4', color: '#0284c7', icon: 'bike', tipo: 'Intervalos · VO2máx', grupo: 'cardio' },
+  biciZ2:    { label: 'Bici zona 2', color: '#0284c7', icon: 'bike', tipo: 'Suave · base aeróbica', grupo: 'cardio' },
   descanso:   { label: 'Descanso', color: '#64748b', icon: 'moon', tipo: 'Recuperación', grupo: 'descanso' },
 };
 
@@ -289,12 +341,14 @@ export const MUSCULOS = {
   biceps:              { label: 'Bíceps',          cat: 'traccion', color: '#16a34a' },
   braquial:            { label: 'Braquial',        cat: 'traccion', color: '#16a34a' },
   antebrazo:           { label: 'Antebrazo',       cat: 'traccion', color: '#16a34a' },
+  manguito:            { label: 'Manguito rotador', cat: 'traccion', color: '#16a34a' },
   // Tren inferior
   cuadriceps:          { label: 'Cuádriceps',      cat: 'pierna',  color: '#65a30d' },
   isquios:             { label: 'Isquios',         cat: 'pierna',  color: '#65a30d' },
   gluteo:              { label: 'Glúteo',          cat: 'pierna',  color: '#65a30d' },
   gluteo_medio:        { label: 'Glúteo medio',    cat: 'pierna',  color: '#65a30d' },
   aductores:           { label: 'Aductores',       cat: 'pierna',  color: '#65a30d' },
+  tibial:              { label: 'Tibial',          cat: 'pierna',  color: '#65a30d' },
   gemelo:              { label: 'Gemelo',          cat: 'pierna',  color: '#65a30d' },
   soleo:               { label: 'Sóleo',           cat: 'pierna',  color: '#65a30d' },
   // Core
@@ -302,6 +356,7 @@ export const MUSCULOS = {
   core_antirotacion:   { label: 'Core anti-rot.',  cat: 'core',    color: '#06b6d4' },
   core_antilateral:    { label: 'Core anti-lat.',  cat: 'core',    color: '#06b6d4' },
   erectores:           { label: 'Erectores',       cat: 'core',    color: '#06b6d4' },
+  cuello:              { label: 'Cuello',          cat: 'core',    color: '#06b6d4' },
 };
 
 export const CAT_MUSCULO = {
@@ -312,7 +367,8 @@ export const CAT_MUSCULO = {
 };
 
 // Franja productiva semanal por grupo (principiante). Fuera de [min,max] → aviso ámbar.
-export const RANGO_VOLUMEN = { objetivoMin: 8, objetivoMax: 12, min: 6, max: 16 };
+// v7: 10-14 por músculo y semana; 14-20 en las prioridades (pecho, espalda, hombro, brazos).
+export const RANGO_VOLUMEN = { objetivoMin: 10, objetivoMax: 20, min: 6, max: 24 };
 
 // ═══════════════ CALENDARIO ═══════════════
 // El array CALENDARIO_DEFAULT de la v5 (31 días escritos a mano) SE ELIMINÓ.
@@ -341,159 +397,406 @@ export const DIAS_SEMANA = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
 //   [bs:'BS1', bstipo:'ant'|'nc'] = bi-serie (E8)
 
 export const SESIONES = {
-  gymA: {
-    nombre: 'Empuje', subtitulo: 'Pecho · hombro · tríceps · carga real', color: '#22c55e',
-    duracion: '~110 min · 35 series',
-    chequeo: 'Banca y press militar son los DOS lifts con progresión lineal del día: van primero y la señal debe salir limpia. N1: 2 series de aproximación antes del primer compuesto de cada patrón. El face pull de la BS1 es obligatorio y no se recorta nunca (E6) — es el contrapeso a 10 series de press. Si fallas las reps dos sesiones seguidas en un lift, bajas el 10% y vuelves a subir (P6).',
+  // ═══════════════ PLAN v7 · BOGOTÁ (desde el 30 de noviembre de 2026) ═══════════════
+  // Dos rutinas en la app y una activa. Por defecto, OPCIÓN A · Torso / Pierna:
+  //   Torso A → Pierna A → Torso B → Pierna B, más una 5.ª opcional de brazos y hombros.
+  // OPCIÓN B · las cinco de siempre (Empuje → Pierna fuerza → Torso → Pierna volumen →
+  //   Tracción), con el contenido de la v7. Sus claves no cambian: gymA, gymC1, gymD,
+  //   gymC2, gymB. Lo que se hizo con ellas hasta el 29 de noviembre está en planV6.js.
+  //
+  // Partes de la v7:
+  //   0 · bloque atlético (saltos, lanzamientos, agilidad): fresco, explosivo
+  //   1 · básicos: series rectas, 1-2 en reserva, 2-3 min, doble progresión (P1)
+  //   2 y 3 · accesorios en bi-series (E8): última serie casi al fallo
+  //   finisher · agarre y carga: un solo acarreo por sesión (E9)
+  // Los aislamientos de brazo y hombro también van en días de pierna (E2 revisada):
+  // los básicos son de una sola zona; los accesorios pequeños no cansan las piernas.
+
+  // ─── OPCIÓN A · Torso / Pierna ───
+  gymTA: {
+    nombre: 'Torso A', subtitulo: 'Pecho y espalda', color: '#22c55e',
+    duracion: '~94 min · 33 series',
+    chequeo: 'La banca va primero: es tu test de pecho. 2 series de aproximación antes del primer básico (N1). Básicos con 1-2 repeticiones en reserva y 2-3 min de descanso; accesorios con la última serie casi al fallo. Doble progresión: primero llegas al tope de repeticiones en todas las series, después subes el peso (P1). Sin correas salvo que la mano falle antes que el músculo.',
     ejercicios: [
-      { id: 'A-1', parte: 1, nombre: 'Press banca con barra', series: 4, reps: '5-8', lineal: true, progresion: '+2.5 kg', descanso: '3 min', nota: 'Prioridad #1. Excéntrica 3s, sin rebote, escápulas retraídas.',
+      { id: 'TA-1', parte: 1, nombre: 'Press de banca con barra', series: 3, reps: '5-8', rir: '1-2', progresion: '+2.5 kg', descanso: '3 min', nota: 'Primero del día: aquí se mide tu pecho. Escápulas atrás, bajada controlada, sin rebote.',
         musculos: { primario: ['pecho', 'triceps'], secundario: ['deltoides_anterior'] } },
-      { id: 'A-2', parte: 1, nombre: 'Press militar sentado mancuernas', series: 3, reps: '6-8', lineal: true, progresion: '+2.5 kg', descanso: '2.5 min', nota: 'PROMOVIDO a lift principal en la v6. Ya no es mantenimiento: ahora progresa.', nuevo: true,
-        musculos: { primario: ['deltoides_anterior', 'triceps'], secundario: ['deltoides_medio'] } },
-
-      { id: 'A-3', parte: 2, nombre: 'Press inclinado mancuernas 30°', series: 3, reps: '8-12', rir: '1-2', descanso: '60s', nota: '30° no más: si subes el banco, el trabajo se va al hombro. Empareja con face pull (no solapa).', bs: 'BS1', bstipo: 'ant',
+      { id: 'TA-2', parte: 1, nombre: 'Dominada', series: 4, reps: '5-8', rir: '1-2', progresion: '+2.5 kg', descanso: '2-3 min', nota: 'Asistida (máquina o banda) si aún no haces 5 limpias. Con cinturón y disco cuando pases de 8 (E3). Sin correas: también es agarre.', lastre: true,
+        musculos: { primario: ['dorsal', 'biceps'], secundario: ['espalda_media', 'braquial', 'antebrazo'] } },
+      { id: 'TA-3', parte: 1, nombre: 'Press inclinado con mancuernas 30°', series: 3, reps: '8-12', rir: '1-2', progresion: '+2 kg', descanso: '2-3 min', nota: '30°, no más: si subes el banco, el trabajo se va al hombro.',
         musculos: { primario: ['pecho', 'deltoides_anterior'], secundario: ['triceps'] } },
-      { id: 'A-4', parte: 2, nombre: 'Face pull', series: 3, reps: '15-20', rir: '1-2', descanso: '60s', nota: 'OBLIGATORIO (E6). Contrapeso a 10 series de press. Salud de hombro.', bs: 'BS1', bstipo: 'ant',
-        musculos: { primario: ['deltoides_posterior'], secundario: ['trapecio', 'espalda_media'] } },
+      { id: 'TA-4', parte: 1, nombre: 'Remo con apoyo en pecho', series: 3, reps: '8-12', rir: '1-2', progresion: '+2.5 kg', descanso: '2 min', nota: 'Codos abiertos, a 45-60° del cuerpo: espalda media y hombro trasero. Máquina, o mancuernas boca abajo en banco inclinado.',
+        musculos: { primario: ['espalda_media', 'deltoides_posterior'], secundario: ['dorsal', 'biceps', 'trapecio'] } },
 
-      { id: 'A-5', parte: 3, nombre: 'Aperturas en polea', series: 3, reps: '12-15', rir: '1-2', descanso: '45s', nota: 'Pectoral en estiramiento profundo.', bs: 'BS2', bstipo: 'nc',
+      { id: 'TA-5', parte: 2, nombre: 'Elevación lateral en polea', series: 4, reps: '12-20', rir: '0-1', descanso: '60-90s', nota: 'Polea baja, a una mano, cable por detrás del cuerpo: el hombro trabaja estirado.', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['deltoides_medio'], secundario: [] } },
+      { id: 'TA-6', parte: 2, nombre: 'Face pull en polea', series: 4, reps: '15-20', rir: '0-1', descanso: '60-90s', nota: 'OBLIGATORIO (E6). Polea alta con cuerda: tira hacia la frente y termina con los brazos en «Y». Hombro trasero, trapecio inferior y manguito.', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['deltoides_posterior', 'trapecio'], secundario: ['manguito', 'espalda_media'] } },
+      { id: 'TA-7', parte: 2, nombre: 'Tríceps sobre la cabeza en polea', series: 3, reps: '10-15', rir: '0-1', descanso: '60-90s', nota: 'De espaldas a la polea, con cuerda. La cabeza larga crece más estirada.', bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['triceps'], secundario: [] } },
+      { id: 'TA-8', parte: 2, nombre: 'Curl inclinado con mancuernas', series: 3, reps: '8-12', rir: '0-1', descanso: '60-90s', nota: 'Banco a 45-60°, brazos colgando por detrás del cuerpo: bíceps estirado.', bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['biceps'], secundario: ['braquial'] } },
+
+      { id: 'TA-9', parte: 3, nombre: 'Aperturas en polea', series: 2, reps: '12-15', rir: '0-1', descanso: '60s', nota: 'Polea doble, cables a la altura del pecho. Abre hasta notar el estiramiento.', bs: 'BS3', bstipo: 'nc',
         musculos: { primario: ['pecho'], secundario: [] } },
-      { id: 'A-6', parte: 3, nombre: 'Elevación lateral en polea', series: 3, reps: '12-20', rir: '1-2', descanso: '45s', nota: 'Deltoides medio (tu déficit).', bs: 'BS2', bstipo: 'nc',
-        musculos: { primario: ['deltoides_medio'], secundario: [] } },
-      { id: 'A-7', parte: 3, nombre: 'Extensión tríceps overhead', series: 3, reps: '10-15', rir: '1-2', descanso: '45s', nota: 'Cabeza larga en longitud larga.', bs: 'BS3', bstipo: 'nc',
+      { id: 'TA-10', parte: 3, nombre: 'Cuello con banda', series: 2, reps: '15-20', rir: '1-2', descanso: '60s', nota: 'Hacia delante y hacia atrás, lento y sin tirones. Empieza muy suave.', bs: 'BS3', bstipo: 'nc',
+        musculos: { primario: ['cuello'], secundario: [] } },
+
+      { id: 'TA-11', parte: 'finisher', nombre: 'Suitcase carry con mancuerna', series: 3, reps: '30 m/lado', rir: '—', descanso: '90s', nota: 'Único acarreo del día (E9). Torso vertical y hombros nivelados: si te inclinas, pesa demasiado (P2). Sin correas.', acarreo: true,
+        musculos: { primario: ['core_antilateral', 'antebrazo'], secundario: ['trapecio', 'erectores'] } },
+      { id: 'TA-12', parte: 'finisher', nombre: 'Dead hang', series: 2, reps: 'máx', rir: '—', descanso: '90s', nota: 'Colgado de la barra, brazos estirados y hombros activos. Anota los segundos; pasados 60 s, con peso o a una mano.', iso: true,
+        musculos: { primario: ['antebrazo'], secundario: ['dorsal'] } },
+    ]
+  },
+
+  gymPA: {
+    nombre: 'Pierna A', subtitulo: 'Cuádriceps y fuerza', color: '#15803d',
+    duracion: '~95 min · 33 series',
+    chequeo: 'Saltos y agilidad primero, frescos y con descanso completo: calidad, no cansancio. La pierna va antes que todo lo demás; los brazos, al final, no le quitan nada. Doble progresión en los básicos (P1). Si fallas las repeticiones dos sesiones seguidas, bajas el 10 % y vuelves a subir (P6). Entre dos días de pierna, al menos un día en medio (S7).',
+    ejercicios: [
+      { id: 'PA-1', parte: 0, nombre: 'Saltos al cajón', series: 3, reps: '3-5', rir: '—', descanso: '90s', nota: 'Sube de un salto y baja andando, no saltando. Calidad, no cansancio.',
+        musculos: { primario: [], secundario: ['cuadriceps', 'gluteo', 'gemelo'] } },
+      { id: 'PA-2', parte: 0, nombre: 'Agilidad con conos', series: 1, reps: '4 min', rir: '—', descanso: '—', nota: 'Ida y vuelta 5-10-5, escalera o cambios de dirección. Rápido y con buena técnica: para antes de que se vuelva lento.',
+        musculos: { primario: [], secundario: ['cuadriceps', 'gemelo'] } },
+
+      { id: 'PA-3', parte: 1, nombre: 'Sentadilla trasera con barra', series: 4, reps: '5-8', rir: '1-2', progresion: '+5 kg', descanso: '3 min', nota: 'Prioridad del día. Profundidad mínimo paralelo, espalda neutra.',
+        musculos: { primario: ['cuadriceps', 'gluteo'], secundario: ['erectores', 'aductores'] } },
+      { id: 'PA-4', parte: 1, nombre: 'Peso muerto rumano con barra', series: 3, reps: '6-10', rir: '1-2', progresion: '+5 kg', descanso: '2-3 min', nota: 'Cadera atrás, barra pegada al muslo, espalda neutra. Sin correas: también es agarre.',
+        musculos: { primario: ['isquios', 'gluteo'], secundario: ['erectores', 'antebrazo', 'trapecio'] } },
+      { id: 'PA-5', parte: 1, nombre: 'Prensa 45°', series: 3, reps: '10-15', rir: '1-2', progresion: '+5 kg', descanso: '2 min', nota: 'Recorrido completo sin despegar la espalda baja.',
+        musculos: { primario: ['cuadriceps'], secundario: ['gluteo'] } },
+
+      { id: 'PA-6', parte: 2, nombre: 'Extensión de cuádriceps', series: 3, reps: '12-20', rir: '0-1', descanso: '60-90s', nota: 'Respaldo reclinado: el recto femoral trabaja estirado. Opcional: 3-5 parciales abajo al final de la última serie.', bs: 'BS1', bstipo: 'ant',
+        musculos: { primario: ['cuadriceps'], secundario: [] } },
+      { id: 'PA-7', parte: 2, nombre: 'Curl femoral sentado', series: 3, reps: '8-12', rir: '0-1', descanso: '60-90s', nota: 'Sentado mejor que tumbado: el isquio trabaja más estirado.', bs: 'BS1', bstipo: 'ant',
+        musculos: { primario: ['isquios'], secundario: [] } },
+      { id: 'PA-8', parte: 2, nombre: 'Gemelo de pie en máquina', series: 5, reps: '8-12', rir: '0-1', descanso: '60s', nota: 'Pausa de 2 s abajo, con el gemelo estirado.', bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['gemelo'], secundario: [] } },
+      { id: 'PA-9', parte: 2, nombre: 'Tibial contra la pared', series: 2, reps: '15-20', rir: '0-1', descanso: '60s', nota: 'De pie, espalda en la pared y talones adelante: sube las puntas. Para progresar, sentado con un disco sobre los pies.', bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['tibial'], secundario: [] } },
+
+      { id: 'PA-10', parte: 3, nombre: 'Curl predicador con barra Z', series: 3, reps: '8-12', rir: '0-1', descanso: '60-90s', nota: 'Bíceps acortado. Baja controlado sin perder la tensión abajo.', bs: 'BS3', bstipo: 'ant',
+        musculos: { primario: ['biceps'], secundario: ['braquial'] } },
+      { id: 'PA-11', parte: 3, nombre: 'Tríceps en polea con barra', series: 3, reps: '10-15', rir: '0-1', descanso: '60-90s', nota: 'Polea alta, barra recta o en V. Codos pegados al cuerpo.', bs: 'BS3', bstipo: 'ant',
         musculos: { primario: ['triceps'], secundario: [] } },
-      { id: 'A-8', parte: 3, nombre: 'Elevación lateral mancuerna', series: 3, reps: '15-25', rir: '1-2', descanso: '45s', nota: 'Segunda dosis de deltoides medio.', bs: 'BS3', bstipo: 'nc',
-        musculos: { primario: ['deltoides_medio'], secundario: [] } },
-      { id: 'A-9', parte: 3, nombre: 'Extensión tríceps polea (cuerda)', series: 3, reps: '12-15', rir: '1-2', descanso: '45s', nota: 'Segunda dosis de tríceps, rango alto.', bs: 'BS4', bstipo: 'nc',
-        musculos: { primario: ['triceps'], secundario: [] } },
-      { id: 'A-10', parte: 3, nombre: 'Pallof press', series: 3, reps: '10-12/lado', rir: '1-2', descanso: '45s', nota: 'Core anti-rotación. Empuja recto, no dejes que el torso gire ni un grado.', bs: 'BS4', bstipo: 'nc',
+      { id: 'PA-12', parte: 3, nombre: 'Pallof press en polea', series: 2, reps: '10-12/lado', rir: '1-2', descanso: '60s', nota: 'Empuja recto sin dejar que el torso gire ni un grado.',
         musculos: { primario: ['core_antirotacion'], secundario: [] } },
-      { id: 'A-11', parte: 'finisher', nombre: 'Práctica de carga real', series: 4, reps: '20-45s', rir: '—', descanso: '2-3 min', nota: 'EL TRABAJO MÁS ESPECÍFICO DE TU OBJETIVO. Vivía en la calistenia; al dejar esta de ocupar día propio se movió aquí, que es la única sesión sin acarreo y llega con pierna y espalda frescas. Levanta desde sentadilla, pégala al pecho, codos contra las costillas. Protocolo completo en el Anexo A.', nuevo: true, iso: true,
+
+      { id: 'PA-13', parte: 'finisher', nombre: 'Carga frontal con saco de arena', series: 4, reps: '20-45s', rir: '—', descanso: '2-3 min', nota: 'Fuerza funcional. Levanta desde sentadilla, pega la carga al pecho y los codos contra las costillas. Al final de la sesión: ligera y con técnica perfecta. Protocolo en el plan (Anexo A).', iso: true,
         musculos: { primario: ['erectores', 'core_antiextension'], secundario: ['cuadriceps', 'gluteo', 'antebrazo', 'trapecio'] } },
-      { id: 'A-12', parte: 'finisher', nombre: 'Escaleras cargando', series: 1, reps: '1 tramo', rir: '—', descanso: '2 min', nota: 'Solo cuando el bloque de 45s se sienta cómodo.', nuevo: true, opcional: true,
+      { id: 'PA-14', parte: 'finisher', nombre: 'Escaleras cargando', series: 1, reps: '1 tramo', rir: '—', descanso: '2 min', nota: 'Con la misma carga. Pasos cortos, pie completo, mirada al frente.',
+        musculos: { primario: ['cuadriceps', 'gluteo'], secundario: ['erectores', 'core_antiextension'] } },
+    ]
+  },
+
+  gymTB: {
+    nombre: 'Torso B', subtitulo: 'Hombro, pecho alto y espalda', color: '#4ade80',
+    duracion: '~95 min · 37 series',
+    chequeo: 'El press inclinado va primero: tu pecho alto llega fresco. Dos remos distintos a propósito: el de Torso A abre los codos (espalda media), este los pega (dorsal). Doble progresión en los básicos (P1). El isométrico del curl martillo y la pinza son agarre: anota los segundos.',
+    ejercicios: [
+      { id: 'TB-1', parte: 0, nombre: 'Lanzamiento rotacional de balón', series: 3, reps: '5/lado', rir: '—', descanso: '60s', nota: 'Contra la pared, girando desde la cadera. Explosivo: es lo que transfiere a tenis, vóley o natación.',
+        musculos: { primario: [], secundario: ['core_antirotacion'] } },
+
+      { id: 'TB-2', parte: 1, nombre: 'Press inclinado con mancuernas 30°', series: 3, reps: '6-10', rir: '1-2', progresion: '+2 kg', descanso: '3 min', nota: 'Primero del día: tu pecho alto (punto débil #1) llega fresco.',
+        musculos: { primario: ['pecho', 'deltoides_anterior'], secundario: ['triceps'] } },
+      { id: 'TB-3', parte: 1, nombre: 'Jalón con agarre neutro', series: 3, reps: '8-12', rir: '1-2', progresion: '+2.5 kg', descanso: '2-3 min', nota: 'Agarre en V o neutro ancho. Baja las escápulas y luego tira. Sin correas.',
+        musculos: { primario: ['dorsal'], secundario: ['biceps', 'espalda_media', 'braquial'] } },
+      { id: 'TB-4', parte: 1, nombre: 'Press militar sentado con mancuernas', series: 4, reps: '6-10', rir: '1-2', progresion: '+2 kg', descanso: '2-3 min', nota: 'Banco a 90°. Hombro delantero y tríceps.',
+        musculos: { primario: ['deltoides_anterior', 'triceps'], secundario: ['deltoides_medio'] } },
+      { id: 'TB-5', parte: 1, nombre: 'Remo a una mano con mancuerna', series: 3, reps: '8-12', rir: '1-2', progresion: '+2 kg', descanso: '90s', nota: 'Apoyado en banco. Codo pegado al cuerpo y hacia la cadera: dorsal. Estira bien arriba.',
+        musculos: { primario: ['dorsal'], secundario: ['espalda_media', 'biceps'] } },
+
+      { id: 'TB-6', parte: 2, nombre: 'Elevación lateral con mancuernas', series: 4, reps: '15-25', rir: '0-1', descanso: '60-90s', nota: 'Hasta la altura del hombro, sin balanceo.', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['deltoides_medio'], secundario: [] } },
+      { id: 'TB-7', parte: 2, nombre: 'Pájaro en máquina', series: 4, reps: '15-20', rir: '0-1', descanso: '60-90s', nota: 'Hombro trasero. Brazos casi estirados; abre sin encoger los hombros.', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['deltoides_posterior'], secundario: ['espalda_media'] } },
+      { id: 'TB-8', parte: 2, nombre: 'Curl martillo con mancuernas', series: 3, reps: '10-15', rir: '0-1', descanso: '60-90s', nota: 'En la ÚLTIMA serie, al terminar quédate con los codos a 90° y aguanta hasta el fallo. Anota los segundos: es lo más parecido a sostener una carga en brazos.', iso: true, bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['braquial', 'biceps'], secundario: ['antebrazo'] } },
+      { id: 'TB-9', parte: 2, nombre: 'Tríceps sobre la cabeza con mancuerna', series: 3, reps: '10-15', rir: '0-1', descanso: '60-90s', nota: 'Sentado, una mancuerna a dos manos. Baja detrás de la cabeza hasta notar el estiramiento.', bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['triceps'], secundario: [] } },
+
+      { id: 'TB-10', parte: 3, nombre: 'Pullover en polea alta', series: 2, reps: '12-15', rir: '0-1', descanso: '60s', nota: 'Con cuerda o barra recta y los brazos casi estirados: dorsal sin bíceps.', bs: 'BS3', bstipo: 'ant',
+        musculos: { primario: ['dorsal'], secundario: ['trapecio'] } },
+      { id: 'TB-11', parte: 3, nombre: 'Aperturas en polea', series: 2, reps: '12-15', rir: '0-1', descanso: '60s', nota: 'Polea doble, cables de abajo hacia arriba: pecho alto.', bs: 'BS3', bstipo: 'ant',
+        musculos: { primario: ['pecho'], secundario: [] } },
+      { id: 'TB-12', parte: 3, nombre: 'Encogimientos con mancuernas', series: 3, reps: '10-15', rir: '0-1', descanso: '60s', nota: 'Sube recto hacia las orejas y pausa 1 s arriba. Sin correas.', bs: 'BS4', bstipo: 'nc',
+        musculos: { primario: ['trapecio'], secundario: [] } },
+      { id: 'TB-13', parte: 3, nombre: 'Pinza de discos', series: 2, reps: 'máx', rir: '—', descanso: '60s', nota: 'Dos discos lisos juntos, sujetos con los dedos estirados. Anota los segundos.', iso: true, bs: 'BS4', bstipo: 'nc',
+        musculos: { primario: ['antebrazo'], secundario: [] } },
+
+      { id: 'TB-14', parte: 'finisher', nombre: "Farmer's walk con mancuernas", series: 3, reps: '40 m', rir: '—', descanso: '90s', nota: 'Único acarreo del día (E9). Hombros atrás, pecho alto, pasos cortos. Sin correas.', acarreo: true,
+        musculos: { primario: ['antebrazo', 'trapecio'], secundario: ['core_antilateral', 'erectores'] } },
+    ]
+  },
+
+  gymPB: {
+    nombre: 'Pierna B', subtitulo: 'Glúteo y parte trasera', color: '#65a30d',
+    duracion: '~95 min · 41 series',
+    chequeo: 'Sin barra a la espalda. El bear hug va pronto porque necesita la espalda fresca (E5), y es el único acarreo del día (E9): fuerza funcional. Saltos y sprints primero, con descanso completo. Los accesorios de hombro y antebrazo del final no cansan las piernas.',
+    ejercicios: [
+      { id: 'PB-1', parte: 0, nombre: 'Salto horizontal', series: 3, reps: '3', rir: '—', descanso: '90s', nota: 'Desde parado, cae amortiguando. Descanso completo.',
+        musculos: { primario: [], secundario: ['gluteo', 'cuadriceps', 'isquios'] } },
+      { id: 'PB-2', parte: 0, nombre: 'Sprints en bicicleta', series: 4, reps: '6-8 s', rir: '—', descanso: '60-90s', nota: 'A tope desde parado, con resistencia alta. Calidad, no cansancio.',
+        musculos: { primario: [], secundario: ['cuadriceps', 'gluteo'] } },
+
+      { id: 'PB-3', parte: 1, nombre: 'Complejo bear hug con saco de arena', series: 3, reps: '6 sent + 30-40 m', rir: '—', progresion: 'carga', descanso: '2 min', nota: 'Fuerza funcional. Carga abrazada al esternón: si baja del ombligo, para y recolócala. Va temprano: necesita la espalda fresca (E5).', acarreo: true,
+        musculos: { primario: ['cuadriceps', 'erectores', 'gluteo'], secundario: ['core_antiextension', 'antebrazo'] } },
+      { id: 'PB-4', parte: 1, nombre: 'Hip thrust con barra', series: 3, reps: '8-12', rir: '1-2', progresion: '+5 kg', descanso: '2 min', nota: 'Espalda en banco, almohadilla en la barra. Pausa 1 s arriba, costillas abajo.',
+        musculos: { primario: ['gluteo'], secundario: ['isquios'] } },
+      { id: 'PB-5', parte: 1, nombre: 'Peso muerto rumano con mancuernas', series: 3, reps: '8-12', rir: '1-2', progresion: '+2 kg', descanso: '2 min', nota: 'Mismo patrón que con barra, sin carga en la espalda. Sin correas.',
+        musculos: { primario: ['isquios', 'gluteo'], secundario: ['erectores', 'antebrazo'] } },
+      { id: 'PB-6', parte: 1, nombre: 'Búlgara con mancuernas', series: 3, reps: '8-10/pierna', rir: '1-2', progresion: '+2 kg', descanso: '90s', nota: 'Pie trasero en banco. Torso un poco inclinado hacia delante: más glúteo.',
+        musculos: { primario: ['cuadriceps', 'gluteo'], secundario: ['aductores', 'gluteo_medio'] } },
+
+      { id: 'PB-7', parte: 2, nombre: 'Curl femoral sentado', series: 3, reps: '8-12', rir: '0-1', descanso: '60-90s', nota: 'Sentado: el isquio trabaja más estirado.',
+        musculos: { primario: ['isquios'], secundario: [] } },
+      { id: 'PB-8', parte: 2, nombre: 'Gemelo sentado en máquina', series: 5, reps: '12-20', rir: '0-1', descanso: '60s', nota: 'Rodilla doblada: sóleo. Pausa abajo.', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['soleo'], secundario: [] } },
+      { id: 'PB-9', parte: 2, nombre: 'Rueda abdominal', series: 3, reps: '8-12', rir: '1-2', descanso: '60s', nota: 'Abdomen firme, sin hundir la espalda baja. Empieza de rodillas.', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['core_antiextension'], secundario: [] } },
+
+      { id: 'PB-10', parte: 3, nombre: 'Aductor en máquina', series: 2, reps: '12-15', rir: '0-1', descanso: '60s', nota: 'Recorrido amplio, abre hasta notar el estiramiento.', bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['aductores'], secundario: [] } },
+      { id: 'PB-11', parte: 3, nombre: 'Abductor en máquina', series: 2, reps: '15-20', rir: '0-1', descanso: '60s', nota: 'Glúteo medio: estabiliza la rodilla.', bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['gluteo_medio'], secundario: [] } },
+      { id: 'PB-12', parte: 3, nombre: 'Elevación lateral en polea', series: 3, reps: '12-20', rir: '0-1', descanso: '60s', nota: 'Polea baja, a una mano.', bs: 'BS3', bstipo: 'nc',
+        musculos: { primario: ['deltoides_medio'], secundario: [] } },
+      { id: 'PB-13', parte: 3, nombre: 'Pájaro en polea', series: 3, reps: '15-20', rir: '0-1', descanso: '60s', nota: 'Cables cruzados a la altura del hombro.', bs: 'BS3', bstipo: 'nc',
+        musculos: { primario: ['deltoides_posterior'], secundario: [] } },
+      { id: 'PB-14', parte: 3, nombre: 'Hiperextensión 45°', series: 2, reps: '12-15', rir: '1-2', descanso: '60s', nota: 'Espalda baja y glúteo. Para progresar, un disco abrazado al pecho.', bs: 'BS4', bstipo: 'nc',
+        musculos: { primario: ['erectores', 'gluteo'], secundario: ['isquios'] } },
+      { id: 'PB-15', parte: 3, nombre: 'Curl inverso con barra Z', series: 2, reps: '12-15', rir: '0-1', descanso: '60s', nota: 'Antebrazo y braquial. Muñecas firmes.', bs: 'BS4', bstipo: 'nc',
+        musculos: { primario: ['braquial', 'antebrazo'], secundario: ['biceps'] } },
+    ]
+  },
+
+  gymE: {
+    nombre: 'Brazos y hombros', subtitulo: '5.ª sesión opcional', color: '#16a34a',
+    duracion: '~65 min · 31 series',
+    chequeo: 'Opcional: cuando quieras, sin condiciones. Las tres cabezas del hombro, bíceps, braquial, tríceps, antebrazo y manguito. No está en la rotación: la eliges tú en el día.',
+    ejercicios: [
+      { id: 'E-1', parte: 1, nombre: 'Press de hombro en máquina', series: 3, reps: '8-12', rir: '1-2', progresion: '+2.5 kg', descanso: '2 min', nota: 'Hombro delantero y tríceps, sin equilibrio que limite.',
+        musculos: { primario: ['deltoides_anterior', 'triceps'], secundario: ['deltoides_medio'] } },
+      { id: 'E-2', parte: 1, nombre: 'Jalón con palmas hacia ti', series: 3, reps: '6-10', rir: '1-2', progresion: '+2.5 kg', descanso: '2 min', nota: 'Barra recta, agarre al ancho de hombros: dorsal y bíceps.',
+        musculos: { primario: ['dorsal', 'biceps'], secundario: ['braquial'] } },
+      { id: 'E-3', parte: 1, nombre: 'Fondos en paralelas', series: 3, reps: '6-10', rir: '1-2', progresion: 'carga', descanso: '2 min', nota: 'Con cinturón y disco cuando hagas 10 limpias. Si molesta el hombro: press cerrado con barra.', lastre: true,
+        musculos: { primario: ['triceps', 'pecho'], secundario: ['deltoides_anterior'] } },
+
+      { id: 'E-4', parte: 2, nombre: 'Elevación lateral en polea', series: 4, reps: '12-20', rir: '0-1', descanso: '60s', nota: 'Polea baja, a una mano.', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['deltoides_medio'], secundario: [] } },
+      { id: 'E-5', parte: 2, nombre: 'Pájaro en máquina', series: 4, reps: '15-20', rir: '0-1', descanso: '60s', nota: 'Hombro trasero.', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['deltoides_posterior'], secundario: [] } },
+      { id: 'E-6', parte: 2, nombre: 'Curl en polea por detrás del cuerpo', series: 3, reps: '10-15', rir: '0-1', descanso: '60s', nota: 'Polea baja a una mano, de espaldas: bíceps estirado.', bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['biceps'], secundario: [] } },
+      { id: 'E-7', parte: 2, nombre: 'Tríceps sobre la cabeza en polea', series: 3, reps: '10-15', rir: '0-1', descanso: '60s', nota: 'De espaldas a la polea, con cuerda.', bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['triceps'], secundario: [] } },
+
+      { id: 'E-8', parte: 3, nombre: 'Curl martillo con cuerda en polea', series: 2, reps: '10-15', rir: '0-1', descanso: '60s', nota: 'En la última serie, isométrico a 90° hasta el fallo. Anota los segundos.', iso: true, bs: 'BS3', bstipo: 'ant',
+        musculos: { primario: ['braquial', 'biceps'], secundario: ['antebrazo'] } },
+      { id: 'E-9', parte: 3, nombre: 'Tríceps en polea con cuerda', series: 2, reps: '12-15', rir: '0-1', descanso: '60s', nota: 'Abre la cuerda abajo.', bs: 'BS3', bstipo: 'ant',
+        musculos: { primario: ['triceps'], secundario: [] } },
+      { id: 'E-10', parte: 3, nombre: 'Curl de muñeca con barra', series: 2, reps: '15-20', rir: '0-1', descanso: '45s', nota: 'Antebrazos apoyados en el banco, solo se mueve la muñeca.', bs: 'BS4', bstipo: 'nc',
+        musculos: { primario: ['antebrazo'], secundario: [] } },
+      { id: 'E-11', parte: 3, nombre: 'Rotación externa en polea', series: 2, reps: '15-20', rir: '1-2', descanso: '45s', nota: 'Polea a la altura del codo, codo pegado al cuerpo. Ligero: protege el hombro.', bs: 'BS4', bstipo: 'nc',
+        musculos: { primario: ['manguito'], secundario: [] } },
+      { id: 'E-12', parte: 3, nombre: 'Gemelo de pie en máquina', series: 2, reps: '8-12', rir: '0-1', descanso: '45s', nota: 'Pausa de 2 s abajo.', bs: 'BS5', bstipo: 'nc',
+        musculos: { primario: ['gemelo'], secundario: [] } },
+      { id: 'E-13', parte: 3, nombre: 'Elevación de piernas colgado', series: 2, reps: '8-12', rir: '1-2', descanso: '45s', nota: 'Sin balanceo: sube con el abdomen, no con impulso.', bs: 'BS5', bstipo: 'nc',
+        musculos: { primario: ['core_antiextension'], secundario: [] } },
+    ]
+  },
+
+  // ─── OPCIÓN B · las cinco de siempre, con el contenido de la v7 ───
+  // Mismos ids que en la v6 para los ejercicios que siguen: su historial continúa.
+  gymA: {
+    nombre: 'Empuje', subtitulo: 'Pecho · hombro · tríceps · fuerza funcional', color: '#22c55e',
+    duracion: '~90 min · 30 series',
+    chequeo: 'La banca va primero. 2 series de aproximación antes del primer básico (N1). El face pull es obligatorio y no se recorta nunca (E6). Doble progresión en los básicos (P1); si fallas las repeticiones dos sesiones seguidas, bajas el 10 % (P6).',
+    ejercicios: [
+      { id: 'A-13', parte: 0, nombre: 'Lanzamiento de balón al pecho', series: 3, reps: '5', rir: '—', descanso: '60s', nota: 'Contra la pared, explosivo. Descanso completo.',
+        musculos: { primario: [], secundario: ['pecho', 'triceps'] } },
+      { id: 'A-1', parte: 1, nombre: 'Press de banca con barra', series: 3, reps: '5-8', rir: '1-2', progresion: '+2.5 kg', descanso: '3 min', nota: 'Prioridad #1. Escápulas atrás, bajada controlada, sin rebote.',
+        musculos: { primario: ['pecho', 'triceps'], secundario: ['deltoides_anterior'] } },
+      { id: 'A-3', parte: 1, nombre: 'Press inclinado con mancuernas 30°', series: 3, reps: '8-12', rir: '1-2', progresion: '+2 kg', descanso: '2-3 min', nota: '30°, no más: si subes el banco, el trabajo se va al hombro.',
+        musculos: { primario: ['pecho', 'deltoides_anterior'], secundario: ['triceps'] } },
+      { id: 'A-2', parte: 1, nombre: 'Press militar sentado con mancuernas', series: 4, reps: '6-10', rir: '1-2', progresion: '+2 kg', descanso: '2-3 min', nota: 'Banco a 90°. Hombro delantero y tríceps.',
+        musculos: { primario: ['deltoides_anterior', 'triceps'], secundario: ['deltoides_medio'] } },
+      { id: 'A-5', parte: 2, nombre: 'Aperturas en polea', series: 2, reps: '12-15', rir: '0-1', descanso: '60-90s', nota: 'Polea doble, cables a la altura del pecho.',
+        musculos: { primario: ['pecho'], secundario: [] } },
+      { id: 'A-6', parte: 2, nombre: 'Elevación lateral en polea', series: 4, reps: '12-20', rir: '0-1', descanso: '60-90s', nota: 'Polea baja, a una mano, cable por detrás del cuerpo.', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['deltoides_medio'], secundario: [] } },
+      { id: 'A-4', parte: 2, nombre: 'Face pull en polea', series: 4, reps: '15-20', rir: '0-1', descanso: '60-90s', nota: 'OBLIGATORIO (E6). Cuerda hacia la frente, terminando con los brazos en «Y».', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['deltoides_posterior', 'trapecio'], secundario: ['manguito', 'espalda_media'] } },
+      { id: 'A-7', parte: 3, nombre: 'Tríceps sobre la cabeza en polea', series: 3, reps: '10-15', rir: '0-1', descanso: '60s', nota: 'De espaldas a la polea, con cuerda: cabeza larga estirada.', bs: 'BS2', bstipo: 'nc',
+        musculos: { primario: ['triceps'], secundario: [] } },
+      { id: 'A-10', parte: 3, nombre: 'Pallof press en polea', series: 2, reps: '10-12/lado', rir: '1-2', descanso: '60s', nota: 'Empuja recto sin dejar que el torso gire.', bs: 'BS2', bstipo: 'nc',
+        musculos: { primario: ['core_antirotacion'], secundario: [] } },
+      { id: 'A-9', parte: 3, nombre: 'Tríceps en polea con cuerda', series: 3, reps: '12-15', rir: '0-1', descanso: '60s', nota: 'Abre la cuerda abajo.', bs: 'BS3', bstipo: 'nc',
+        musculos: { primario: ['triceps'], secundario: [] } },
+      { id: 'A-14', parte: 3, nombre: 'Cuello con banda', series: 2, reps: '15-20', rir: '1-2', descanso: '60s', nota: 'Hacia delante y hacia atrás, lento. Empieza muy suave.', bs: 'BS3', bstipo: 'nc',
+        musculos: { primario: ['cuello'], secundario: [] } },
+      { id: 'A-11', parte: 'finisher', nombre: 'Carga frontal con saco de arena', series: 4, reps: '20-45s', rir: '—', descanso: '2-3 min', nota: 'Fuerza funcional. Levanta desde sentadilla, pega la carga al pecho y los codos contra las costillas. Protocolo en el plan (Anexo A).', iso: true,
+        musculos: { primario: ['erectores', 'core_antiextension'], secundario: ['cuadriceps', 'gluteo', 'antebrazo', 'trapecio'] } },
+      { id: 'A-12', parte: 'finisher', nombre: 'Escaleras cargando', series: 1, reps: '1 tramo', rir: '—', descanso: '2 min', nota: 'Con la misma carga. Pasos cortos, pie completo.',
         musculos: { primario: ['cuadriceps', 'gluteo'], secundario: ['erectores', 'core_antiextension'] } },
     ]
   },
 
   gymC1: {
-    nombre: 'Pierna fuerza', subtitulo: 'Pierna pesada · CERO torso', color: '#15803d',
-    duracion: '~105 min · 31 series',
-    chequeo: 'Tres compuestos con progresión lineal: sentadilla +5 kg, Zercher +2.5 kg, RDL +5 kg. N1: 2 series de aproximación antes del primero de cada patrón. Sem 1-3: el Zercher deliberadamente ligero, debe sentirse fácil (L1). Si fallas las reps dos sesiones seguidas, bajas el 10% (P6). Separación mínima con el otro día de pierna: 2-3 días (S7). Con 3 gym por semana la cadencia real es de 1-1.5 sesiones de pierna semanales.',
+    nombre: 'Pierna fuerza', subtitulo: 'Cuádriceps y fuerza', color: '#15803d',
+    duracion: '~90 min · 31 series',
+    chequeo: 'Saltos y agilidad primero, frescos. La pierna va antes que todo; los brazos, al final. Doble progresión en los básicos (P1); si fallas las repeticiones dos sesiones seguidas, bajas el 10 % (P6). Entre dos días de pierna, al menos un día en medio (S7).',
     ejercicios: [
-      { id: 'C1-1', parte: 1, nombre: 'Sentadilla trasera con barra', series: 4, reps: '5-8', lineal: true, progresion: '+5 kg', descanso: '3 min', nota: 'Prioridad del día. Profundidad mínimo paralelo. Alt: hack squat.',
-        musculos: { primario: ['cuadriceps', 'gluteo'], secundario: ['erectores', 'isquios'] } },
-      { id: 'C1-2', parte: 1, nombre: 'Sentadilla Zercher', series: 3, reps: '6-8', lineal: true, progresion: '+2.5 kg', descanso: '2.5 min', nota: 'Barra en el pliegue del codo, pegada al pecho. Codos SIEMPRE contra las costillas. Usa pad. Limitado por postura → va temprano (E5).', nuevo: true,
-        musculos: { primario: ['cuadriceps', 'erectores'], secundario: ['gluteo', 'core_antiextension'] } },
-      { id: 'C1-3', parte: 1, nombre: 'Peso muerto rumano', series: 3, reps: '6-10', lineal: true, progresion: '+5 kg', descanso: '2.5 min', nota: 'Isquio en longitud larga. Cadera atrás, tibias verticales, barra pegada al muslo.',
-        musculos: { primario: ['isquios', 'gluteo'], secundario: ['erectores', 'trapecio'] } },
-
-      { id: 'C1-4', parte: 2, nombre: 'Prensa 45°', series: 3, reps: '10-15', rir: '1-2', descanso: '90s', nota: 'Empareja con gemelo sentado (no solapa).', bs: 'BS1', bstipo: 'nc',
+      { id: 'C1-11', parte: 0, nombre: 'Saltos al cajón', series: 3, reps: '3-5', rir: '—', descanso: '90s', nota: 'Sube de un salto y baja andando. Calidad, no cansancio.',
+        musculos: { primario: [], secundario: ['cuadriceps', 'gluteo', 'gemelo'] } },
+      { id: 'C1-12', parte: 0, nombre: 'Agilidad con conos', series: 1, reps: '4 min', rir: '—', descanso: '—', nota: 'Ida y vuelta 5-10-5 o escalera. Para antes de que se vuelva lento.',
+        musculos: { primario: [], secundario: ['cuadriceps', 'gemelo'] } },
+      { id: 'C1-1', parte: 1, nombre: 'Sentadilla trasera con barra', series: 4, reps: '5-8', rir: '1-2', progresion: '+5 kg', descanso: '3 min', nota: 'Prioridad del día. Profundidad mínimo paralelo.',
+        musculos: { primario: ['cuadriceps', 'gluteo'], secundario: ['erectores', 'aductores'] } },
+      { id: 'C1-3', parte: 1, nombre: 'Peso muerto rumano con barra', series: 3, reps: '6-10', rir: '1-2', progresion: '+5 kg', descanso: '2-3 min', nota: 'Cadera atrás, barra pegada al muslo. Sin correas.',
+        musculos: { primario: ['isquios', 'gluteo'], secundario: ['erectores', 'antebrazo', 'trapecio'] } },
+      { id: 'C1-4', parte: 1, nombre: 'Prensa 45°', series: 3, reps: '10-15', rir: '1-2', progresion: '+5 kg', descanso: '2 min', nota: 'Recorrido completo sin despegar la espalda baja.',
         musculos: { primario: ['cuadriceps'], secundario: ['gluteo'] } },
-      { id: 'C1-5', parte: 2, nombre: 'Gemelo sentado (sóleo)', series: 3, reps: '12-20', rir: '1-2', descanso: '60s', nota: 'Rodilla flexionada = sóleo.', bs: 'BS1', bstipo: 'nc',
-        musculos: { primario: ['soleo'], secundario: [] } },
-
-      { id: 'C1-6', parte: 3, nombre: 'Extensión de cuádriceps', series: 3, reps: '12-20', rir: '1-2', descanso: '45s', nota: 'Antagonista del curl femoral.', bs: 'BS2', bstipo: 'ant',
+      { id: 'C1-6', parte: 2, nombre: 'Extensión de cuádriceps', series: 3, reps: '12-20', rir: '0-1', descanso: '60-90s', nota: 'Respaldo reclinado: recto femoral estirado.', bs: 'BS1', bstipo: 'ant',
         musculos: { primario: ['cuadriceps'], secundario: [] } },
-      { id: 'C1-7', parte: 3, nombre: 'Curl femoral sentado', series: 3, reps: '8-12', rir: '1-2', descanso: '45s', nota: 'Sentado > tumbado.', bs: 'BS2', bstipo: 'ant',
+      { id: 'C1-7', parte: 2, nombre: 'Curl femoral sentado', series: 3, reps: '8-12', rir: '0-1', descanso: '60-90s', nota: 'Sentado mejor que tumbado.', bs: 'BS1', bstipo: 'ant',
         musculos: { primario: ['isquios'], secundario: [] } },
-      { id: 'C1-8', parte: 3, nombre: 'Hip thrust con barra', series: 3, reps: '8-12', rir: '1-2', descanso: '60s', nota: 'Glúteo en acortamiento máximo. Pausa 1s arriba, costillas abajo.', bs: 'BS3', bstipo: 'nc',
-        musculos: { primario: ['gluteo'], secundario: ['isquios'] } },
-      { id: 'C1-9', parte: 3, nombre: 'Gemelo de pie', series: 3, reps: '8-12', rir: '1-2', descanso: '45s', nota: 'Rodilla extendida = gastrocnemio. Pausa 2s abajo.', bs: 'BS3', bstipo: 'nc',
+      { id: 'C1-9', parte: 2, nombre: 'Gemelo de pie en máquina', series: 5, reps: '8-12', rir: '0-1', descanso: '60s', nota: 'Pausa de 2 s abajo.', bs: 'BS2', bstipo: 'ant',
         musculos: { primario: ['gemelo'], secundario: [] } },
-      { id: 'C1-10', parte: 3, nombre: 'Abductor en máquina', series: 3, reps: '15-20', rir: '1-2', descanso: '45s', nota: 'Glúteo medio, estabiliza rodilla.',
-        musculos: { primario: ['gluteo_medio'], secundario: [] } },
+      { id: 'C1-13', parte: 2, nombre: 'Tibial contra la pared', series: 2, reps: '15-20', rir: '0-1', descanso: '60s', nota: 'Espalda en la pared, sube las puntas. Para progresar, disco sobre los pies.', bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['tibial'], secundario: [] } },
+      { id: 'C1-14', parte: 3, nombre: 'Curl predicador con barra Z', series: 3, reps: '8-12', rir: '0-1', descanso: '60-90s', nota: 'Bíceps acortado. Baja controlado.', bs: 'BS3', bstipo: 'ant',
+        musculos: { primario: ['biceps'], secundario: ['braquial'] } },
+      { id: 'C1-15', parte: 3, nombre: 'Tríceps en polea con barra', series: 3, reps: '10-15', rir: '0-1', descanso: '60-90s', nota: 'Codos pegados al cuerpo.', bs: 'BS3', bstipo: 'ant',
+        musculos: { primario: ['triceps'], secundario: [] } },
+      { id: 'C1-16', parte: 3, nombre: 'Rueda abdominal', series: 2, reps: '8-12', rir: '1-2', descanso: '60s', nota: 'Sin hundir la espalda baja. Empieza de rodillas.',
+        musculos: { primario: ['core_antiextension'], secundario: [] } },
     ]
   },
 
   gymD: {
-    nombre: 'Torso', subtitulo: 'Empuje + tracción · equilibrio', color: '#4ade80',
-    duracion: '~90 min · 29 series',
-    chequeo: 'Única sesión donde empuje y tracción conviven a propósito: mantiene alta la frecuencia de tus dos puntos débiles. Segunda dosis semanal de banca y de jalón, las dos con progresión lineal. El farmer\'s walk es el único acarreo del día (E9) y va al final por estar limitado por agarre (E5). En la secuencia v6, D queda encajada entre C1 y C2, así que no toca ni A ni B.',
+    nombre: 'Torso', subtitulo: 'Pecho alto · espalda · hombro · brazos', color: '#4ade80',
+    duracion: '~92 min · 33 series',
+    chequeo: 'El press inclinado va primero. Empuje y tracción juntos a propósito: tus dos puntos débiles reciben su segunda dosis. El farmer\'s walk es el único acarreo (E9) y va al final por el agarre (E5).',
     ejercicios: [
-      { id: 'D-1', parte: 1, nombre: 'Press banca con barra', series: 4, reps: '5-8', lineal: true, progresion: '+2.5 kg', descanso: '2.5 min', nota: 'Segunda dosis de tu punto débil #1.',
-        musculos: { primario: ['pecho', 'triceps'], secundario: ['deltoides_anterior'] } },
-      { id: 'D-2', parte: 1, nombre: 'Dominada o jalón pesado', series: 4, reps: '6-10', lineal: true, progresion: 'carga', descanso: '2.5 min', nota: 'Punto débil #2. Progresa en CARGA. SIN correas en dominada / CON en jalón.', lastre: true,
-        musculos: { primario: ['dorsal', 'biceps'], secundario: ['espalda_media', 'braquial', 'antebrazo'] } },
-
-      { id: 'D-3', parte: 2, nombre: 'Press inclinado mancuernas 30°', series: 3, reps: '8-12', rir: '1-2', descanso: '90s', nota: 'Pectoral superior. Antagonista real del remo.', bs: 'BS1', bstipo: 'ant',
+      { id: 'D-3', parte: 1, nombre: 'Press inclinado con mancuernas 30°', series: 3, reps: '6-10', rir: '1-2', progresion: '+2 kg', descanso: '3 min', nota: 'Primero del día: pecho alto fresco.',
         musculos: { primario: ['pecho', 'deltoides_anterior'], secundario: ['triceps'] } },
-      { id: 'D-4', parte: 2, nombre: 'Remo con apoyo en pecho', series: 3, reps: '8-12', rir: '1-2', descanso: '90s', nota: 'Espalda media sin carga lumbar. Antagonista del press inclinado.', bs: 'BS1', bstipo: 'ant',
-        musculos: { primario: ['espalda_media', 'dorsal'], secundario: ['biceps', 'deltoides_posterior'] } },
-
-      { id: 'D-5', parte: 3, nombre: 'Elevación lateral', series: 3, reps: '12-20', rir: '1-2', descanso: '45s', nota: 'Deltoides medio.', bs: 'BS2', bstipo: 'nc',
+      { id: 'D-2', parte: 1, nombre: 'Dominada', series: 3, reps: '6-10', rir: '1-2', progresion: '+2.5 kg', descanso: '2-3 min', nota: 'Asistida si aún no haces 6 limpias; con cinturón y disco al pasar de 8 (E3). Sin correas.', lastre: true,
+        musculos: { primario: ['dorsal', 'biceps'], secundario: ['espalda_media', 'braquial', 'antebrazo'] } },
+      { id: 'D-4', parte: 1, nombre: 'Remo con apoyo en pecho', series: 3, reps: '8-12', rir: '1-2', progresion: '+2.5 kg', descanso: '2 min', nota: 'Codos abiertos: espalda media y hombro trasero.',
+        musculos: { primario: ['espalda_media', 'deltoides_posterior'], secundario: ['dorsal', 'biceps', 'trapecio'] } },
+      { id: 'D-10', parte: 1, nombre: 'Press de pecho en máquina', series: 2, reps: '8-12', rir: '1-2', progresion: '+2.5 kg', descanso: '2 min', nota: 'Segunda dosis de pecho sin equilibrio que limite.',
+        musculos: { primario: ['pecho', 'triceps'], secundario: ['deltoides_anterior'] } },
+      { id: 'D-5', parte: 2, nombre: 'Elevación lateral con mancuernas', series: 4, reps: '15-25', rir: '0-1', descanso: '60-90s', nota: 'Hasta la altura del hombro, sin balanceo.', bs: 'BS1', bstipo: 'nc',
         musculos: { primario: ['deltoides_medio'], secundario: [] } },
-      { id: 'D-6', parte: 3, nombre: 'Curl inverso', series: 3, reps: '12-15', rir: '1-2', descanso: '45s', nota: 'Braquiorradial + extensores del antebrazo. Muñeca firme. Usa 50-60% del peso de tu curl normal.', nuevo: true, bs: 'BS2', bstipo: 'nc',
-        musculos: { primario: ['braquial', 'antebrazo'], secundario: ['biceps'] } },
-      { id: 'D-7', parte: 3, nombre: 'Face pull o pájaro', series: 3, reps: '15-20', rir: '1-2', descanso: '45s', nota: 'Deltoides posterior.', bs: 'BS3', bstipo: 'nc',
-        musculos: { primario: ['deltoides_posterior'], secundario: ['trapecio'] } },
-      { id: 'D-8', parte: 3, nombre: 'Extensión tríceps overhead', series: 3, reps: '10-15', rir: '1-2', descanso: '45s', nota: 'Cabeza larga del tríceps.', bs: 'BS3', bstipo: 'nc',
+      { id: 'D-7', parte: 2, nombre: 'Pájaro en máquina', series: 4, reps: '15-20', rir: '0-1', descanso: '60-90s', nota: 'Hombro trasero.', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['deltoides_posterior'], secundario: ['espalda_media'] } },
+      { id: 'D-11', parte: 2, nombre: 'Curl martillo con mancuernas', series: 3, reps: '10-15', rir: '0-1', descanso: '60-90s', nota: 'En la última serie, isométrico a 90° hasta el fallo. Anota los segundos.', iso: true, bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['braquial', 'biceps'], secundario: ['antebrazo'] } },
+      { id: 'D-8', parte: 2, nombre: 'Tríceps sobre la cabeza con mancuerna', series: 3, reps: '10-15', rir: '0-1', descanso: '60-90s', nota: 'Sentado, una mancuerna a dos manos.', bs: 'BS2', bstipo: 'ant',
         musculos: { primario: ['triceps'], secundario: [] } },
-
-      { id: 'D-9', parte: 'finisher', nombre: "Farmer's walk", series: 3, reps: '40 m', rir: '—', descanso: '90s', nota: 'Único acarreo del día. Hombros atrás y abajo, pecho alto, pasos cortos. Progresa en carga mientras mantengas la postura (P2).', nuevo: true, acarreo: true,
+      { id: 'D-12', parte: 3, nombre: 'Aperturas en polea', series: 2, reps: '12-15', rir: '0-1', descanso: '60s', nota: 'Cables de abajo hacia arriba: pecho alto.', bs: 'BS3', bstipo: 'nc',
+        musculos: { primario: ['pecho'], secundario: [] } },
+      { id: 'D-13', parte: 3, nombre: 'Encogimientos con mancuernas', series: 3, reps: '10-15', rir: '0-1', descanso: '60s', nota: 'Pausa 1 s arriba. Sin correas.', bs: 'BS3', bstipo: 'nc',
+        musculos: { primario: ['trapecio'], secundario: [] } },
+      { id: 'D-14', parte: 3, nombre: 'Pinza de discos', series: 2, reps: 'máx', rir: '—', descanso: '60s', nota: 'Dos discos lisos juntos con los dedos estirados. Anota los segundos.', iso: true,
+        musculos: { primario: ['antebrazo'], secundario: [] } },
+      { id: 'D-9', parte: 'finisher', nombre: "Farmer's walk con mancuernas", series: 3, reps: '40 m', rir: '—', descanso: '90s', nota: 'Único acarreo del día (E9). Hombros atrás, pecho alto, pasos cortos (P2).', acarreo: true,
         musculos: { primario: ['antebrazo', 'trapecio'], secundario: ['core_antilateral', 'erectores'] } },
     ]
   },
 
   gymC2: {
-    nombre: 'Pierna volumen', subtitulo: 'Pierna volumen · sin barra a la espalda', color: '#65a30d',
-    duracion: '~100 min · 31 series',
-    chequeo: 'Sin carga axial: ninguna barra a la espalda. Secuencia deliberada prensa → bear hug → RDL, porque el bear hug necesita erectores frescos. Es el único acarreo del día (E9) y va temprano por estar limitado por postura (E5). Sem 1-3: bear hug deliberadamente ligero (L1). El step-up y la búlgara ALTERNAN por sesión.',
+    nombre: 'Pierna volumen', subtitulo: 'Glúteo y parte trasera · sin barra a la espalda', color: '#65a30d',
+    duracion: '~95 min · 39 series',
+    chequeo: 'Sin barra a la espalda. El bear hug va pronto (E5) y es el único acarreo (E9): fuerza funcional. Saltos y sprints primero, con descanso completo.',
     ejercicios: [
-      { id: 'C2-1', parte: 1, nombre: 'Prensa 45°', series: 4, reps: '10-15', lineal: true, progresion: '+5 kg', descanso: '2.5 min', nota: 'Motor del día. Pies a media altura, ROM completo sin despegar la lumbar.',
+      { id: 'C2-11', parte: 0, nombre: 'Salto horizontal', series: 3, reps: '3', rir: '—', descanso: '90s', nota: 'Desde parado, cae amortiguando.',
+        musculos: { primario: [], secundario: ['gluteo', 'cuadriceps', 'isquios'] } },
+      { id: 'C2-12', parte: 0, nombre: 'Sprints en bicicleta', series: 4, reps: '6-8 s', rir: '—', descanso: '60-90s', nota: 'A tope desde parado, resistencia alta.',
+        musculos: { primario: [], secundario: ['cuadriceps', 'gluteo'] } },
+      { id: 'C2-1', parte: 1, nombre: 'Prensa 45°', series: 3, reps: '10-15', rir: '1-2', progresion: '+5 kg', descanso: '2 min', nota: 'Motor del día. Recorrido completo sin despegar la espalda baja.',
         musculos: { primario: ['cuadriceps'], secundario: ['gluteo', 'isquios'] } },
-      { id: 'C2-2', parte: 1, nombre: 'Complejo bear hug', series: 3, reps: '6 sent + 30-40 m', lineal: true, progresion: 'carga', descanso: '2 min', nota: 'Lo más parecido a cargar a una persona. Objeto abrazado AL ESTERNÓN: si baja del ombligo, para y recolócalo. Protocolo completo en el Anexo A.', nuevo: true, acarreo: true,
+      { id: 'C2-2', parte: 1, nombre: 'Complejo bear hug con saco de arena', series: 3, reps: '6 sent + 30-40 m', rir: '—', progresion: 'carga', descanso: '2 min', nota: 'Fuerza funcional. Carga abrazada al esternón: si baja del ombligo, recolócala.', acarreo: true,
         musculos: { primario: ['cuadriceps', 'erectores', 'gluteo'], secundario: ['core_antiextension', 'antebrazo'] } },
-      { id: 'C2-3', parte: 1, nombre: 'Peso muerto rumano con mancuernas', series: 3, reps: '8-12', lineal: true, progresion: 'carga', descanso: '2 min', nota: 'Mismo patrón que el RDL con barra, sin carga axial.',
-        musculos: { primario: ['isquios', 'gluteo'], secundario: ['erectores', 'antebrazo'] } },
-
-      { id: 'C2-4', parte: 2, nombre: 'Step-up cajón alto (goblet) ⇄ Búlgara', series: 3, reps: '8-10/pierna', rir: '1-2', descanso: '90s', nota: 'ALTERNAN por sesión: una C2 step-up, la siguiente búlgara. Step-up: pie completo, empuja con el talón de arriba, sin impulso, bajada 3s.', nuevo: true, bs: 'BS1', bstipo: 'nc',
-        musculos: { primario: ['cuadriceps', 'gluteo'], secundario: ['isquios', 'gluteo_medio', 'aductores'] } },
-      { id: 'C2-5', parte: 2, nombre: 'Gemelo sentado (sóleo)', series: 3, reps: '12-20', rir: '1-2', descanso: '60s', nota: 'No solapa con el step-up.', bs: 'BS1', bstipo: 'nc',
-        musculos: { primario: ['soleo'], secundario: [] } },
-
-      { id: 'C2-6', parte: 3, nombre: 'Curl femoral sentado', series: 3, reps: '8-12', rir: '1-2', descanso: '45s', nota: 'Antagonista de la extensión.', bs: 'BS2', bstipo: 'ant',
-        musculos: { primario: ['isquios'], secundario: [] } },
-      { id: 'C2-7', parte: 3, nombre: 'Extensión de cuádriceps', series: 3, reps: '12-20', rir: '1-2', descanso: '45s', nota: 'Recto femoral con cadera extendida.', bs: 'BS2', bstipo: 'ant',
-        musculos: { primario: ['cuadriceps'], secundario: [] } },
-      { id: 'C2-8', parte: 3, nombre: 'Hiperextensión 45°', series: 3, reps: '12-15', rir: '1-2', descanso: '60s', nota: 'Empuja con glúteo, no con lumbar.', bs: 'BS3', bstipo: 'nc',
-        musculos: { primario: ['gluteo', 'erectores'], secundario: ['isquios'] } },
-      { id: 'C2-9', parte: 3, nombre: 'Gemelo de pie', series: 3, reps: '8-12', rir: '1-2', descanso: '45s', nota: 'Rodilla extendida = gastrocnemio. Pausa 2s abajo.', bs: 'BS3', bstipo: 'nc',
-        musculos: { primario: ['gemelo'], secundario: [] } },
-      { id: 'C2-10', parte: 3, nombre: 'Hip thrust', series: 3, reps: '8-12', rir: '1-2', descanso: '60s', nota: 'Glúteo directo. Pausa 1s arriba.',
+      { id: 'C2-10', parte: 1, nombre: 'Hip thrust con barra', series: 3, reps: '8-12', rir: '1-2', progresion: '+5 kg', descanso: '2 min', nota: 'Pausa 1 s arriba, costillas abajo.',
         musculos: { primario: ['gluteo'], secundario: ['isquios'] } },
+      { id: 'C2-3', parte: 1, nombre: 'Peso muerto rumano con mancuernas', series: 3, reps: '8-12', rir: '1-2', progresion: '+2 kg', descanso: '2 min', nota: 'Sin carga en la espalda. Sin correas.',
+        musculos: { primario: ['isquios', 'gluteo'], secundario: ['erectores', 'antebrazo'] } },
+      { id: 'C2-4', parte: 1, nombre: 'Búlgara con mancuernas', series: 3, reps: '8-10/pierna', rir: '1-2', progresion: '+2 kg', descanso: '90s', nota: 'Pie trasero en banco, torso un poco inclinado.',
+        musculos: { primario: ['cuadriceps', 'gluteo'], secundario: ['aductores', 'gluteo_medio'] } },
+      { id: 'C2-6', parte: 2, nombre: 'Curl femoral sentado', series: 2, reps: '8-12', rir: '0-1', descanso: '60-90s', nota: 'Sentado: isquio estirado.',
+        musculos: { primario: ['isquios'], secundario: [] } },
+      { id: 'C2-5', parte: 2, nombre: 'Gemelo sentado en máquina', series: 5, reps: '12-20', rir: '0-1', descanso: '60s', nota: 'Rodilla doblada: sóleo. Pausa abajo.', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['soleo'], secundario: [] } },
+      { id: 'C2-13', parte: 2, nombre: 'Rueda abdominal', series: 3, reps: '8-12', rir: '1-2', descanso: '60s', nota: 'Sin hundir la espalda baja.', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['core_antiextension'], secundario: [] } },
+      { id: 'C2-14', parte: 3, nombre: 'Aductor en máquina', series: 2, reps: '12-15', rir: '0-1', descanso: '60s', nota: 'Recorrido amplio.', bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['aductores'], secundario: [] } },
+      { id: 'C2-15', parte: 3, nombre: 'Abductor en máquina', series: 2, reps: '15-20', rir: '0-1', descanso: '60s', nota: 'Glúteo medio.', bs: 'BS2', bstipo: 'ant',
+        musculos: { primario: ['gluteo_medio'], secundario: [] } },
+      { id: 'C2-16', parte: 3, nombre: 'Elevación lateral en polea', series: 3, reps: '12-20', rir: '0-1', descanso: '60s', nota: 'Polea baja, a una mano.', bs: 'BS3', bstipo: 'nc',
+        musculos: { primario: ['deltoides_medio'], secundario: [] } },
+      { id: 'C2-17', parte: 3, nombre: 'Pájaro en polea', series: 3, reps: '15-20', rir: '0-1', descanso: '60s', nota: 'Cables cruzados a la altura del hombro.', bs: 'BS3', bstipo: 'nc',
+        musculos: { primario: ['deltoides_posterior'], secundario: [] } },
+      { id: 'C2-8', parte: 3, nombre: 'Hiperextensión 45°', series: 2, reps: '12-15', rir: '1-2', descanso: '60s', nota: 'Espalda baja y glúteo.', bs: 'BS4', bstipo: 'nc',
+        musculos: { primario: ['erectores', 'gluteo'], secundario: ['isquios'] } },
+      { id: 'C2-18', parte: 3, nombre: 'Curl inverso con barra Z', series: 2, reps: '12-15', rir: '0-1', descanso: '60s', nota: 'Antebrazo y braquial.', bs: 'BS4', bstipo: 'nc',
+        musculos: { primario: ['braquial', 'antebrazo'], secundario: ['biceps'] } },
     ]
   },
 
   gymB: {
-    nombre: 'Tracción', subtitulo: 'Espalda · bíceps · braquial', color: '#16a34a',
-    duracion: '~100 min · 32 series',
-    chequeo: 'Jalón y remo con progresión lineal en carga. Cuando llegues a 8 dominadas a peso corporal, cambias a progresión por lastre (E3). SIN correas en el jalón pesado / CON correas en remo y jalón neutro. El suitcase es el único acarreo (E9) y va al final por estar limitado por agarre (E5). El isométrico del curl martillo es tu métrica clave del objetivo: ANOTA EL TIEMPO.',
+    nombre: 'Tracción', subtitulo: 'Espalda · bíceps · braquial · agarre', color: '#16a34a',
+    duracion: '~88 min · 33 series',
+    chequeo: 'Dominada primero: punto débil #2. Al llegar a 8 a peso corporal, con lastre (E3). Sin correas: la espalda también entrena el agarre. El suitcase es el único acarreo (E9) y va al final (E5).',
     ejercicios: [
-      { id: 'B-1', parte: 1, nombre: 'Jalón pesado o dominada lastrada', series: 4, reps: '5-8', lineal: true, progresion: 'carga', descanso: '3 min', nota: 'Prioridad #2. Nunca al fallo. Alterna pronado/neutro. SIN correas.', lastre: true,
+      { id: 'B-12', parte: 0, nombre: 'Lanzamiento rotacional de balón', series: 3, reps: '5/lado', rir: '—', descanso: '60s', nota: 'Contra la pared, girando desde la cadera.',
+        musculos: { primario: [], secundario: ['core_antirotacion'] } },
+      { id: 'B-1', parte: 1, nombre: 'Dominada', series: 4, reps: '5-8', rir: '1-2', progresion: '+2.5 kg', descanso: '3 min', nota: 'Prioridad #2. Nunca al fallo. Sin correas.', lastre: true,
         musculos: { primario: ['dorsal', 'biceps'], secundario: ['espalda_media', 'braquial', 'antebrazo'] } },
-      { id: 'B-2', parte: 1, nombre: 'Remo con apoyo en pecho', series: 4, reps: '8-12', lineal: true, progresion: 'carga', descanso: '2.5 min', nota: 'Espalda media sin carga lumbar. CON correas.',
-        musculos: { primario: ['espalda_media', 'dorsal'], secundario: ['biceps', 'deltoides_posterior', 'trapecio'] } },
-
-      { id: 'B-3', parte: 2, nombre: 'Jalón agarre neutro', series: 3, reps: '10-15', rir: '1-2', descanso: '60s', nota: 'Escápulas abajo, luego tira. CON correas. Empareja con core (no solapa).', bs: 'BS1', bstipo: 'nc',
+      { id: 'B-13', parte: 1, nombre: 'Remo a una mano con mancuerna', series: 3, reps: '8-12', rir: '1-2', progresion: '+2 kg', descanso: '90s', nota: 'Codo pegado al cuerpo y hacia la cadera: dorsal.',
+        musculos: { primario: ['dorsal'], secundario: ['espalda_media', 'biceps'] } },
+      { id: 'B-3', parte: 1, nombre: 'Jalón con agarre neutro', series: 3, reps: '10-15', rir: '1-2', progresion: '+2.5 kg', descanso: '2 min', nota: 'Escápulas abajo, luego tira.',
         musculos: { primario: ['dorsal'], secundario: ['biceps', 'espalda_media'] } },
-      { id: 'B-4', parte: 2, nombre: 'Rueda abdominal o plancha', series: 3, reps: '8-12 / 30-45s', rir: '1-2', descanso: '60s', nota: 'Core anti-extensión. Aquí vive TODO tu trabajo anti-extensión: no lo recortes.', bs: 'BS1', bstipo: 'nc',
-        musculos: { primario: ['core_antiextension'], secundario: ['dorsal'] } },
-
-      { id: 'B-5', parte: 3, nombre: 'Pullover en polea alta', series: 3, reps: '12-15', rir: '1-2', descanso: '45s', nota: 'Dorsal SIN que el bíceps intervenga.', bs: 'BS2', bstipo: 'nc',
+      { id: 'B-5', parte: 2, nombre: 'Pullover en polea alta', series: 2, reps: '12-15', rir: '0-1', descanso: '60s', nota: 'Dorsal sin que el bíceps intervenga.',
         musculos: { primario: ['dorsal'], secundario: ['trapecio'] } },
-      { id: 'B-6', parte: 3, nombre: 'Curl inclinado mancuernas 45-60°', series: 3, reps: '8-12', rir: '1-2', descanso: '45s', nota: 'Bíceps en longitud larga.', bs: 'BS2', bstipo: 'nc',
+      { id: 'B-7', parte: 2, nombre: 'Pájaro en máquina', series: 3, reps: '15-20', rir: '0-1', descanso: '60s', nota: 'Hombro trasero.', bs: 'BS1', bstipo: 'nc',
+        musculos: { primario: ['deltoides_posterior'], secundario: [] } },
+      { id: 'B-6', parte: 2, nombre: 'Curl inclinado con mancuernas', series: 3, reps: '8-12', rir: '0-1', descanso: '60s', nota: 'Bíceps estirado.', bs: 'BS1', bstipo: 'nc',
         musculos: { primario: ['biceps'], secundario: ['braquial'] } },
-      { id: 'B-7', parte: 3, nombre: 'Pájaro o face pull', series: 3, reps: '15-20', rir: '1-2', descanso: '45s', nota: 'Deltoides posterior.', bs: 'BS3', bstipo: 'nc',
-        musculos: { primario: ['deltoides_posterior'], secundario: ['trapecio'] } },
-      { id: 'B-8', parte: 3, nombre: 'Curl martillo + isométrico final', series: 3, reps: '10-15', rir: '1-2', descanso: '45s', nota: 'En la ÚLTIMA serie, al terminar quédate con los codos a 90° y aguanta hasta el fallo. ANOTA EL TIEMPO. Solo tiempo hasta los 60s, después carga (P3).', nuevo: true, iso: true, bs: 'BS3', bstipo: 'nc',
+      { id: 'B-14', parte: 2, nombre: 'Face pull en polea', series: 3, reps: '15-20', rir: '0-1', descanso: '60s', nota: 'OBLIGATORIO (E6). Cuerda hacia la frente, terminando en «Y».', bs: 'BS2', bstipo: 'nc',
+        musculos: { primario: ['deltoides_posterior', 'trapecio'], secundario: ['manguito'] } },
+      { id: 'B-8', parte: 2, nombre: 'Curl martillo con mancuernas', series: 3, reps: '10-15', rir: '0-1', descanso: '60s', nota: 'En la última serie, isométrico a 90° hasta el fallo. Anota los segundos.', iso: true, bs: 'BS2', bstipo: 'nc',
         musculos: { primario: ['braquial', 'biceps'], secundario: ['antebrazo'] } },
-      { id: 'B-9', parte: 3, nombre: 'Encogimiento', series: 3, reps: '10-15', rir: '1-2', descanso: '45s', nota: 'Trapecio. Con suitcase y farmer\'s ya recibe carga sobrada.', opcional: true,
-        musculos: { primario: ['trapecio'], secundario: [] } },
-
-      { id: 'B-10', parte: 'finisher', nombre: 'Suitcase carry', series: 3, reps: '30 m/lado', rir: '—', descanso: '90s', nota: 'Único acarreo del día. Torso 100% vertical, hombros nivelados. Si te inclinas, pesa demasiado y bajas peso (P2).', nuevo: true, acarreo: true,
+      { id: 'B-15', parte: 3, nombre: 'Curl inverso con barra Z', series: 2, reps: '12-15', rir: '0-1', descanso: '45s', nota: 'Antebrazo y braquial.', bs: 'BS3', bstipo: 'nc',
+        musculos: { primario: ['braquial', 'antebrazo'], secundario: ['biceps'] } },
+      { id: 'B-16', parte: 3, nombre: 'Rotación externa en polea', series: 2, reps: '15-20', rir: '1-2', descanso: '45s', nota: 'Ligero: protege el hombro.', bs: 'BS3', bstipo: 'nc',
+        musculos: { primario: ['manguito'], secundario: [] } },
+      { id: 'B-10', parte: 'finisher', nombre: 'Suitcase carry con mancuerna', series: 3, reps: '30 m/lado', rir: '—', descanso: '90s', nota: 'Único acarreo del día (E9). Torso vertical (P2).', acarreo: true,
         musculos: { primario: ['core_antilateral', 'antebrazo'], secundario: ['trapecio', 'erectores'] } },
-      { id: 'B-11', parte: 'finisher', nombre: 'Dead hang', series: 1, reps: '30-45s', rir: '—', descanso: '—', nota: 'Solo descompresión de columna, no trabajo de agarre.', opcional: true,
-        musculos: { primario: [], secundario: ['antebrazo'] } },
+      { id: 'B-11', parte: 'finisher', nombre: 'Dead hang', series: 2, reps: 'máx', rir: '—', descanso: '90s', nota: 'Brazos estirados, hombros activos. Anota los segundos.', iso: true,
+        musculos: { primario: ['antebrazo'], secundario: ['dorsal'] } },
+    ]
+  },
+
+  // ─── Cardio v7 · bici (o remo) ───
+  // El cupo de cardio de Bogotá: 2 por semana, alternando 4×4 y zona 2.
+  bici4x4: {
+    nombre: 'Bici 4×4', subtitulo: '~40 min · 4 × 4 min fuerte', color: '#0284c7', duracion: '40 min',
+    chequeo: 'La sesión que más sube el VO2máx: 4 bloques de 4 min al 85-95 % de tu frecuencia máxima con 3 min suaves entre medias (protocolo de Helgerud). En bici o en remo. En los bloques solo puedes decir palabras sueltas. Las primeras semanas en Bogotá, por la altura, empieza por el 85 %.',
+    ejercicios: [
+      { id: 'BX-1', parte: 1, nombre: 'Calentamiento', series: 1, reps: '10 min', rir: '—', descanso: '—', nota: 'Suave, subiendo poco a poco. Termina con 2 aceleraciones de 15 s.', musculos: { primario: [], secundario: [] } },
+      { id: 'BX-2', parte: 2, nombre: 'Bloques fuertes', series: 4, reps: '4 min', rir: '—', descanso: '3 min suave', nota: 'Esfuerzo 8-9 de 10. Los primeros 60-90 s se sienten fáciles: no aceleres de más.', musculos: { primario: [], secundario: [] } },
+      { id: 'BX-3', parte: 'finisher', nombre: 'Vuelta a la calma', series: 1, reps: '5 min', rir: '—', descanso: '—', nota: 'Pedaleo suave, resistencia mínima.', musculos: { primario: [], secundario: [] } },
+    ]
+  },
+  biciZ2: {
+    nombre: 'Bici zona 2', subtitulo: '30-45 min · suave', color: '#0284c7', duracion: '40-55 min',
+    chequeo: 'Base aeróbica sin cansar las piernas para el gym. Puedes hablar en frases completas: esfuerzo 3-4 de 10. En bici, remo o elíptica. Cuando tengas piscina o un parque, la natación o la carrera también valen.',
+    ejercicios: [
+      { id: 'BZ-1', parte: 1, nombre: 'Calentamiento', series: 1, reps: '5 min', rir: '—', descanso: '—', nota: 'Cadencia cómoda, resistencia baja.', musculos: { primario: [], secundario: [] } },
+      { id: 'BZ-2', parte: 2, nombre: 'Zona 2 continua', series: 1, reps: '30-45 min', rir: '—', descanso: '—', nota: 'Frases completas sin esfuerzo. Si no puedes hablar, baja la resistencia.', musculos: { primario: [], secundario: [] } },
+      { id: 'BZ-3', parte: 'finisher', nombre: 'Vuelta a la calma', series: 1, reps: '5 min', rir: '—', descanso: '—', nota: 'Pedaleo suave.', musculos: { primario: [], secundario: [] } },
     ]
   },
 
@@ -765,10 +1068,11 @@ export const SESIONES = {
 
 // Orden de presentación de las partes dentro de una sesión.
 export const PARTES = {
-  1: { label: 'Parte 1 · Series rectas', desc: 'Compuestos pesados · progresión lineal · descansos largos' },
-  2: { label: 'Parte 2 · Compuesto secundario + aislamiento', desc: 'Bi-series entre ejercicios que no solapan (E8)' },
+  0: { label: 'Bloque atlético', desc: 'Saltos, lanzamientos y agilidad · fresco y explosivo · descanso completo' },
+  1: { label: 'Parte 1 · Básicos', desc: 'Series rectas · 1-2 en reserva · 2-3 min de descanso' },
+  2: { label: 'Parte 2 · Accesorios', desc: 'Bi-series entre ejercicios que no solapan (E8)' },
   3: { label: 'Parte 3 · Aislamientos', desc: 'Bi-series de aislamiento + aislamiento' },
-  finisher: { label: 'Finisher', desc: 'Un solo acarreo por sesión (E9)' },
+  finisher: { label: 'Agarre y carga', desc: 'Un solo acarreo por sesión (E9)' },
 };
 
 // ─── E11 · Deshacer una bi-serie sobre la marcha (v7.1) ───

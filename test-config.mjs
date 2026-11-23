@@ -7,7 +7,7 @@
 import { generarDesdeAncla, generarMes, combinacionValida, solapanGym, deISO } from './src/generador.js';
 import { normalizarConfig, resolverConfig, conCampo, registrarDeportes, solapesDeRotacion, claveDeporte,
   cupoDelPlan, turnosDelPlan, CONFIG_PLAN } from './src/config.js';
-import { PRIORIDAD_TURNO, VENTANA_PISCINA, DOBLES, SECUENCIA_GYM, SECUENCIA_NATACION, SESION_INFO, SESIONES } from './src/data.js';
+import { PRIORIDAD_TURNO, VENTANA_PISCINA, DOBLES, SECUENCIA_GYM, SECUENCIA_NATACION, SESION_INFO, SESIONES, SECUENCIA_TORSO_PIERNA } from './src/data.js';
 import { previsualizar } from './src/utiles/previa.js';
 import { nombrarClaves } from './src/utiles/nombres.js';
 
@@ -19,9 +19,11 @@ const check = (nombre, ok, detalle = '') => {
 };
 const seccion = (t) => console.log(`\n── ${t} ──`);
 const HASTA = '2027-07-31';
+// Ajustes cambia el plan VIGENTE (Bogotá). Para medir sus efectos sin la mezcla
+// de semanas del v6, el generador se fija a ese plan en todo el rango.
 const gen = (config) => {
   registrarDeportes(normalizarConfig(config).deportes);
-  return generarDesdeAncla({ hasta: HASTA, config });
+  return generarDesdeAncla({ hasta: HASTA, config, planFijo: 'v7' });
 };
 const diff = (a, b) => Math.round((deISO(a) - deISO(b)) / 864e5);
 // Semanas completas lunes→domingo
@@ -42,12 +44,12 @@ check('Sin config y con config vacía sale el mismo calendario, día por día',
 const r0 = resolverConfig({});
 check('La config resuelta usa los objetos del plan tal cual (prioridad, piscina, dobles)',
   ['L', 'C', 'N', 'P'].every(t => r0.prioridad[t] === PRIORIDAD_TURNO[t] && r0.ventana[t] === VENTANA_PISCINA[t] && r0.dobles[t] === DOBLES.turnos[t]));
-check('Y la rotación del plan', r0.secGym === SECUENCIA_GYM && r0.secNat === SECUENCIA_NATACION && !r0.personalizada);
+check('Y la rotación del plan (Bogotá: Torso / Pierna)', r0.secGym === SECUENCIA_TORSO_PIERNA && r0.secNat === SECUENCIA_NATACION && !r0.personalizada);
 check('Poner en Ajustes exactamente lo del plan no guarda nada',
   JSON.stringify(conCampo({}, 'cupo', cupoDelPlan())) === '{}' && JSON.stringify(conCampo({}, 'turnos', turnosDelPlan())) === '{}'
-  && JSON.stringify(conCampo({}, 'rotacion', { gym: [...SECUENCIA_GYM], natacion: [...SECUENCIA_NATACION] })) === '{}');
+  && JSON.stringify(conCampo({}, 'rotacion', { gym: [...SECUENCIA_TORSO_PIERNA], natacion: [...SECUENCIA_NATACION] })) === '{}');
 check('Una config que repite los valores del plan genera lo mismo que la vacía',
-  JSON.stringify(base) === JSON.stringify(generarDesdeAncla({ hasta: HASTA, config: { cupo: { gym: 3, natacion: 2, cardio: 1, flexible: 1 }, ciclo: { turnos: ['L', 'C', 'N', 'P'] } } })));
+  JSON.stringify(base) === JSON.stringify(generarDesdeAncla({ hasta: HASTA, config: { cupo: { gym: 4, natacion: 0, cardio: 2, flexible: 1 }, ciclo: { turnos: ['L', 'C', 'N', 'P'] } } })));
 
 // ═══ 2 · NORMALIZAR: UNA CONFIG ROTA NUNCA ROMPE NADA ═══
 seccion('NORMALIZAR LO GUARDADO');
@@ -100,14 +102,16 @@ check('Un turno sin nada → sus días son descanso', pNada.filter(d => d.turno 
 
 // ═══ 5 · ORDEN DE ROTACIÓN ═══
 seccion('ORDEN DE ROTACIÓN');
-const rot = gen({ rotacion: { gym: ['gymB', 'gymC1', 'gymA', 'gymC2'] } }).dias;
+// Con la rutina B (las cinco de siempre) el orden propio vale en los dos planes.
+const rot = gen({ rutinaGym: 'B', rotacion: { gym: ['gymB', 'gymC1', 'gymA', 'gymC2'] } }).dias;
 const gymsRot = rot.flatMap(claves).filter(esGym);
 check('Solo salen los gym de la rotación', gymsRot.every(k => ['gymB', 'gymC1', 'gymA', 'gymC2'].includes(k)) && !gymsRot.includes('gymD'));
 check('En el orden elegido', gymsRot.slice(0, 8).join(',') === 'gymB,gymC1,gymA,gymC2,gymB,gymC1,gymA,gymC2', gymsRot.slice(0, 8).join(','));
 check('Avisa de dos seguidas que trabajan lo mismo, también al dar la vuelta',
   JSON.stringify(solapesDeRotacion(['gymB', 'gymC1', 'gymA', 'gymC2', 'gymD'], solapanGym)) === '[["gymD","gymB"]]');
 check('El orden del plan no tiene ninguna', solapesDeRotacion(SECUENCIA_GYM, solapanGym).length === 0);
-const nat2 = gen({ rotacion: { natacion: ['natB2', 'natA1'] } }).dias;
+// En Bogotá la natación es opcional (cupo 0): se activa para probar la rotación.
+const nat2 = gen({ cupo: { natacion: 2 }, rotacion: { natacion: ['natB2', 'natA1'] } }).dias;
 const vars = nat2.flatMap(d => [d.sesion === 'natacion' && d.variante, d.sesionSecundaria === 'natacion' && d.varianteSecundaria]).filter(Boolean);
 check('Natación: solo las elegidas, más el test CSS', vars.every(v => ['natB2', 'natA1', 'natCSS'].includes(v)) && vars[0] === 'natCSS');
 check('Y el test se repite aunque Umbral no esté en la rotación', vars.filter(v => v === 'natCSS').length >= 3, vars.filter(v => v === 'natCSS').length + ' tests');
@@ -123,7 +127,7 @@ const dEsc = gen({ deportes: [esc] }).dias;
 const cuentaEsc = media(dEsc, k => k === 'dep_esc');
 check('Automático 1 vez por semana → sale casi todas las semanas', cuentaEsc >= 0.9, cuentaEsc.toFixed(2));
 check('Sin quitarle nada al plan: mismo gym, natación y cardio',
-  media(dEsc, esGym) === media(base.dias, esGym) && media(dEsc, k => k === 'natacion') === media(base.dias, k => k === 'natacion'));
+  media(dEsc, esGym) === media(gen({}).dias, esGym) && media(dEsc, k => k === 'natacion') === media(gen({}).dias, k => k === 'natacion'));
 check('Solo en los turnos elegidos', gen({ deportes: [{ ...esc, turnos: ['L'] }] }).dias.filter(d => claves(d).includes('dep_esc')).every(d => d.turno === 'L'));
 const fut = { id: 'fut', nombre: 'Fútbol', modo: 'auto', porSemana: 2, turnos: ['L', 'P', 'N', 'C'], piernas: true };
 const dFut = gen({ deportes: [fut] }).dias;
@@ -180,15 +184,15 @@ check('CONFIG_PLAN es la config vacía resuelta', JSON.stringify(CONFIG_PLAN) ==
 
 // ═══ 9 · ASÍ QUEDARÍA ═══
 seccion('VISTA PREVIA');
-const prev = { ancla: { fecha: '2026-08-01', turno: 'L', gymIdx: 0 }, fijados: {}, festivos: ['2026-08-07', '2026-08-17'], desde: '2026-11-14' };
+const prev = { ancla: { fecha: '2026-08-01', turno: 'L', gymIdx: 0 }, fijados: {}, festivos: ['2026-08-07', '2026-08-17'], desde: '2026-12-01' };
 const p0 = previsualizar({ ...prev, config: {} });
-check('Con el plan: 3 gym, 2 natación, 1 cardio por semana', p0.gym === 3 && p0.natacion === 2 && p0.cardio === 1, JSON.stringify(p0));
+check('Con el plan de Bogotá: 4 gym, 2 cardio y sin natación por semana', p0.gym === 4 && p0.natacion === 0 && p0.cardio === 2, JSON.stringify(p0));
 const pEsc = previsualizar({ ...prev, config: { deportes: [esc] } });
 check('Un deporte sin guardar todavía ya sale con su nombre', pEsc.deportes.some(([n, v]) => n === 'Escalada' && v > 0), JSON.stringify(pEsc.deportes));
 const p5 = previsualizar({ ...prev, config: { cupo: { gym: 5 } } });
 check('Lo que no cabe sale explicado y con nombres, no con claves', p5.nProblemas > 0 && p5.problemas.every(t => !/\bgym[ABCD]\b|\bnatacion\b/.test(t)), p5.problemas.join(' | '));
 check('nombrarClaves cambia claves por nombres', nombrarClaves('no hay donde doblar gymB ni natacion') === 'no hay donde doblar Tracción ni Natación');
-check('generarMes acepta la config', generarMes({ anio: 2026, mes: 10, config: { cupo: { gym: 2 } } }).dias.filter(d => esGym(d.sesion)).length < generarMes({ anio: 2026, mes: 10 }).dias.filter(d => esGym(d.sesion)).length);
+check('generarMes acepta la config', generarMes({ anio: 2026, mes: 11, config: { cupo: { gym: 2 } } }).dias.filter(d => esGym(d.sesion)).length < generarMes({ anio: 2026, mes: 11 }).dias.filter(d => esGym(d.sesion)).length);
 
 console.log(`\n══ TOTAL CONFIGURACIÓN: ${pruebas - fallos}/${pruebas} ══`);
 if (fallos) process.exit(1);

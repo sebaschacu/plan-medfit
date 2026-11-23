@@ -1,22 +1,30 @@
 import React from 'react';
 import { ArrowLeft, Pencil } from 'lucide-react';
 import { SESIONES, SESION_INFO, PARTES } from '../../data.js';
-import { resolverRutina, estaEditada } from '../../rutina.js';
+import { resolverRutina, estaEditada, sesionBase } from '../../rutina.js';
+import { PLAN_BOGOTA } from '../../data.js';
+import { SESIONES_V6 } from '../../planV6.js';
 import { usePlanCtx } from '../../estado/contextos.js';
 import { COLUMNA } from '../../utiles/constantes-ui.js';
 import FichaEjercicio from '../comunes/FichaEjercicio.jsx';
 import { Detalle, Punto, BotonCTA } from '../comunes/ui.jsx';
 
 // ═══════════════ FICHA DE SESIÓN (solo lectura) ═══════════════
-// Enseña la rutina VIGENTE hoy para esa sesión. Editar está a un toque, abajo.
-const FichaSesion = ({ sesionKey, onCerrar, onEditar }) => {
+// Enseña la rutina VIGENTE en `fecha` (hoy, si no se dice) para esa sesión.
+// Editar está a un toque, abajo. Antes del 30 de noviembre, Rutinas puede abrir
+// la versión de Bogotá de una sesión que aún tiene la del plan anterior: esa se
+// consulta, pero se edita desde el día 30 (una edición de hoy no llegaría allí).
+const FichaSesion = ({ sesionKey, fecha, onCerrar, onEditar: onEditarProp }) => {
   const { todayISO, rutina } = usePlanCtx();
-  const ses = SESIONES[sesionKey];
+  const dia = fecha && fecha > todayISO ? fecha : todayISO;
+  const ses = sesionBase(sesionKey, dia) ?? SESIONES[sesionKey];
   const info = SESION_INFO[sesionKey];
   if (!ses) return null;
-  const lista = resolverRutina(sesionKey, todayISO, rutina) ?? ses.ejercicios;
+  const futura = dia > todayISO && todayISO < PLAN_BOGOTA.desde && !!SESIONES_V6[sesionKey];
+  const onEditar = futura ? null : onEditarProp;
+  const lista = resolverRutina(sesionKey, dia, rutina) ?? ses.ejercicios;
   const series = lista.filter(e => !e.opcional).reduce((a, e) => a + (typeof e.series === 'number' ? e.series : 0), 0);
-  const editada = estaEditada(sesionKey, todayISO, rutina);
+  const editada = estaEditada(sesionKey, dia, rutina);
   const esGym = String(sesionKey).startsWith('gym');
   let n = 0;
   let parteAnterior = null;
@@ -40,6 +48,7 @@ const FichaSesion = ({ sesionKey, onCerrar, onEditar }) => {
             Rutina editada · la versión de hoy no es la original del plan.
           </p>
         )}
+        {futura && <p className="px-4 py-3 rounded-2xl bg-tarjeta text-[15px] text-tinta3">Versión de Bogotá · rige desde el lunes 30 de noviembre. Se podrá editar desde ese día.</p>}
         {ses.chequeo && <Detalle>{ses.chequeo}</Detalle>}
         {ses.recortada && <Detalle resumen="Versión recortada (45 min)">{ses.recortada}</Detalle>}
         {lista.length === 0

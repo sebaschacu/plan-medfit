@@ -175,7 +175,7 @@ const ExerciseCard = ({ ex, numero, prog, pr, color, avisoReset, ultima, sugeren
             <NumInput value={p.segundos ?? (ex.lastre ? null : p.lastre)} onChange={(v) => onLastre(ex.id, v === '' ? null : parseFloat(v))} placeholder="seg" />
             <span className="text-sm text-tinta3">seg</span>
           </div>
-          <p className="text-sm text-mudo mt-1.5">Métrica clave del objetivo. Solo tiempo hasta 60s, luego carga</p>
+          <p className="text-sm text-mudo mt-1.5">Anota los segundos y busca superarlos la próxima vez</p>
         </div>
       )}
       {ex.lastre && (

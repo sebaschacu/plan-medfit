@@ -3,6 +3,7 @@ import { ArrowLeft, Minus, Plus, ChevronRight, AlertTriangle } from 'lucide-reac
 import { COLUMNA } from '../../utiles/constantes-ui.js';
 import { previsualizar } from '../../utiles/previa.js';
 import { usePlanCtx } from '../../estado/contextos.js';
+import { PLAN_BOGOTA } from '../../data.js';
 
 // ═══════════════ PIEZAS DE AJUSTES ═══════════════
 // Lo que comparten las pantallas de configuración del plan.
@@ -82,14 +83,17 @@ export const VistaPrevia = ({ config }) => {
   const { ancla, fijados, festivos, todayISO } = usePlanCtx();
   // Se recalcula solo cuando cambia el CONTENIDO de la config, no su identidad:
   // la pantalla la reconstruye en cada pintado.
+  // Los ajustes son del plan de Bogotá: antes del 30 de noviembre, la vista
+  // previa empieza ese día (las semanas del plan anterior no cambian).
   const clave = JSON.stringify(config);
-  const p = useMemo(() => previsualizar({ ancla, fijados, festivos, config: JSON.parse(clave), desde: todayISO }),
-    [ancla, fijados, festivos, clave, todayISO]);
+  const desde = todayISO < PLAN_BOGOTA.desde ? PLAN_BOGOTA.desde : todayISO;
+  const p = useMemo(() => previsualizar({ ancla, fijados, festivos, config: JSON.parse(clave), desde }),
+    [ancla, fijados, festivos, clave, desde]);
   const cifras = [['Gym', p.gym], ['Natación', p.natacion], ['Running o bici', p.cardio], ...p.deportes, ['Descanso', p.descanso]];
   return (
     <section className="rounded-3xl bg-tarjeta p-5" aria-label="Así quedaría">
       <div className="rotulo">Así quedaría</div>
-      <p className="text-sm text-tinta3 mt-1">Media por semana en las próximas {p.semanas} semanas</p>
+      <p className="text-sm text-tinta3 mt-1">Media por semana en {desde === todayISO ? `las próximas ${p.semanas} semanas` : `las ${p.semanas} primeras semanas de Bogotá (desde el 30 nov)`}</p>
       <div className="grid grid-cols-3 gap-x-3 gap-y-3 mt-3">
         {cifras.map(([l, v]) => (
           <div key={l} className="min-w-0">

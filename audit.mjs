@@ -16,7 +16,7 @@ ok('Sin IDs duplicados dentro de una sesión', idsDup.length === 0, idsDup.join(
 const todosIds = todas.flatMap(([,s]) => s.ejercicios.map(e=>e.id));
 const dupGlobal = [...new Set(todosIds.filter((id,i)=>todosIds.indexOf(id)!==i))];
 ok('Sin IDs duplicados entre sesiones (el progreso se indexa por ID)', dupGlobal.length === 0, dupGlobal.join(', '));
-const partesMalas = todas.flatMap(([k,s]) => s.ejercicios.filter(e => e.parte != null && ![1,2,3,'finisher'].includes(e.parte)).map(e=>k+'/'+e.id));
+const partesMalas = todas.flatMap(([k,s]) => s.ejercicios.filter(e => e.parte != null && ![0,1,2,3,'finisher'].includes(e.parte)).map(e=>k+'/'+e.id));
 ok('Todas las partes son válidas', partesMalas.length === 0, partesMalas.join(', '));
 
 console.log('\n── COHERENCIA CON EL PLAN ──');
@@ -24,9 +24,10 @@ ok('Cupo: 3 gym, 2 natación, 1 running, 1 flexible',
   CUPO_SEMANAL.gym===3 && CUPO_SEMANAL.natacion===2 && CUPO_SEMANAL.running===1 && CUPO_SEMANAL.flexible===1);
 ok('La calistenia NO está en el cupo', !('calistenia' in CUPO_SEMANAL));
 ok('Las 6 sesiones de natación existen', SECUENCIA_NATACION.every(k => SESIONES[k]));
-ok('La práctica de carga real vive en un gym, no en calistenia',
-  SESIONES.gymA.ejercicios.some(e=>/carga real/i.test(e.nombre)) &&
-  !SESIONES.calistenia.ejercicios.some(e=>/carga real/i.test(e.nombre)));
+ok('La carga frontal vive en el gym (Empuje y la rutina Torso / Pierna), no en calistenia',
+  SESIONES.gymA.ejercicios.some(e=>/carga frontal/i.test(e.nombre)) &&
+  ['gymTA','gymPA','gymTB','gymPB'].some(k => SESIONES[k].ejercicios.some(e=>/carga frontal/i.test(e.nombre))) &&
+  !SESIONES.calistenia.ejercicios.some(e=>/carga frontal|carga real/i.test(e.nombre)));
 const reglasMuertas = /SOLO en día libre|nunca ambas|recorta a 2 series|antes ni después de pierna/i;
 const textos = JSON.stringify(todas.map(([,s])=>[s.chequeo,s.subtitulo]));
 ok('Ningún texto cita reglas eliminadas', !reglasMuertas.test(textos));

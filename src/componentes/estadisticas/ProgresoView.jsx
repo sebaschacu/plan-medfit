@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronDown, TrendingUp } from 'lucide-react';
-import { SESIONES, SESION_INFO, DOBLES, clavePrincipal, claveSecundaria, familiaDe } from '../../data.js';
+import { SESIONES, SESION_INFO, DOBLES, RUTINAS_GYM, PLAN_BOGOTA, planDe, clavePrincipal, claveSecundaria, familiaDe } from '../../data.js';
+import { SESIONES_V6 } from '../../planV6.js';
+import { resolverConfig } from '../../config.js';
 import { historialEjercicio, mmss } from '../../reglas.js';
 import { ejerciciosDelDia } from '../../rutina.js';
 import { COLUMNA } from '../../utiles/constantes-ui.js';
@@ -13,18 +15,27 @@ import VolumenMuscular from './VolumenMuscular.jsx';
 // Responde primero a la única pregunta que importa —¿estoy subiendo?— y debajo
 // pone los números que la sostienen: los compuestos, el bloque, la semana.
 
-// Los compuestos de progresión lineal, en el orden del plan. Un mismo ejercicio
-// puede estar en dos sesiones con ids distintos (el press banca va en Empuje y
-// en Torso): se juntan por nombre y su historial suma los dos.
+// Los ejercicios principales: los básicos (Parte 1) del plan de Bogotá, en su
+// orden, y detrás los compuestos del plan anterior, para no perder su historial.
+// Un mismo ejercicio puede estar en dos sesiones con ids distintos (el press
+// banca va en Torso A y en Empuje): se juntan por nombre —o por id, si cambió
+// de nombre— y su historial suma los dos. `opciones` dice de qué rutina es.
+const OPCION_DE = Object.fromEntries(Object.entries(RUTINAS_GYM).flatMap(([o, r]) => [...r.secuencia, ...r.extra].map(k => [k, o])));
 const LINEALES = (() => {
-  const porNombre = new Map();
-  Object.entries(SESIONES).forEach(([k, ses]) => (ses.ejercicios ?? []).forEach(ex => {
-    if (!ex.lineal) return;
-    const n = porNombre.get(ex.nombre);
-    if (n) { if (!n.ids.includes(ex.id)) n.ids.push(ex.id); return; }
-    porNombre.set(ex.nombre, { ex, ids: [ex.id], color: SESION_INFO[k]?.color ?? '#e8edf0' });
-  }));
-  return [...porNombre.values()];
+  const lista = [], porNombre = new Map(), porId = new Map();
+  const meter = (k, ex, opcion) => {
+    const n = porNombre.get(ex.nombre) ?? porId.get(ex.id);
+    if (n) {
+      if (!n.ids.includes(ex.id)) n.ids.push(ex.id);
+      n.opciones.add(opcion); porId.set(ex.id, n); return;
+    }
+    const nuevo = { ex, ids: [ex.id], opciones: new Set([opcion]), color: SESION_INFO[k]?.color ?? '#e8edf0' };
+    lista.push(nuevo); porNombre.set(ex.nombre, nuevo); porId.set(ex.id, nuevo);
+  };
+  const conCarga = (ex) => !ex.iso && !ex.acarreo;
+  Object.entries(SESIONES).forEach(([k, ses]) => OPCION_DE[k] && ses.ejercicios.forEach(ex => ex.parte === 1 && conCarga(ex) && meter(k, ex, OPCION_DE[k])));
+  Object.entries(SESIONES_V6).forEach(([k, ses]) => ses.ejercicios.forEach(ex => ex.lineal && meter(k, ex, 'v6')));
+  return lista;
 })();
 const VISIBLES = 5;
 const lunesDe = (f) => { const d = new Date(f + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
@@ -95,15 +106,17 @@ const FilaEjercicio = ({ ex, color, hist, abierta, onAbrir }) => {
 
 const ProgresoView = () => {
   contarRender('ProgresoView');
-  const { calendario, todayISO, css, rutina, planCfg } = usePlanCtx();
+  const { calendario, todayISO, css, rutina, planCfg, config } = usePlanCtx();
   const { progress } = useProgresoCtx();
   const [abierto, setAbierto] = useState(null);
   const [verVolumen, setVerVolumen] = useState(false);
 
+  // Se ven los de la rutina activa y cualquiera que ya tenga registros.
   const lifts = useMemo(() => LINEALES
     .map(l => ({ ...l, hist: l.ids.flatMap(id => historialEjercicio(progress, id)).sort((a, b) => a.fecha.localeCompare(b.fecha)) }))
+    .filter(l => l.hist.length > 0 || l.opciones.has(planCfg.rutinaGym ?? 'A'))
     // Primero los que ya tienen registros; dentro de cada grupo, el orden del plan.
-    .sort((a, b) => (b.hist.length > 0) - (a.hist.length > 0)), [progress]);
+    .sort((a, b) => (b.hist.length > 0) - (a.hist.length > 0)), [progress, planCfg.rutinaGym]);
   const [todos, setTodos] = useState(false);
   const visibles = todos ? lifts : lifts.slice(0, VISIBLES);
   const conDatos = lifts.filter(l => l.hist.length > 1);
@@ -119,15 +132,19 @@ const ProgresoView = () => {
   const hoy = calendario.find(d => d.fecha === todayISO) ?? calendario[0];
   const semanaBloque = hoy?.semanaBloque ?? null;
   const semana = useMemo(() => (hoy ? calendario.filter(d => lunesDe(d.fecha) === lunesDe(hoy.fecha)) : []), [calendario, hoy]);
+  // La semana se mide contra el cupo del plan que la rige: hasta el 29 de
+  // noviembre, el de Barranquilla; desde el 30, el de Bogotá (o el de Ajustes).
+  const cfgSemana = useMemo(() => (planDe(hoy?.fecha ?? todayISO) === PLAN_BOGOTA ? planCfg : resolverConfig(config, planDe(hoy?.fecha ?? todayISO))),
+    [planCfg, config, hoy?.fecha, todayISO]);
   const cupo = useMemo(() => {
     const hecha = (fecha, clave) => {
       const p = progress[fecha] || {};
       const ejs = ejerciciosDelDia(clave, fecha, rutina, p);
       return ejs.length > 0 && ejs.every(ex => { const sc = typeof ex.series === 'number' ? ex.series : 1; return sc > 0 && p[ex.id]?.sets?.length === sc && p[ex.id].sets.every(Boolean); });
     };
-    const grupo = (k) => (String(k).startsWith('gym') ? 'gym' : String(k).startsWith('nat') ? 'natacion' : k === 'running' || k === 'ciclismo' || familiaDe(k) === 'running' ? 'cardio' : SESION_INFO[k]?.deporte ? k : null);
+    const grupo = (k) => (String(k).startsWith('gym') ? 'gym' : String(k).startsWith('nat') ? 'natacion' : k === 'running' || k === 'ciclismo' || familiaDe(k) === 'running' || familiaDe(k) === 'ciclismo' ? 'cardio' : SESION_INFO[k]?.deporte ? k : null);
     const c = { gym: [0, 0], natacion: [0, 0], cardio: [0, 0], flexible: [0, 0] };
-    planCfg.deportesAuto.forEach(dp => { c[dp.clave] = [0, 0]; });
+    cfgSemana.deportesAuto.forEach(dp => { c[dp.clave] = [0, 0]; });
     semana.forEach(d => {
       const claves = [
         [clavePrincipal(d), d.flexible],
@@ -143,13 +160,13 @@ const ProgresoView = () => {
     });
     return [
       // El objetivo es el cupo de la semana: el del plan o el de Ajustes
-      ['Gym', c.gym[0], Math.max(c.gym[1], planCfg.cupo.gym), '#22c55e'],
-      ['Natación', c.natacion[0], Math.max(c.natacion[1], planCfg.cupo.natacion), '#06b6d4'],
-      ['Running o bici', c.cardio[0], Math.max(c.cardio[1], planCfg.cupo.running), '#0891b2'],
-      ...(planCfg.cupo.flexible ? [['Flexible', c.flexible[0], Math.max(c.flexible[1], planCfg.cupo.flexible), '#8a97a1']] : []),
-      ...planCfg.deportesAuto.map(dp => [dp.nombre, c[dp.clave][0], Math.max(c[dp.clave][1], dp.porSemana), dp.color]),
+      ['Gym', c.gym[0], Math.max(c.gym[1], cfgSemana.cupo.gym), '#22c55e'],
+      ['Natación', c.natacion[0], Math.max(c.natacion[1], cfgSemana.cupo.natacion), '#06b6d4'],
+      ['Running o bici', c.cardio[0], Math.max(c.cardio[1], cfgSemana.cupo.running), '#0891b2'],
+      ...(cfgSemana.cupo.flexible ? [['Flexible', c.flexible[0], Math.max(c.flexible[1], cfgSemana.cupo.flexible), '#8a97a1']] : []),
+      ...cfgSemana.deportesAuto.map(dp => [dp.nombre, c[dp.clave][0], Math.max(c[dp.clave][1], dp.porSemana), dp.color]),
     ].filter(([, , t]) => t > 0);
-  }, [semana, progress, rutina, planCfg]);
+  }, [semana, progress, rutina, cfgSemana]);
 
   return (
     <div className="min-h-screen bg-fondo">

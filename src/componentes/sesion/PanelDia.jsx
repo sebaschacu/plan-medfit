@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronRight, X, Plus, Check } from 'lucide-react';
-import { SESION_INFO, COMPLEMENTOS, DOBLES, claveSecundaria, familiaDe } from '../../data.js';
+import { SESION_INFO, COMPLEMENTOS, DOBLES, claveSecundaria, familiaDe, planDe, gymOfrecido } from '../../data.js';
 import { combinacionValida, ordenDoble, validarSeparacion } from '../../generador.js';
 import { GYM_PIERNA_UI } from '../../utiles/constantes-ui.js';
 import { contarRender } from '../../utiles/medir.js';
@@ -26,7 +26,8 @@ const PanelDia = ({ dia, reducida = false, nEjerciciosSec = 0 }) => {
     // Las variantes (Tempo, Umbral…) no se eligen aquí: se elige el tipo y la
     // variante sale de la rotación, o se cambia después dentro de la sesión.
     .filter(k => k !== 'descanso' && !SESION_INFO[k].archivado && !familiaDe(k))
-    .map(k => ({ k, ...combinacionValida(dia.sesion, k) }))
+    .filter(k => gymOfrecido(k, dia.fecha, planCfg.rutinaGym))
+    .map(k => ({ k, ...combinacionValida(dia.sesion, k, { s3: planDe(dia.fecha).s3 }) }))
     .filter(o => o.ok);
 
   const comp = COMPLEMENTOS.calistenia;
@@ -54,7 +55,7 @@ const PanelDia = ({ dia, reducida = false, nEjerciciosSec = 0 }) => {
             <ChevronRight size={20} className="text-mudo flex-shrink-0" />
           </button>
           <div className="px-5 pb-4 space-y-2.5 border-t border-divisor pt-3">
-            {dia.franjaSecundaria && (
+            {dia.franjaSecundaria?.hora != null && (
               <p className="text-[15px] text-tinta2">Piscina a las {dia.franjaSecundaria.hora}:00{dia.franjaSecundaria.guiado ? ' · guiado' : ''}</p>
             )}
             <div className="flex items-center gap-2.5 flex-wrap">

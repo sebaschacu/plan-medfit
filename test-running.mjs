@@ -4,7 +4,12 @@
 // Tempo, Fondo largo, Series de umbral, Cuestas y Series 4×4, con un test de
 // 30 min cada ~12 carreras. La clave del día sigue siendo 'running' (de ella
 // cuelgan el cupo de cardio y la regla S3); lo que cambia es la variante.
-import { generarDesdeAncla, deISO, combinacionValida } from './src/generador.js';
+import * as G from './src/generador.js';
+import { deISO, combinacionValida } from './src/generador.js';
+// La rotación de running se estudia con el plan v6, que pone una carrera cada
+// semana. En Bogotá el cardio es bici y la carrera es opcional (se añade a mano):
+// la rotación y el sellado son los mismos.
+const generarDesdeAncla = (o) => G.generarDesdeAncla({ planFijo: 'v6', ...o });
 import { normalizarConfig, conCampo } from './src/config.js';
 import { SESIONES, SESION_INFO, SECUENCIA_RUNNING, RUNNING_SESIONES, RUNNING_TEST, VARIANTES_DE, ZONAS_RUN, GYM_PIERNA,
   claveReal, clavePrincipal, claveSecundaria, familiaDe } from './src/data.js';

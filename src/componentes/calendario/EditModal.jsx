@@ -57,7 +57,7 @@ const EditModal = ({ dia, onSave, onLiberar, onClose }) => {
         </div>
         <div>
           <div className="rotulo mb-2">Sesión</div>
-          <MenuSesiones sesion={sesion} onElegir={setSesion} />
+          <MenuSesiones sesion={sesion} onElegir={setSesion} fecha={dia.fecha} />
         </div>
         <button onClick={() => setFestivo(!festivo)} aria-pressed={festivo}
           className="w-full min-h-[56px] px-4 rounded-2xl bg-elevada flex items-center gap-3 text-left">

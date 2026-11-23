@@ -33,6 +33,7 @@ export default function App() {
   // ─── Flags de pantalla ───
   const [editandoRutina, setEditandoRutina] = useState(null);   // clave de sesión
   const [fichaSesion, setFichaSesion] = useState(null);         // clave de sesión a consultar
+  const [fichaFecha, setFichaFecha] = useState(null);           // y en qué fecha (Rutinas: la de Bogotá antes del 30)
   const [editMode, setEditMode] = useState(false);
   const [editingDay, setEditingDay] = useState(null);
   const [seccionAjustes, setSeccionAjustes] = useState(null);   // qué pantalla de Ajustes está abierta
@@ -70,7 +71,7 @@ export default function App() {
 
   let pantalla;
   if (fichaSesion) {
-    pantalla = <FichaSesion sesionKey={fichaSesion} onCerrar={() => setFichaSesion(null)} onEditar={setEditandoRutina} />;
+    pantalla = <FichaSesion sesionKey={fichaSesion} fecha={fichaFecha} onCerrar={() => { setFichaSesion(null); setFichaFecha(null); }} onEditar={setEditandoRutina} />;
   } else if (view === 'session' && diaActivo) {
     // La sesión se usa de pie en el gimnasio: sin barra inferior, toda la
     // pantalla para el ejercicio y el temporizador.
@@ -80,7 +81,7 @@ export default function App() {
   } else if (view === 'progreso') {
     pantalla = <ProgresoView />;
   } else if (view === 'rutinas') {
-    pantalla = <Biblioteca onAbrir={setFichaSesion} onNuevoDeporte={() => { setSeccionAjustes('deporte:nuevo'); irA('ajustes'); }} />;
+    pantalla = <Biblioteca onAbrir={(k, f) => { setFichaFecha(f ?? null); setFichaSesion(k); }} onNuevoDeporte={() => { setSeccionAjustes('deporte:nuevo'); irA('ajustes'); }} />;
   } else if (view === 'ajustes') {
     pantalla = <AjustesView seccion={seccionAjustes} setSeccion={setSeccionAjustes} onEditarRutina={setEditandoRutina} />;
   } else {

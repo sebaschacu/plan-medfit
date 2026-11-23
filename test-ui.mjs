@@ -7,7 +7,11 @@
 import { chromium } from 'playwright';
 import fs from 'fs';
 import { generarMes } from './src/generador.js';
-import { SESIONES, SESION_INFO as INFO_RUN, VARIANTES_DE } from './src/data.js';
+import { SESIONES as SESIONES_V7, SESION_INFO as INFO_RUN, VARIANTES_DE } from './src/data.js';
+import { SESIONES_V6 } from './src/planV6.js';
+// Estas pruebas viven en agosto de 2026, con el plan v6: sus sesiones de gym son
+// las de Barranquilla (el plan de Bogotá empieza el 30 de noviembre).
+const SESIONES = { ...SESIONES_V7, ...SESIONES_V6 };
 // Lo que puede enseñar una celda de running: la genérica o cualquiera de sus variantes.
 const ETIQUETAS_RUN = ['Running', ...VARIANTES_DE.running.map(k => INFO_RUN[k].label)];
 
@@ -42,10 +46,12 @@ const alCalendario = async (p) => {
   await pestana(p, 'Calendario').click().catch(() => {});
   await p.waitForTimeout(450);
 };
-const nuevaPagina = async (seed, opts = {}) => {
+// `hoy` cambia la fecha de la app (por defecto HOY, en agosto). Con otra fecha
+// la página se queda en su mes: no navega hasta el del ancla.
+const nuevaPagina = async (seed, { hoy = HOY, ...opts } = {}) => {
   const p = await b.newPage({ viewport: { width: 430, height: 1400 }, ...opts });
   p.on('pageerror', e => errores.push(e.message.split('\n')[0]));
-  await p.addInitScript(([h]) => localStorage.setItem('plan-internado-hoy', h), [HOY]);
+  await p.addInitScript(([h]) => localStorage.setItem('plan-internado-hoy', h), [hoy]);
   if (seed) await p.addInitScript(([s]) => localStorage.setItem('plan-internado', JSON.stringify(s)), [seed]);
   await p.goto(URL, { waitUntil: 'networkidle' });
   await p.waitForTimeout(1100);
@@ -61,7 +67,7 @@ const nuevaPagina = async (seed, opts = {}) => {
     throw new Error(`nuevaPagina: no se llegó al calendario${causa}`);
   }
   const btn = mesesDesdeHoy < 0 ? 'Mes anterior' : 'Mes siguiente';
-  for (let i = 0; i < Math.abs(mesesDesdeHoy); i++) {
+  for (let i = 0; hoy === HOY && i < Math.abs(mesesDesdeHoy); i++) {
     await p.locator(`button[aria-label="${btn}"]`).click().catch(() => {});
     await p.waitForTimeout(160);
   }
@@ -1306,21 +1312,26 @@ seccion('SESIÓN TERMINADA');
 seccion('AJUSTES · TU SEMANA');
 const abrirAjuste = async (p, titulo) => { await p.locator('main button', { hasText: titulo }).first().click(); await p.waitForTimeout(400); };
 const guardarAjuste = async (p) => { await p.locator('button', { hasText: /^(Guardar|Crear deporte)$/ }).last().click(); await p.waitForTimeout(600); };
-p = await nuevaPagina();
+// Los ajustes son del plan de Bogotá: se prueban un miércoles de diciembre.
+const DIC = '2026-12-02';
+p = await nuevaPagina(null, { hoy: DIC });
 const calAntes = await sesionPorDia(p);
 await irAAjustes(p);
 ok('Ajustes empieza por «Tu plan»', await p.locator('text=/Tu plan/i').count() > 0 && await p.locator('main button', { hasText: 'Tu semana' }).count() === 1);
 ok('Quien no toca nada no guarda config', (await ls(p)).config === undefined);
 await abrirAjuste(p, 'Tu semana');
-ok('Abre con lo del plan: 3 gym', await p.locator('[aria-label="Gym: 3"]').count() === 1);
+ok('Abre con lo del plan de Bogotá: 4 gym, 2 de cardio, sin natación', await p.locator('[aria-label="Gym: 4"]').count() === 1
+  && await p.locator('[aria-label="Running o bici: 2"]').count() === 1 && await p.locator('[aria-label="Natación: 0"]').count() === 1);
+const previa0 = await p.locator('section[aria-label="Así quedaría"]').innerText();
+ok('La vista previa cuenta 4 gym por semana', /\b4\s*Gym/.test(previa0), previa0.replace(/\n/g, ' '));
 await p.locator('button[aria-label="Más Gym"]').click(); await p.waitForTimeout(500);
-ok('La vista previa se recalcula antes de guardar', await p.locator('section[aria-label="Así quedaría"]', { hasText: /3\.5\s*Gym/ }).count() === 1);
+ok('La vista previa se recalcula antes de guardar', (await p.locator('section[aria-label="Así quedaría"]').innerText()) !== previa0);
 ok('Y no guarda nada hasta pulsar Guardar', (await ls(p)).config === undefined);
 await guardarAjuste(p);
-ok('Guardar deja solo lo que cambió', JSON.stringify((await ls(p)).config) === '{"cupo":{"gym":4}}', JSON.stringify((await ls(p)).config));
+ok('Guardar deja solo lo que cambió', JSON.stringify((await ls(p)).config) === '{"cupo":{"gym":5}}', JSON.stringify((await ls(p)).config));
 ok('Y el apartado se marca como cambiado', await p.locator('main button', { hasText: /Tu semana\s*Cambiado/ }).count() === 1);
 await pestana(p, 'Progreso').click(); await p.waitForTimeout(500);
-ok('Progreso mide la semana contra el cupo nuevo', /Gym\s*\d\/4/.test(await p.evaluate(() => document.body.innerText)));
+ok('Progreso mide la semana contra el cupo nuevo', /Gym\s*\d\/5/.test(await p.evaluate(() => document.body.innerText)));
 await alCalendario(p);
 const calCambiado = await sesionPorDia(p);
 ok('El calendario cambia con el cupo nuevo', JSON.stringify(calCambiado) !== JSON.stringify(calAntes));
@@ -1351,20 +1362,63 @@ ok('Hoy pasa a ser Noche', await p.locator('header', { hasText: 'Noche' }).count
 await p.close();
 
 seccion('AJUSTES · ORDEN DE ROTACIÓN');
-p = await nuevaPagina();
+p = await nuevaPagina(null, { hoy: DIC });
 await irAAjustes(p);
 await abrirAjuste(p, 'Orden de rotación');
 ok('Sin avisos con el orden del plan', await p.locator('text=/trabajan lo mismo/').count() === 0);
-await p.locator('button[aria-label="Subir Tracción en el gym"]').click(); await p.waitForTimeout(300);
-ok('Poner Tracción justo después de Torso avisa de que trabajan lo mismo', await p.locator('text=/Tracción\\s*va justo después de Torso/').count() === 1);
-await p.locator('button[aria-label="Sacar Pierna volumen de el gym"]').click(); await p.waitForTimeout(300);
-ok('Sacar una sesión la deja «fuera de la rotación»', await p.locator('button[aria-label="Volver a meter Pierna volumen en el gym"]').count() === 1);
+ok('La rutina activa es Torso / Pierna', await p.locator('[role=radio][aria-checked="true"]', { hasText: 'Torso / Pierna' }).count() === 1);
+await p.locator('button[aria-label="Subir Torso B en el gym"]').click(); await p.waitForTimeout(300);
+ok('Poner Torso B justo después de Torso A avisa de que trabajan lo mismo', await p.locator('text=/Torso B\\s*va justo después de Torso A/').count() === 1);
+await p.locator('button[aria-label="Sacar Pierna B de el gym"]').click(); await p.waitForTimeout(300);
+ok('Sacar una sesión la deja «fuera de la rotación»', await p.locator('button[aria-label="Volver a meter Pierna B en el gym"]').count() === 1);
 await guardarAjuste(p);
-ok('Guarda el orden nuevo', JSON.stringify((await ls(p)).config?.rotacion?.gym) === '["gymA","gymC1","gymD","gymB"]', JSON.stringify((await ls(p)).config));
+ok('Guarda el orden nuevo', JSON.stringify((await ls(p)).config?.rotacion?.gym) === '["gymTA","gymTB","gymPA"]', JSON.stringify((await ls(p)).config));
 await pestana(p, 'Rutinas').click(); await p.waitForTimeout(500);
 const txtR = await p.evaluate(() => document.body.innerText);
-ok('Rutinas sigue el orden nuevo, con lo que salió aparte', txtR.indexOf('Torso') < txtR.indexOf('Tracción') && txtR.indexOf('Fuera de la rotación') > 0
-  && txtR.indexOf('Pierna volumen') > txtR.indexOf('Fuera de la rotación'));
+ok('Rutinas sigue el orden nuevo, con lo que salió aparte', txtR.indexOf('Torso A') < txtR.indexOf('Torso B') && txtR.indexOf('Torso B') < txtR.indexOf('Pierna A')
+  && txtR.indexOf('Fuera de la rotación') > 0 && txtR.indexOf('Pierna B') > txtR.indexOf('Fuera de la rotación'));
+await p.close();
+
+// Las dos rutinas: A (Torso / Pierna) activa; B (las cinco de siempre) guardada.
+seccion('AJUSTES · TU RUTINA DE GYM');
+p = await nuevaPagina(null, { hoy: DIC });
+await pestana(p, 'Rutinas').click(); await p.waitForTimeout(500);
+let txtRut2 = await p.evaluate(() => document.body.innerText);
+ok('Rutinas enseña la activa y la guardada', /Gym · Torso \/ Pierna/i.test(txtRut2) && /Guardada · Empuje · Tracción · Pierna/i.test(txtRut2));
+ok('Con la 5.ª como opcional', /Brazos y hombros\s*Opcional/.test(txtRut2));
+await alCalendario(p);
+await irAAjustes(p);
+await abrirAjuste(p, 'Orden de rotación');
+await p.locator('[role=radio]', { hasText: 'Empuje · Tracción · Pierna' }).click(); await p.waitForTimeout(300);
+ok('Elegir la B enseña sus cinco sesiones en la cola', await p.locator('button[aria-label="Subir Tracción en el gym"]').count() === 1);
+await guardarAjuste(p);
+ok('Y se guarda como rutinaGym: B', JSON.stringify((await ls(p)).config) === '{"rutinaGym":"B"}', JSON.stringify((await ls(p)).config));
+await alCalendario(p);
+ok('El calendario de diciembre pasa a las cinco de siempre', Object.values(await sesionPorDia(p)).some(e => /Empuje|Tracción/.test(e))
+  && !Object.values(await sesionPorDia(p)).some(e => /Torso A|Pierna A/.test(e)));
+await pestana(p, 'Rutinas').click(); await p.waitForTimeout(500);
+txtRut2 = await p.evaluate(() => document.body.innerText);
+ok('Y Rutinas guarda ahora la A', /Gym · Empuje · Tracción · Pierna/i.test(txtRut2) && /Guardada · Torso \/ Pierna/i.test(txtRut2));
+await p.close();
+
+// Antes del 30 de noviembre conviven los dos planes en Rutinas.
+seccion('RUTINAS · ANTES DE BOGOTÁ');
+p = await nuevaPagina(null, { hoy: '2026-11-23' });
+await pestana(p, 'Rutinas').click(); await p.waitForTimeout(500);
+const txtNov = await p.evaluate(() => document.body.innerText);
+const txtNovU = txtNov.toUpperCase();
+ok('Arriba, el gym de ahora (hasta el 29)', txtNovU.indexOf('HASTA EL 29 DE NOVIEMBRE') >= 0 && txtNovU.indexOf('HASTA EL 29 DE NOVIEMBRE') < txtNovU.indexOf('BOGOTÁ · DESDE EL 30 NOV'));
+ok('Debajo, el de Bogotá con su primera fecha', /Bogotá · desde el 30 nov · Torso \/ Pierna/i.test(txtNov) && /Torso A\s*[^\n]*\n?\s*(Lun 30|Mar 1 dic|Mié 2 dic)/.test(txtNov), txtNov.slice(txtNovU.indexOf('BOGOTÁ'), txtNovU.indexOf('BOGOTÁ') + 120).replace(/\n/g, ' | '));
+await p.locator('main button', { hasText: /^Torso A/ }).first().click(); await p.waitForTimeout(400);
+ok('Torso A se abre y se puede editar ya (es nueva)', await p.locator('h1', { hasText: 'Torso A' }).count() > 0 && await p.locator('button', { hasText: 'Editar esta rutina' }).count() === 1);
+await p.locator('button', { hasText: 'Volver' }).first().click(); await p.waitForTimeout(400);
+await p.locator('section', { hasText: /Guardada/i }).locator('button', { hasText: /^Empuje/ }).click(); await p.waitForTimeout(400);
+const txtEmpB = await p.evaluate(() => document.body.innerText);
+ok('El Empuje guardado enseña su versión de Bogotá, sin editar hasta el 30', /Versión de Bogotá/.test(txtEmpB) && /Carga frontal/.test(txtEmpB)
+  && await p.locator('button', { hasText: 'Editar esta rutina' }).count() === 0);
+await p.locator('button', { hasText: 'Volver' }).first().click(); await p.waitForTimeout(400);
+await p.locator('section', { hasText: /hasta el 29/i }).locator('button', { hasText: /^Empuje/ }).click(); await p.waitForTimeout(400);
+ok('El Empuje de ahora, el de siempre (editable)', !/Carga frontal/.test(await p.evaluate(() => document.body.innerText)) && await p.locator('button', { hasText: 'Editar esta rutina' }).count() === 1);
 await p.close();
 
 seccion('AJUSTES · TUS DEPORTES');

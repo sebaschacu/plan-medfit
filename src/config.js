@@ -13,12 +13,19 @@
 //   cupo      { gym, natacion, cardio, flexible }        números; flexible 0/1
 //   ciclo     { turnos: ['L','C','N','P'], hoy: { fecha, pos } }
 //   turnos    { L: { gym, cardio, natacion, doblar }, … } booleanos
-//   rotacion  { gym: ['gymA', …], natacion: ['natA1', …] }
+//   rutinaGym 'A' (Torso / Pierna, la del plan) | 'B' (Empuje · Tracción · Pierna)
+//   rotacion  { gym: ['gymTA', …], natacion: ['natA1', …] }
+//
+// Hay DOS planes (data.js): el v6 hasta el 29 de noviembre de 2026 y el v7 de
+// Bogotá desde el 30. La pantalla y lo que se guarda se refieren al v7, el
+// vigente. Las semanas del v6 aplican lo que tenga sentido (el ciclo, los
+// turnos, los deportes) sobre su propio cupo y su propia cola.
 //   deportes  [{ id, nombre, color, icono, modo, porSemana, turnos, piernas,
 //               duracion, nota, archivado }]
 
-import { CUPO_SEMANAL, PRIORIDAD_TURNO, VENTANA_PISCINA, DOBLES, SECUENCIA_GYM, SECUENCIA_NATACION,
-  SECUENCIA_RUNNING, RUNNING_SESIONES, RUNNING_TEST, NATACION_CSS, SESION_INFO, SESIONES } from './data.js';
+import { PRIORIDAD_TURNO, VENTANA_PISCINA, DOBLES, SECUENCIA_GYM, SECUENCIA_NATACION,
+  SECUENCIA_RUNNING, RUNNING_SESIONES, RUNNING_TEST, NATACION_CSS, SESION_INFO, SESIONES,
+  RUTINAS_GYM, PLAN_BOGOTA, PLAN_V6 } from './data.js';
 
 export const LETRAS_TURNO = ['L', 'C', 'N', 'P'];
 export const CICLO_DEFAULT = ['L', 'C', 'N', 'P'];
@@ -34,9 +41,13 @@ export const turnosDelPlan = () => Object.fromEntries(LETRAS_TURNO.map(t => [t, 
   natacion: !!VENTANA_PISCINA[t],
   doblar: !!DOBLES.turnos[t]?.permite,
 }]));
-export const cupoDelPlan = () => ({
-  gym: CUPO_SEMANAL.gym, natacion: CUPO_SEMANAL.natacion, cardio: CUPO_SEMANAL.running, flexible: CUPO_SEMANAL.flexible,
+export const cupoDelPlan = (plan = PLAN_BOGOTA) => ({
+  gym: plan.cupo.gym, natacion: plan.cupo.natacion, cardio: plan.cupo.running, flexible: plan.cupo.flexible,
 });
+// La cola de gym de cada opción, y todas las claves que pueden ir en una cola.
+export const secuenciaDe = (opcion) => (RUTINAS_GYM[opcion] ?? RUTINAS_GYM.A).secuencia;
+const CLAVES_COLA = [...new Set(Object.values(RUTINAS_GYM).flatMap(r => r.secuencia))];
+const opcionDe = (lista) => Object.keys(RUTINAS_GYM).find(o => lista.every(k => RUTINAS_GYM[o].secuencia.includes(k)));
 
 // ─── Normalizar lo leído (localStorage o un respaldo) ───
 // Todo lo que no tenga la forma esperada se descarta y vale lo del plan: una
@@ -81,7 +92,9 @@ export function normalizarConfig(c) {
   if (esObj(c.rotacion)) {
     const rot = {};
     const limpia = (lista, validas) => (Array.isArray(lista) ? [...new Set(lista.filter(k => validas.includes(k)))] : []);
-    const g = limpia(c.rotacion.gym, SECUENCIA_GYM);
+    // Una cola es de UNA opción: si se mezclan, valen las de la opción de la primera.
+    let g = limpia(c.rotacion.gym, CLAVES_COLA);
+    if (g.length) { const o = opcionDe([g[0]]); g = g.filter(k => RUTINAS_GYM[o].secuencia.includes(k)); }
     const n = limpia(c.rotacion.natacion, SECUENCIA_NATACION);
     const r = limpia(c.rotacion.running, RUNNING_SESIONES);
     if (g.length) rot.gym = g;
@@ -89,6 +102,7 @@ export function normalizarConfig(c) {
     if (r.length) rot.running = r;
     if (Object.keys(rot).length) out.rotacion = rot;
   }
+  if (c.rutinaGym === 'B') out.rutinaGym = 'B';   // 'A' es la del plan: no se guarda
   if (Array.isArray(c.deportes)) {
     const vistos = new Set();
     const deportes = c.deportes.filter(d => esObj(d) && /^[a-z0-9]{1,24}$/.test(d.id ?? '') && typeof d.nombre === 'string' && d.nombre.trim())
@@ -152,12 +166,14 @@ export function registrarDeportes(deportes = []) {
 // Une lo guardado con lo del plan. Con config vacía devuelve exactamente las
 // constantes de data.js: es lo que garantiza que nada cambie para quien no
 // toque Ajustes.
-export function resolverConfig(c = {}) {
+export function resolverConfig(c = {}, planBase = PLAN_BOGOTA) {
   const cfg = normalizarConfig(c);
   const plan = turnosDelPlan();
   const turnos = Object.fromEntries(LETRAS_TURNO.map(t => [t, { ...plan[t], ...(cfg.turnos?.[t] ?? {}) }]));
-  const cupoBase = cupoDelPlan();
-  const cupo = { ...cupoBase, ...(cfg.cupo ?? {}) };
+  const cupoBase = cupoDelPlan(planBase);
+  // El cupo guardado son diferencias con el plan VIGENTE (Bogotá): no tiene
+  // sentido aplicarlas a las semanas del v6, que tenían su propio cupo.
+  const cupo = { ...cupoBase, ...(planBase.version === 'v6' ? {} : (cfg.cupo ?? {})) };
 
   // PRIORIDAD_TURNO, VENTANA_PISCINA y DOBLES.turnos se reconstruyen desde los
   // permisos. Si un turno conserva los del plan, se usa el objeto del plan tal
@@ -177,7 +193,12 @@ export function resolverConfig(c = {}) {
   }
 
   const ciclo = cfg.ciclo?.turnos ?? CICLO_DEFAULT;
-  const secGym = cfg.rotacion?.gym ?? SECUENCIA_GYM;
+  // La cola de gym: la de la opción elegida (v7) o la de siempre (v6). Un orden
+  // propio vale si es de esa misma opción.
+  const rutinaGym = planBase.version === 'v6' ? 'B' : (cfg.rutinaGym ?? 'A');
+  const baseGym = planBase.version === 'v6' ? SECUENCIA_GYM : secuenciaDe(rutinaGym);
+  const rotGym = cfg.rotacion?.gym;
+  const secGym = rotGym?.length && rotGym.every(k => baseGym.includes(k)) ? rotGym : baseGym;
   const secNat = cfg.rotacion?.natacion ?? SECUENCIA_NATACION;
   // El test de CSS sustituye a un Umbral; si el Umbral no está en la rotación,
   // a la primera de las que quedan.
@@ -193,6 +214,9 @@ export function resolverConfig(c = {}) {
     turnos, prioridad, ventana, dobles,
     ciclo, cicloHoy: cfg.ciclo?.hoy ?? null,
     secGym, secNat, cssSustituye, secRun, runTestSustituye,
+    rutinaGym, plan: planBase.version,
+    // Lo que cambia de un plan a otro (data.js → PLAN_V6 / PLAN_BOGOTA)
+    cardio: planBase.cardio, s3: planBase.s3, piscina: planBase.piscina, descarga: planBase.descarga,
     // El día flexible vive en el turno que no admite nada (C en el plan). Si el
     // usuario abre ese turno a todo, el flexible sigue en C.
     turnoFlexible: 'C',
@@ -201,6 +225,7 @@ export function resolverConfig(c = {}) {
 }
 
 export const CONFIG_PLAN = resolverConfig({});
+export const CONFIG_V6 = resolverConfig({}, PLAN_V6);
 
 // ─── Avisos de la rotación de gym ───
 // Dos sesiones seguidas que trabajan lo mismo no se ponen juntas: el generador
@@ -240,9 +265,17 @@ export function conCampo(config, campo, valor) {
     }
     valor = dif;
     delPlan = Object.keys(dif).length === 0;
+  } else if (campo === 'rutinaGym') {
+    delPlan = valor !== 'B';
+    // La cola guardada era de la otra opción: deja de valer.
+    if (out.rotacion?.gym && !out.rotacion.gym.every(k => secuenciaDe(valor).includes(k))) {
+      const { gym: _g, ...resto } = out.rotacion;
+      if (Object.keys(resto).length) out.rotacion = resto; else delete out.rotacion;
+    }
   } else if (campo === 'rotacion') {
     const r = {};
-    if (valor?.gym && !mismo(valor.gym, SECUENCIA_GYM)) r.gym = valor.gym;
+    const base = secuenciaDe(out.rutinaGym ?? 'A');
+    if (valor?.gym && !mismo(valor.gym, base)) r.gym = valor.gym;
     if (valor?.natacion && !mismo(valor.natacion, SECUENCIA_NATACION)) r.natacion = valor.natacion;
     if (valor?.running && !mismo(valor.running, SECUENCIA_RUNNING)) r.running = valor.running;
     valor = r;

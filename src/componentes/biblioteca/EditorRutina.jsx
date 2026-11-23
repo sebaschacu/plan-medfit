@@ -275,10 +275,11 @@ const EditorRutina = ({ sesionKey, onGuardar, onRestaurar, onCerrar }) => {
                       <Campo label="Parte">
                         <select value={ex.parte ?? 3} onChange={e => editar(i, { parte: e.target.value === 'finisher' ? 'finisher' : Number(e.target.value) })}
                           aria-label="Parte" className={`${texto} pr-2`}>
-                          <option value={1}>Parte 1</option>
-                          <option value={2}>Parte 2</option>
-                          <option value={3}>Parte 3</option>
-                          <option value="finisher">Finisher</option>
+                          <option value={0}>Bloque atlético</option>
+                          <option value={1}>Parte 1 · Básicos</option>
+                          <option value={2}>Parte 2 · Accesorios</option>
+                          <option value={3}>Parte 3 · Aislamientos</option>
+                          <option value="finisher">Agarre y carga</option>
                         </select>
                       </Campo>
                     )}

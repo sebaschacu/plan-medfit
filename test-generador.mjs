@@ -1,6 +1,12 @@
 // Banco de pruebas del generador v6.
 // Verifica las reglas del plan contra 6 meses generados, no contra un caso feliz.
-import { generarMes, generarDesdeAncla, FESTIVOS_DEFAULT, franjasCompatibles, deISO, aISO } from './src/generador.js';
+import * as G from './src/generador.js';
+import { FESTIVOS_DEFAULT, franjasCompatibles, deISO, aISO } from './src/generador.js';
+// Este banco estudia el PLAN v6 (Barranquilla) a lo largo de años: se fija a ese
+// plan. El de Bogotá, que rige desde el 30 de noviembre de 2026, tiene su propio
+// banco (test-bogota.mjs).
+const generarMes = (o) => G.generarMes({ planFijo: 'v6', ...o });
+const generarDesdeAncla = (o) => G.generarDesdeAncla({ planFijo: 'v6', ...o });
 import { SECUENCIA_GYM, SECUENCIA_NATACION, NATACION_CSS, S7_PIERNA, CUPO_SEMANAL, DOBLES, GYM_PIERNA, GYM_TORSO, SESIONES,
   CARDIO_FLEXIBLE, CARDIO_CUPO, CARDIO_POR_DEFECTO_FLEXIBLE } from './src/data.js';
 import { combinacionValida, ordenDoble, validarSeparacion, POLITICA_FIJADO, solapanGym, avisoAlFijar } from './src/generador.js';

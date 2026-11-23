@@ -128,6 +128,8 @@ export const FAMILIAS = [
     opciones: ['Lanzamiento de balón al pecho', 'Flexiones explosivas'] },
   { clave: 'lanzamientoRotacional', patron: /rotacional|lenador/,
     opciones: ['Lanzamiento rotacional de balón', 'Leñador explosivo en polea'] },
+  { clave: 'agilidad', patron: /agilidad/,
+    opciones: ['Agilidad con conos', 'Agilidad con escalera', 'Agilidad con marcas en el suelo'] },
   { clave: 'sprints', patron: /sprints?/,
     opciones: ['Sprints en bicicleta', 'Sprints en remo', 'Sprints en assault bike'] },
 ];

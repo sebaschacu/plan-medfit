@@ -1,13 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { SESION_INFO, GRUPOS_SESION } from '../../data.js';
+import { SESION_INFO, GRUPOS_SESION, gymOfrecido } from '../../data.js';
+import { usePlanCtx } from '../../estado/contextos.js';
 import { Punto } from '../comunes/ui.jsx';
 
 // ═══════════════ MENÚ DE SESIONES AGRUPADO ═══════════════
 // 16 opciones sueltas cuestan de leer. Se agrupan por el campo `grupo` de
 // SESION_INFO — no por una lista escrita aquí, que se quedaría desfasada.
 // Arranca desplegada la categoría de lo que ese día ya tenía.
-const MenuSesiones = ({ sesion, onElegir }) => {
+const MenuSesiones = ({ sesion, onElegir, fecha }) => {
+  const { planCfg } = usePlanCtx();
   const porGrupo = useMemo(() => {
     const g = {};
     Object.entries(SESION_INFO).forEach(([k, v]) => {
@@ -16,10 +18,12 @@ const MenuSesiones = ({ sesion, onElegir }) => {
       // Solo sale si es lo que ya tiene el día (registros de antes de las variantes).
       if (k === 'running' && sesion !== 'running') return;
       if (v.archivado && k !== sesion) return;   // deporte archivado: solo si ya es el del día
+      // Gym: las de la rutina activa (o las del v6, en días de antes de Bogotá).
+      if (k !== sesion && !gymOfrecido(k, fecha, planCfg.rutinaGym)) return;
       (g[v.grupo] ??= []).push({ k, ...v });
     });
     return g;
-  }, [sesion]);
+  }, [sesion, fecha, planCfg.rutinaGym]);
   const grupoActual = SESION_INFO[sesion]?.grupo ?? 'gym';
   const [abierto, setAbierto] = useState(grupoActual);
 

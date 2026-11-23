@@ -1,8 +1,8 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight, Settings, Star, Clock, Moon, AlertTriangle, ChevronRight } from 'lucide-react';
-import { SESION_INFO, SESIONES, GRUPOS_SESION as GRUPOS, PISCINA_DURACION_MIN, clavePrincipal, claveSecundaria } from '../../data.js';
+import { SESION_INFO, GRUPOS_SESION as GRUPOS, PISCINA_DURACION_MIN, clavePrincipal, claveSecundaria } from '../../data.js';
 import { S4, SUENO_POCO, SUENO_BIEN, ultimaSesion, sugerirCarga } from '../../reglas.js';
-import { ejerciciosDelDia } from '../../rutina.js';
+import { ejerciciosDelDia, sesionBase } from '../../rutina.js';
 import { VACIO, COLUMNA, NOMBRES_MES } from '../../utiles/constantes-ui.js';
 import { anotaCarga, proponerSerie, serieQueToca } from '../../utiles/serie.js';
 import { contarRender } from '../../utiles/medir.js';
@@ -34,7 +34,7 @@ const DiaView = ({ onVerFicha }) => {
   const { backToCalendar, irA, onSueno, abrirSesionDelDia } = useAccionesCtx();
 
   const esHoy = activeFecha === todayISO;
-  const ses = SESIONES[sesionKey];
+  const ses = sesionBase(sesionKey, activeFecha);
   const info = SESION_INFO[sesionKey];
   const color = ses.color;
   const lista = ejerciciosVigentes ?? ses.ejercicios;
@@ -140,7 +140,7 @@ const DiaView = ({ onVerFicha }) => {
               : ' La piscina universitaria está cerrada, pero el gym y las demás sesiones no se afectan.'}
           </Detalle>
         )}
-        {dia.franja && (
+        {dia.franja?.hora != null && (
           <div className="rounded-2xl bg-tarjeta px-4 py-3 flex items-start gap-3">
             <Clock size={18} className="flex-shrink-0 mt-0.5" style={{ color: '#06b6d4' }} />
             <p className="text-[15px] text-tinta2 leading-relaxed">

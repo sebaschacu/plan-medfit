@@ -66,7 +66,7 @@ export const S4 = (h) => {
   if (h == null || h === '') return null;
   const n = Number(h);
   if (Number.isNaN(n)) return null;
-  if (n < 6) return { nivel: 'reducida', color: '#f5b54a', texto: 'Menos de 6 h: sesión reducida. Dos series por ejercicio y fuera los acarreos; los compuestos de Parte 1 se mantienen. Hoy no hay segunda sesión.' };
+  if (n < 6) return { nivel: 'reducida', color: '#f5b54a', texto: 'Menos de 6 h: sesión reducida. Una serie menos en cada básico (Parte 1), dejando 2-3 repeticiones en reserva; los accesorios, igual. Hoy no hay segunda sesión.' };
   return { nivel: 'normal', color: '#4ade80', texto: '6 h o más: sesión normal.' };
 };
 
@@ -223,9 +223,11 @@ const incrementoDe = (ex) => {
 export function sugerirCarga(ex, progress, { hasta = null, descarga = false } = {}) {
   if (!ex) return null;
 
-  // Los isométricos progresan en TIEMPO hasta 60s (P3), no en carga
-  if (ex.iso && !ex.lineal) {
-    return { kg: null, tipo: 'no-aplica', motivo: 'Aquí progresas en tiempo, no en carga: solo subes peso al pasar de 60s (P3).' };
+  // Lo que se mide en TIEMPO (dead hang, pinza, carga frontal) no lleva
+  // sugerencia de kilos. Un curl con isométrico al final sí: sus repeticiones
+  // progresan como las de cualquier accesorio.
+  if (ex.iso && !ex.lineal && (/\d\s*s\b|m[aá]x/i.test(String(ex.reps ?? '')) || !repsObjetivo(ex.reps))) {
+    return { kg: null, tipo: 'no-aplica', motivo: 'Aquí progresas en tiempo: anota los segundos y busca superarlos.' };
   }
 
   const hist = historialEjercicio(progress, ex.id, hasta);
@@ -249,14 +251,28 @@ export function sugerirCarga(ex, progress, { hasta = null, descarga = false } = 
       motivo: `Última vez ${kg ?? '—'} kg. Sube carga solo si mantuviste los 30 m con postura perfecta; si te inclinaste, baja (P2).` };
   }
 
-  // Aislamientos: doble progresión con RIR, no lineal
+  // Doble progresión (P1): primero repeticiones, después peso. Se sube cuando
+  // TODAS las series llegan al tope del rango. Los básicos (Parte 1) también
+  // tienen el reset de P6 y suben con el incremento que trae el ejercicio.
   if (!ex.lineal) {
-    const tope = obj && ult.repsMax >= obj.max;
+    const basico = ex.parte === 1;
+    if (basico) {
+      const dos = hist.slice(-2);
+      if (dos.length === 2 && obj && dos.every(s => s.repsMax > 0 && s.repsMax < obj.min)) {
+        const nuevo = kg ? Math.round(kg * 0.9 * 2) / 2 : null;
+        return { kg: nuevo, tipo: 'reset',
+          motivo: `Fallaste el mínimo de ${obj.min} reps dos sesiones seguidas (${dos.map(s => s.repsMax).join(' y ')}). Reset del 10 %: de ${kg} a ${nuevo} kg, y vuelves a subir (P6).` };
+      }
+    }
+    const logs = ult.logs.filter(l => l.reps != null);
+    const tope = obj && logs.length > 0 && logs.length >= Math.min(ex.series ?? 1, ult.series || 1) && logs.every(l => l.reps >= obj.max);
+    const inc = incrementoDe(ex);
     return {
-      kg, tipo: tope ? 'subir' : 'mantener',
+      kg: tope && basico && kg ? kg + inc : kg, tipo: tope ? 'subir' : 'mantener',
       motivo: tope
-        ? `Llegaste a ${ult.repsMax} reps, el tope del rango. Sube al salto mínimo disponible y vuelve al extremo bajo.`
-        : `Doble progresión: quédate en ${kg ?? '—'} kg y sube reps hasta ${obj?.max ?? 'el tope'} antes de tocar el peso.`,
+        ? (basico ? `Todas las series en el tope (${obj.max}). Sube ${inc} kg y vuelve al mínimo del rango.`
+          : `Todas las series en el tope del rango. Sube al salto mínimo disponible y vuelve al extremo bajo.`)
+        : `Doble progresión: quédate en ${kg ?? '—'} kg y sube repeticiones hasta ${obj?.max ?? 'el tope'} en todas las series antes de tocar el peso.`,
     };
   }
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronRight, AlertTriangle, RotateCcw } from 'lucide-react';
 import { Punto } from '../comunes/ui.jsx';
-import { SESION_INFO, SECUENCIA_GYM, VARIANTES_DE, claveReal } from '../../data.js';
+import { SESION_INFO, VARIANTES_DE, PLAN_BOGOTA, RUTINAS_GYM, SECUENCIA_GYM, claveReal } from '../../data.js';
 import { useAccionesCtx, usePlanCtx } from '../../estado/contextos.js';
 import { avisoAlFijar } from '../../generador.js';
 
@@ -11,17 +11,20 @@ import { avisoAlFijar } from '../../generador.js';
 // en la siguiente sesión (ver POLITICA_FIJADO en generador.js).
 const SelectorVariante = ({ dia, secundaria = false, registrados = 0 }) => {
   const { fijarVariante: onFijar, soltarVariante: onSoltar } = useAccionesCtx();
-  const { calendario } = usePlanCtx();
+  const { calendario, planCfg } = usePlanCtx();
   const [abierto, setAbierto] = useState(false);
   const [porConfirmar, setPorConfirmar] = useState(null);   // clave elegida pendiente de confirmar
   const [porAvisar, setPorAvisar] = useState(null);         // { clave, avisos } · solape o S7 al fijar
   const tipo = secundaria ? dia.sesionSecundaria : dia.sesion;
   // Natación y running eligen VARIANTE dentro de su tipo; el gym, la sesión.
-  const conVariantes = !!VARIANTES_DE[tipo];
+  // La bici solo tiene variantes desde el plan de Bogotá.
+  const conVariantes = !!VARIANTES_DE[tipo] && !(tipo === 'ciclismo' && dia.fecha < PLAN_BOGOTA.desde);
   const esGym = String(tipo).startsWith('gym');
   if (!conVariantes && !esGym) return null;
 
-  const opciones = conVariantes ? VARIANTES_DE[tipo] : SECUENCIA_GYM;
+  const rutina = RUTINAS_GYM[planCfg.rutinaGym] ?? RUTINAS_GYM.A;
+  const opciones = conVariantes ? VARIANTES_DE[tipo]
+    : (dia.fecha < PLAN_BOGOTA.desde ? SECUENCIA_GYM : [...rutina.secuencia, ...rutina.extra]);
   const actual = conVariantes
     ? claveReal(tipo, secundaria ? dia.varianteSecundaria : dia.variante)
     : tipo;

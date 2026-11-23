@@ -1,8 +1,10 @@
 // Banco de pruebas del verificador de rutina.
-// La prueba de fuego: el plan v6 tal cual debe pasar SIN un solo hallazgo duro.
+// La prueba de fuego: el plan vigente (v7, Bogotá) tal cual debe pasar SIN un
+// solo hallazgo duro.
 // Si el verificador se queja del plan que él mismo defiende, está mal calibrado.
 import { verificarSesion, solapan, volumenSesion } from './src/validador.js';
 import { SESIONES } from './src/data.js';
+import { SESIONES_V6 } from './src/planV6.js';
 
 let fallos = 0, pruebas = 0;
 const check = (nombre, ok, detalle = '') => {
@@ -12,8 +14,8 @@ const check = (nombre, ok, detalle = '') => {
 };
 const clonar = (k) => JSON.parse(JSON.stringify(SESIONES[k].ejercicios));
 
-console.log('\n── EL PLAN v6 PASA LIMPIO ──');
-for (const k of ['gymA', 'gymC1', 'gymD', 'gymC2', 'gymB', 'calistenia']) {
+console.log('\n── EL PLAN v7 PASA LIMPIO ──');
+for (const k of ['gymTA', 'gymPA', 'gymTB', 'gymPB', 'gymE', 'gymA', 'gymC1', 'gymD', 'gymC2', 'gymB', 'calistenia']) {
   const r = verificarSesion(k, SESIONES[k].ejercicios);
   check(`${k} sin hallazgos duros (${r.resumen.series} series · ${r.resumen.biseries} bi-series)`,
     r.duras.length === 0,
@@ -29,7 +31,7 @@ const pares = [
   ['Remo con apoyo', 'Rueda abdominal', true],
   ['Prensa', 'Gemelo sentado', true],
   ['Press militar', 'Pallof', true],
-  ['Press inclinado', 'Extensión tríceps overhead', false],
+  ['Press inclinado', 'Tríceps sobre la cabeza', false],
   ['Remo con apoyo', 'Curl inclinado', false],
   ['Press inclinado', 'Elevación lateral en polea', false],
   ['Sentadilla trasera', 'Extensión de cuádriceps', false],
@@ -47,7 +49,8 @@ const tiene = (r, regla) => r.duras.some(d => d.regla === regla);
 
 // E2 · mezclar torso y pierna
 let ej = clonar('gymA');
-ej.push({ ...clonar('gymC1')[0], id: 'X-1' });   // sentadilla como trabajo principal
+const sentadilla = () => ({ ...SESIONES.gymC1.ejercicios.find(e => e.id === 'C1-1') });
+ej.push({ ...sentadilla(), id: 'X-1' });   // sentadilla como trabajo principal
 check('E2 detecta mezclar pierna en una sesión de torso', tiene(verificarSesion('gymA', ej), 'E2'));
 // …pero NO se aplica a la calistenia, que es full body por diseño
 ej = clonar('calistenia');
@@ -57,11 +60,19 @@ check('E2 no se aplica a una plantilla que ya nace full body',
 // como primario y NO debe convertir Gym A en full body
 check('Un finisher con pierna no desactiva E2 en una sesión de torso',
   !tiene(verificarSesion('gymA', clonar('gymA')), 'E2') &&
-  tiene(verificarSesion('gymA', [...clonar('gymA'), { ...clonar('gymC1')[0], id: 'X-9' }]), 'E2'));
+  tiene(verificarSesion('gymA', [...clonar('gymA'), { ...sentadilla(), id: 'X-9' }]), 'E2'));
+// E2 revisada (v7): en un día de pierna caben accesorios de brazo y hombro, pero
+// no un básico de torso.
+const curl = SESIONES.gymTA.ejercicios.find(e => /curl inclinado/i.test(e.nombre));
+const bancaTA = SESIONES.gymTA.ejercicios.find(e => /banca/i.test(e.nombre));
+check('E2 v7 · un accesorio de brazo en un día de pierna está permitido',
+  !tiene(verificarSesion('gymPB', [...clonar('gymPB'), { ...curl, id: 'X-10', parte: 3 }]), 'E2'));
+check('E2 v7 · un básico de torso en un día de pierna, no',
+  tiene(verificarSesion('gymPB', [...clonar('gymPB'), { ...bancaTA, id: 'X-11', parte: 1 }]), 'E2'));
 
 // E1 · compuesto de Parte 1 metido en bi-serie
 ej = clonar('gymA');
-ej[0].bs = 'BS1';
+ej.find(e => e.parte === 1).bs = 'BS1';
 check('E1 detecta un compuesto de Parte 1 dentro de una bi-serie', tiene(verificarSesion('gymA', ej), 'E1'));
 
 // E8 · emparejar dos que solapan
@@ -136,7 +147,8 @@ check('El tríceps sale como el más cargado de Gym A tras el pecho',
 const R = await import('./src/rutina.js');
 console.log('\n── RUTINA VERSIONADA ──');
 
-const base = SESIONES.gymA.ejercicios;
+// Las fechas de estas pruebas son de septiembre: rige el plan v6 (planBase).
+const base = SESIONES_V6.gymA.ejercicios;
 check('Sin versiones, resuelve el plan base',
   R.resolverRutina('gymA', '2026-09-01', {}).length === base.length);
 
@@ -178,8 +190,8 @@ check('estaEditada detecta la diferencia con el plan',
 
 // Restaurar
 const restaurada = R.restaurarPlan(rutina, 'gymA', '2026-12-01');
-check('Restaurar vuelve al plan original desde esa fecha',
-  R.resolverRutina('gymA', '2026-12-05', restaurada).length === base.length);
+check('Restaurar vuelve al plan que rige en esa fecha (en diciembre, el de Bogotá)',
+  R.resolverRutina('gymA', '2026-12-05', restaurada).length === SESIONES.gymA.ejercicios.length);
 check('Y no borra el historial anterior',
   R.resolverRutina('gymA', '2026-10-01', restaurada).length === v1.length);
 
@@ -191,8 +203,13 @@ check('Detecta el registro huérfano tras quitar un ejercicio',
 check('El sueño no cuenta como ejercicio huérfano', !huer.includes('__sueno'));
 
 // Utilidades del editor
-check('El catálogo reúne todos los ejercicios del plan',
-  R.catalogoEjercicios().length === Object.values(SESIONES).reduce((a, s) => a + s.ejercicios.length, 0));
+const cat = R.catalogoEjercicios();
+const nPlan = Object.values(SESIONES).reduce((a, s) => a + s.ejercicios.length, 0);
+check('El catálogo reúne todos los ejercicios del plan', cat.slice(0, nPlan).every((e, i) => e.id === Object.values(SESIONES).flatMap(s => s.ejercicios)[i].id));
+const nombresPlan = new Set(Object.values(SESIONES).flatMap(s => s.ejercicios.map(e => e.nombre.toLowerCase())));
+const anteriores = Object.values(SESIONES_V6).flatMap(s => s.ejercicios).filter(e => !nombresPlan.has(e.nombre.toLowerCase()));
+check('Y los del plan anterior que ya no están, uno por nombre', cat.length === nPlan + new Set(anteriores.map(e => e.nombre.toLowerCase())).size
+  && cat.slice(nPlan).every(e => /plan anterior/.test(e.origenNombre)));
 check('mover intercambia posiciones', R.mover(['a', 'b', 'c'], 0, 1).join('') === 'bac');
 check('mover no se sale de los límites', R.mover(['a', 'b'], 0, -1).join('') === 'ab');
 check('nuevoId no choca con los existentes', !base.some(e => e.id === R.nuevoId('gymA', base)));
@@ -258,9 +275,12 @@ check('Aislamiento sin llegar al tope → sube reps, no carga', sAislNo.tipo ===
 const acarreo = SESIONES.gymD.ejercicios.find(e => e.acarreo);
 check('El acarreo progresa por postura (P2), no por rango de reps',
   /P2/.test(RG.sugerirCarga(acarreo, { '2026-08-01': { [acarreo.id]: { lastre: 20 } } }).motivo));
-const iso = SESIONES.gymB.ejercicios.find(e => e.iso && !e.lineal);
-check('El isométrico progresa en tiempo hasta 60s (P3)',
+const iso = SESIONES.gymB.ejercicios.find(e => /dead hang/i.test(e.nombre));
+check('Lo que se mide en segundos (dead hang) progresa en tiempo, sin kilos',
   RG.sugerirCarga(iso, {}).tipo === 'no-aplica');
+const martilloIso = SESIONES.gymB.ejercicios.find(e => /martillo/i.test(e.nombre));
+check('Un curl con isométrico al final sí progresa en repeticiones y kilos',
+  martilloIso.iso && RG.sugerirCarga(martilloIso, { '2026-12-02': { [martilloIso.id]: { sets: [true, true, true], logs: [{ kg: 12, reps: 15 }, { kg: 12, reps: 15 }, { kg: 12, reps: 15 }] } } }).tipo === 'subir');
 
 check('Primera vez lo dice en vez de dejar un hueco', RG.sugerirCarga(banca, {}).tipo === 'primera');
 

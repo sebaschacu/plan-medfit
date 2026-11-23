@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { RotateCcw, ArrowLeft, AlertTriangle, Pencil, Check, Moon } from 'lucide-react';
-import { SESION_INFO, SESIONES, PARTES, GRUPOS_SESION as GRUPOS, E11 } from '../../data.js';
+import { SESION_INFO, PARTES, GRUPOS_SESION as GRUPOS, E11 } from '../../data.js';
 import { S4, ultimaSesion, sugerirCarga } from '../../reglas.js';
-import { estaEditada, huerfanosDelDia, resolverRutina } from '../../rutina.js';
+import { estaEditada, huerfanosDelDia, resolverRutina, sesionBase } from '../../rutina.js';
 import { opcionesDe, alternativa } from '../../alternativas.js';
 import { VACIO, COLUMNA } from '../../utiles/constantes-ui.js';
 import { proponerSerie, textoSerie } from '../../utiles/serie.js';
@@ -36,7 +36,7 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
   const huerfanos = huerfanosDelDia(progress ?? {}, ejerciciosVigentes ?? []);
   const rutinaEditada = estaEditada(sesionKey, todayISO, rutina);
 
-  const ses = SESIONES[sesionKey];
+  const ses = sesionBase(sesionKey, activeFecha);
   const info = SESION_INFO[sesionKey];
   const color = ses.color;
   // Los ejercicios salen de la rutina VIGENTE en esta fecha, no de la base:
@@ -53,7 +53,7 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
 
   // v6: agrupar por Parte 1 / 2 / 3 / Finisher, respetando el orden del plan
   const grupos = useMemo(() => {
-    const orden = [1, 2, 3, 'finisher'];
+    const orden = [0, 1, 2, 3, 'finisher'];
     const map = new Map();
     listaEj.forEach(ex => {
       const k = ex.parte ?? 1;
@@ -66,8 +66,9 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
   // son bloques de una sesión aeróbica y esas etiquetas ahí no significan nada.
   const esAgua = String(sesionKey).startsWith('nat');
   const esRun = String(sesionKey).startsWith('run');
-  const mostrarPartes = grupos.length > 1 && !esAgua && !esRun;
-  const unidad = esAgua || esRun || sesionKey === 'ciclismo' ? 'bloques' : 'ejercicios';
+  const esBici = sesionKey === 'ciclismo' || String(sesionKey).startsWith('bici');
+  const mostrarPartes = grupos.length > 1 && !esAgua && !esRun && !esBici;
+  const unidad = esAgua || esRun || esBici ? 'bloques' : 'ejercicios';
   const s4 = diaData.turno === 'P' ? S4(dayProg.__sueno) : null;
   // E11: bi-series que hoy se hacen por separado (nota del día, no de la rutina)
   const bsSueltas = Array.isArray(dayProg[E11.clave]) ? dayProg[E11.clave] : [];

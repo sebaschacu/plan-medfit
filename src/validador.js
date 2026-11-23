@@ -36,7 +36,7 @@ export const SOLO_ESTABILIZA = {
   'CAL-8': [],
 };
 
-const ES_PIERNA = new Set(['cuadriceps', 'isquios', 'gluteo', 'gluteo_medio', 'aductores', 'gemelo', 'soleo']);
+const ES_PIERNA = new Set(['cuadriceps', 'isquios', 'gluteo', 'gluteo_medio', 'aductores', 'gemelo', 'soleo', 'tibial']);
 const ES_TORSO = new Set(['pecho', 'deltoides_anterior', 'deltoides_medio', 'triceps',
   'dorsal', 'espalda_media', 'trapecio', 'deltoides_posterior', 'biceps', 'braquial']);
 
@@ -107,27 +107,30 @@ export function verificarSesion(sesionKey, ejercicios) {
       [...new Set(idsRepetidos)]);
   }
 
-  // ── E2 · torso y pierna nunca se mezclan ──
-  // Solo aplica a sesiones que NACEN separadas. La calistenia del plan es full
-  // body a propósito, así que la regla no le corresponde; se deduce de la propia
-  // plantilla en vez de mantener una lista de excepciones que se quedaría vieja.
-  // La ZONA de una sesión la define su trabajo principal, no un finisher opcional.
-  // Si no, la "práctica de carga real" y las escaleras cargando —que llevan pierna
-  // como primario y viven al final de Gym A— harían pasar esa sesión por full body
-  // y desactivarían E2 justo donde más falta hace.
-  const trabajoPrincipal = (ejs) => (ejs ?? []).filter(e => !e.opcional && e.parte !== 'finisher');
-  const mezclaEn = (ejs) => {
-    const m = new Set(trabajoPrincipal(ejs).flatMap(e => e.musculos?.primario ?? []));
-    return [...m].some(x => ES_PIERNA.has(x)) && [...m].some(x => ES_TORSO.has(x));
+  // ── E2 · torso y pierna nunca se mezclan (revisada en la v7) ──
+  // Los BÁSICOS son de una sola zona. En un día de pierna caben accesorios de
+  // brazo y hombro (decisión de Sebastián, nov 2026: son músculos pequeños y no
+  // cansan las piernas); en un día de torso no cabe pierna. La zona la da la
+  // Parte 1 del plan; lo que ya trae el propio plan nunca cuenta (así la
+  // calistenia, full body a propósito, no salta).
+  const primarios = (ejs) => new Set((ejs ?? []).flatMap(e => e.musculos?.primario ?? []));
+  const zonaDe = (ejs) => {
+    const p1 = (ejs ?? []).filter(e => e.parte === 1);
+    const m = primarios(p1.length ? p1 : (ejs ?? []).filter(e => !e.opcional && e.parte !== 'finisher'));
+    return { pierna: [...m].some(x => ES_PIERNA.has(x)), torso: [...m].some(x => ES_TORSO.has(x)) };
   };
-  const plantillaEsFullBody = mezclaEn(base?.ejercicios);
-  const musculosSesion = new Set(trabajoPrincipal(conSeries).flatMap(e => e.musculos?.primario ?? []));
-  const hayPierna = [...musculosSesion].some(m => ES_PIERNA.has(m));
-  const hayTorso = [...musculosSesion].some(m => ES_TORSO.has(m));
-  if (hayPierna && hayTorso && !plantillaEsFullBody) {
-    const culpables = conSeries.filter(e => (e.musculos?.primario ?? []).some(m => ES_PIERNA.has(m)))
-      .map(e => e.id);
-    dura('E2', 'Esta sesión mezcla torso y pierna. El plan las mantiene separadas: cada sesión es de una zona.', culpables);
+  const zona = zonaDe(base?.ejercicios ?? conSeries);
+  const delPlan = new Set((base?.ejercicios ?? []).map(e => e.id));
+  const nuevos = conSeries.filter(e => !delPlan.has(e.id) && e.parte !== 'finisher' && !e.opcional);
+  const toca = (e, zonaSet) => (e.musculos?.primario ?? []).some(m => zonaSet.has(m));
+  let culpables = [];
+  if (zona.pierna && !zona.torso) culpables = nuevos.filter(e => e.parte === 1 && toca(e, ES_TORSO));
+  else if (zona.torso && !zona.pierna) culpables = nuevos.filter(e => toca(e, ES_PIERNA));
+  if (culpables.length) {
+    dura('E2', zona.pierna
+      ? 'Un básico de torso en un día de pierna. Los básicos son de una sola zona; de torso aquí solo caben accesorios de brazo y hombro.'
+      : 'Esta sesión mezcla torso y pierna. En un día de torso no va trabajo de pierna.',
+      culpables.map(e => e.id));
   }
 
   // ── E1 · los compuestos de Parte 1 van en series rectas ──
@@ -185,11 +188,12 @@ export function verificarSesion(sesionKey, ejercicios) {
   }
 
   // ── R2 · los compuestos de Parte 1 no se quitan ──
-  const p1Base = (base?.ejercicios ?? []).filter(e => e.parte === 1 && e.lineal);
+  // v7: todos los básicos de Parte 1, tengan o no progresión lineal.
+  const p1Base = (base?.ejercicios ?? []).filter(e => e.parte === 1);
   const idsActuales = new Set(lista.map(e => e.id));
   const quitados = p1Base.filter(e => !idsActuales.has(e.id));
   if (quitados.length) {
-    dura('R2', `Quitaste ${quitados.length === 1 ? 'el compuesto' : 'los compuestos'} de Parte 1: ${quitados.map(e => e.nombre).join(', ')}. Es lo último que se recorta — ahí vive tu progresión lineal.`,
+    dura('R2', `Quitaste ${quitados.length === 1 ? 'el compuesto' : 'los compuestos'} de Parte 1: ${quitados.map(e => e.nombre).join(', ')}. Es lo último que se recorta: si falta tiempo, se recortan antes los accesorios.`,
       quitados.map(e => e.id));
   }
 

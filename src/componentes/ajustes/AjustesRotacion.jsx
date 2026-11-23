@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowUp, ArrowDown, X, Plus, RotateCcw, AlertTriangle } from 'lucide-react';
-import { SESION_INFO, SECUENCIA_GYM, SECUENCIA_NATACION, SECUENCIA_RUNNING, RUNNING_SESIONES } from '../../data.js';
+import { SESION_INFO, SECUENCIA_NATACION, SECUENCIA_RUNNING, RUNNING_SESIONES, RUTINAS_GYM, SECUENCIA_TORSO_PIERNA } from '../../data.js';
 import { solapanGym } from '../../generador.js';
 import { usePlanCtx, useAccionesCtx } from '../../estado/contextos.js';
 import { conCampo, solapesDeRotacion } from '../../config.js';
@@ -51,20 +51,41 @@ const Lista = ({ titulo, orden, todas, onCambiar, nombre }) => {
 const AjustesRotacion = ({ onVolver }) => {
   const { config, planCfg } = usePlanCtx();
   const { setConfig } = useAccionesCtx();
+  // Las dos rutinas de gym viven en la app; una está activa (A por defecto).
+  const [opcion, setOpcion] = useState(planCfg.rutinaGym ?? 'A');
   const [gym, setGym] = useState(() => [...planCfg.secGym]);
+  const elegirOpcion = (o) => { if (o === opcion) return; setOpcion(o); setGym([...RUTINAS_GYM[o].secuencia]); };
   const [nat, setNat] = useState(() => [...planCfg.secNat]);
   const [run, setRun] = useState(() => [...planCfg.secRun]);
-  const borrador = conCampo(config, 'rotacion', { gym, natacion: nat, running: run });
+  const borrador = conCampo(conCampo(config, 'rutinaGym', opcion), 'rotacion', { gym, natacion: nat, running: run });
   const solapes = solapesDeRotacion(gym, solapanGym);
   const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  const esPlan = igual(gym, SECUENCIA_GYM) && igual(nat, SECUENCIA_NATACION) && igual(run, SECUENCIA_RUNNING);
+  const esPlan = opcion === 'A' && igual(gym, SECUENCIA_TORSO_PIERNA) && igual(nat, SECUENCIA_NATACION) && igual(run, SECUENCIA_RUNNING);
   const sinUmbral = !nat.includes('natB1');
   const sinTempo = !run.includes('runB1');
 
   return (
     <Pantalla titulo="Orden de rotación" subtitulo="Qué sesión viene después de cuál. La lista se repite sin fin."
       onVolver={onVolver} onGuardar={() => { setConfig(borrador); onVolver(); }}>
-      <Lista titulo="Gym" nombre="el gym" orden={gym} todas={SECUENCIA_GYM} onCambiar={setGym} />
+      <section className="rounded-3xl bg-tarjeta px-5 pt-4 pb-2">
+        <div className="rotulo">Tu rutina de gym</div>
+        <div role="radiogroup" aria-label="Rutina de gym" className="mt-1 divide-y divide-divisor">
+          {Object.entries(RUTINAS_GYM).map(([o, r]) => (
+            <button key={o} role="radio" aria-checked={opcion === o} onClick={() => elegirOpcion(o)}
+              className="w-full min-h-[64px] py-2.5 flex items-center gap-3 text-left">
+              <span className="flex-1 min-w-0">
+                <span className={`block text-[17px] ${opcion === o ? 'text-tinta font-medium' : 'text-tinta2'}`}>{r.label}</span>
+                <span className="block text-sm text-tinta3 mt-0.5">{r.desc}</span>
+              </span>
+              <span aria-hidden="true" className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center"
+                style={{ boxShadow: `inset 0 0 0 1.5px ${opcion === o ? '#22c55e' : '#3a454e'}` }}>
+                {opcion === o && <span className="w-2.5 h-2.5 rounded-full bg-[#22c55e]" />}
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+      <Lista titulo="Gym" nombre="el gym" orden={gym} todas={RUTINAS_GYM[opcion].secuencia} onCambiar={setGym} />
       {solapes.length > 0 && (
         <div className="p-4 rounded-2xl flex items-start gap-2.5" style={{ background: 'rgba(245,158,11,0.10)' }}>
           <AlertTriangle size={18} className="text-ambar flex-shrink-0 mt-0.5" />
@@ -88,7 +109,7 @@ const AjustesRotacion = ({ onVolver }) => {
       </p>
       <VistaPrevia config={borrador} />
       {!esPlan && (
-        <button onClick={() => { setGym([...SECUENCIA_GYM]); setNat([...SECUENCIA_NATACION]); setRun([...SECUENCIA_RUNNING]); }}
+        <button onClick={() => { setOpcion('A'); setGym([...SECUENCIA_TORSO_PIERNA]); setNat([...SECUENCIA_NATACION]); setRun([...SECUENCIA_RUNNING]); }}
           className="w-full h-12 text-[15px] font-medium text-ambar flex items-center justify-center gap-2">
           <RotateCcw size={16} /> Volver al orden del plan
         </button>

@@ -19,7 +19,7 @@
 // cardio si el turno y las reglas de seguridad lo permiten. Eso reconcilia las
 // dos filas de la tabla y reproduce el ejemplo del plan.
 
-import { NATACION_CSS, RUNNING_TEST, VARIANTES_DE, PISCINA, VENTANA_PISCINA, CUPO_SEMANAL,
+import { NATACION_CSS, RUNNING_TEST, VARIANTES_DE, PISCINA, VENTANA_PISCINA, CUPO_SEMANAL, PLAN_V6, PLAN_BOGOTA, SECUENCIA_BICI,
   PRIORIDAD_TURNO, S7_PIERNA, DOBLES, GYM_PIERNA, GYM_TORSO, GYM_SOLAPAN, ORDEN_DOBLE, CARDIO_FLEXIBLE,
   CARDIO_CUPO, CARDIO_POR_DEFECTO_FLEXIBLE, SESION_INFO } from './data.js';
 import { resolverConfig, CONFIG_PLAN } from './config.js';
@@ -32,7 +32,7 @@ import { resolverConfig, CONFIG_PLAN } from './config.js';
 const admite = (turno, tipo, prioridad = PRIORIDAD_TURNO) => (prioridad[turno] || []).includes(tipo);
 
 const DIAS_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-const ES_PIERNA = new Set(['gymC1', 'gymC2']);
+const ES_PIERNA = new Set(GYM_PIERNA);   // v6: C1 y C2 · v7: además Pierna A y Pierna B
 
 // ─── Fechas (UTC para que no dependa de la zona horaria del dispositivo) ───
 export const aISO = (d) => d.toISOString().slice(0, 10);
@@ -186,7 +186,9 @@ export function avisoAlFijar(calendario, fecha, sesion) {
 // Sección 2 de la especificación. La natación combina con todo; el running solo
 // con gym de TORSO. Gym de pierna + running está PROHIBIDO, no avisado: es donde
 // se lesiona la gente y además viola S3.
-export function combinacionValida(principal, secundaria) {
+// `s3`: en el plan v7 (Bogotá) la regla S3 se quitó, y pierna + cardio el mismo
+// día vale (pesas primero, cardio unas horas después). Por defecto, la del v6.
+export function combinacionValida(principal, secundaria, { s3 = true } = {}) {
   if (!principal || !secundaria) return { ok: false, motivo: 'Falta una de las dos sesiones.' };
   if (principal === secundaria) return { ok: false, motivo: 'No tiene sentido repetir la misma sesión.' };
 
@@ -225,6 +227,7 @@ export function combinacionValida(principal, secundaria) {
   const gym = esGym(principal) ? principal : esGym(secundaria) ? secundaria : null;
   const otra = gym === principal ? secundaria : principal;
   if (gym && esCardioPierna(otra)) {
+    if (pierna(gym) && !s3) return { ok: true };
     if (pierna(gym)) {
       // La bici es de impacto cero, pero el cuádriceps trabaja igual: la regla
       // vale para las dos. Lo que la bici protege son pies, tibias y sóleo.
@@ -271,16 +274,25 @@ export function validarSeparacion(horas, principal, secundaria) {
 // Genera SIEMPRE desde el ancla hasta `hasta`, aunque solo quieras un mes:
 // es lo que hace que el contador de gym sea continuo entre meses y que
 // regenerar dé exactamente el mismo resultado.
-export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, festivos = FESTIVOS_DEFAULT, config = {} }) {
+// `planFijo` ('v6' | 'v7') fuerza un plan para todo el rango: sirve para estudiar
+// un plan entero (las pruebas del v6 miden años con él). Por defecto, por fecha.
+export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, festivos = FESTIVOS_DEFAULT, config = {}, planFijo = null }) {
   // Config de Ajustes, ya unida a la del plan. Vacía = data.js tal cual.
-  const C = resolverConfig(config);
+  // DOS planes: v6 (Barranquilla) hasta el 29 de noviembre de 2026 y v7 (Bogotá)
+  // desde el lunes 30. Cada semana usa el suyo; el cambio no reescribe el pasado.
+  const C6 = resolverConfig(config, PLAN_V6);
+  const C7 = resolverConfig(config, PLAN_BOGOTA);
+  let C = null;
+  let SEC_GYM, SEC_NAT, SEC_RUN, DOBLES_TURNOS;
+  const usarPlan = (c) => { C = c; SEC_GYM = c.secGym; SEC_NAT = c.secNat; SEC_RUN = c.secRun; DOBLES_TURNOS = c.dobles; };
   const admiteGym = (turno) => admite(turno, 'gym', C.prioridad);
   const admiteCardio = (turno) => admite(turno, 'cardio', C.prioridad);
-  const SEC_GYM = C.secGym;
-  const SEC_NAT = C.secNat;
-  const SEC_RUN = C.secRun;
-  const DOBLES_TURNOS = C.dobles;
-  const franjas = (fecha, turno, fest) => franjasCompatibles(fecha, turno, fest, C.ventana);
+  // En Bogotá no hay horario de piscina conocido (N5 se quitó): basta con que el
+  // turno admita natación, y el día no lleva hora.
+  const SIN_HORARIO = { hora: null, guiado: false };
+  const franjas = (fecha, turno, fest) => (C.piscina
+    ? franjasCompatibles(fecha, turno, fest, C.ventana)
+    : (C.ventana[turno] ? [SIN_HORARIO] : []));
   const inicio = deISO(ancla.fecha);
   const fin = deISO(hasta);
   // Rango anterior al ancla: no hay nada que generar. Se devuelve la MISMA forma
@@ -298,6 +310,7 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
   let runHechas = 0;                  // carreras hechas (las genéricas antiguas no cuentan)
   let runUltimoTest = 0;              // cuándo se hizo el último test de 30 min
   let runTestHecho = false;
+  let biciIdx = 0;                    // v7 · posición en zona 2 → 4×4
   let gymSeguidos = 0;                // S1 — nunca más de 4 gym consecutivos
   let ultimaPierna = null;            // S7 — separación mínima entre días de pierna
   let ultimoGym = null;               // clave del último gym colocado — guardarraíl de solapes
@@ -360,6 +373,14 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
   };
 
   for (const semana of semanasDe(inicio, fin)) {
+    const planSemana = planFijo === 'v6' ? C6 : planFijo === 'v7' ? C7 : (aISO(semana[0]) >= PLAN_BOGOTA.desde ? C7 : C6);
+    if (planSemana !== C) {
+      // Al pasar al plan de Bogotá con una cola NUEVA (Torso / Pierna), empieza
+      // por la primera. Con la misma cola (opción B), sigue donde iba.
+      // S1 y S7 siguen mirando hacia atrás, así que la frontera las respeta.
+      if (C && JSON.stringify(C.secGym) !== JSON.stringify(planSemana.secGym)) gymIdx = 0;
+      usarPlan(planSemana);
+    }
     const ds = semana.map(f => nuevoDia(f, turnoDe(aISO(f), ancla, fijados, C)));
 
     // Días ya decididos: fijados a mano por el usuario, o fijados AUTOMÁTICAMENTE
@@ -378,7 +399,7 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
           d.franja = mejorFranja(franjas(d.fecha, d.turno, festivos));
           d.varianteFijada = fij.variante;
         }
-        if (d.sesion === 'running') d.varianteFijada = fij.variante;
+        if (d.sesion === 'running' || d.sesion === 'ciclismo') d.varianteFijada = fij.variante;
       } else libres.push(d);
       // La variante fijada de la SECUNDARIA se lee siempre: el día puede tener
       // gym como principal y natación doblada, y entonces el bloque de arriba
@@ -540,8 +561,8 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
 
     let runPuestos = 0;
     for (let i = 0; i < cupo.running; i++) {
-      const ok = libres.filter(d => !esTrasPierna(d) && admiteCardio(d.turno));
-      if (!ok.length) {
+      const ok = libres.filter(d => !(C.s3 && esTrasPierna(d)) && admiteCardio(d.turno));
+      if (!ok.length && C.s3) {
         // Sin hueco válido. ¿Hay uno libre que solo bloquea S3? Entonces el swap.
         const bloqueados = libres.filter(d => esTrasPierna(d) && admiteCardio(d.turno))
           .sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -550,8 +571,12 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
         continue;
       }
       const orden = { N: 0, L: 1, P: 2, C: 3 };
-      const elegido = [...ok].sort((a, b) => orden[a.turno] - orden[b.turno] || a.fecha.localeCompare(b.fecha))[0];
-      elegido.sesion = 'running';
+      if (!ok.length) { if (semanaCompleta) pendientes.push('running'); continue; }
+      // Dos cardios en la semana: mejor separados que en días seguidos.
+      const separado = (d) => !ds.some(x => CARDIO_CUPO.includes(x.sesion) && Math.abs(diffDias(deISO(x.fecha), deISO(d.fecha))) === 1);
+      const preferir = (a, b) => (C.plan === 'v7' ? separado(b) - separado(a) : 0);
+      const elegido = [...ok].sort((a, b) => preferir(a, b) || orden[a.turno] - orden[b.turno] || a.fecha.localeCompare(b.fecha))[0];
+      elegido.sesion = C.cardio;   // v6: running · v7: bici
       libres.splice(libres.indexOf(elegido), 1);
       runPuestos++;
     }
@@ -584,7 +609,7 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
     // El flexible ya sabe qué hubo el día anterior (las principales están puestas).
     // Si fue pierna, S3 prohíbe el running ahí y la bici tampoco conviene: la UI
     // lo lee para no ofrecer lo que rompería la regla.
-    if (flexible) flexible.trasPierna = !!esTrasPierna(flexible);
+    if (flexible) flexible.trasPierna = C.s3 && !!esTrasPierna(flexible);
 
     // ── 5. SESIONES DOBLES · cubrir lo que no cupo como principal ──
     // El déficit es de ~3 sesiones cada 28 días, no un problema semanal.
@@ -594,7 +619,7 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
       // bici, nunca running). Antes no se doblaba nada y esas semanas perdían el
       // cardio: 5 huecos para 6 sesiones y la única salida cerrada.
       const semanaBloque = Math.floor(diffDias(deISO(ds[0].fecha), inicio) / 7) % DOBLES.semanasBloque + 1;
-      const enDescarga = semanaBloque === DOBLES.semanasBloque;
+      const enDescarga = C.descarga && semanaBloque === DOBLES.semanasBloque;
       const esSuave = (s) => DOBLES.descarga.doblesSuaves.includes(s);
 
       // Orden de preferencia de qué se dobla (el running es el más flexible de horario)
@@ -625,8 +650,8 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
         && Math.abs(diffDias(deISO(x.fecha), deISO(d.fecha))) < S7_PIERNA.separacionMinimaDias);
       const anfitrionesPara = (sesion) => ds
         .filter(d => d.sesion && !d.sesionSecundaria && DOBLES_TURNOS[d.turno]?.permite)
-        .filter(d => combinacionValida(d.sesion, sesion).ok)
-        .filter(d => !(CARDIO_CUPO.includes(sesion) && esTrasPierna(d)))
+        .filter(d => combinacionValida(d.sesion, sesion, { s3: C.s3 }).ok)
+        .filter(d => !(C.s3 && CARDIO_CUPO.includes(sesion) && esTrasPierna(d)))
         .filter(d => !ES_PIERNA.has(sesion) || lejosDePierna(d))
         .filter(sinVecinosDoblados)
         .sort((a, b) => (DOBLES_TURNOS[a.turno].condicional - DOBLES_TURNOS[b.turno].condicional)
@@ -649,7 +674,7 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
         if (dobladosSemana >= DOBLES.maxPorSemana) return false;                      // D1
         const candidatas = ds
           .filter(d => d.sesion === 'natacion' && !d.fijado && !d.sesionSecundaria)
-          .filter(d => admiteCardio(d.turno) && !esTrasPierna(d))
+          .filter(d => admiteCardio(d.turno) && !(C.s3 && esTrasPierna(d)))
           .sort((a, b) => a.fecha.localeCompare(b.fecha));
         for (const nat of candidatas) {
           const host = ds
@@ -667,7 +692,7 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
           host.d.dobleOrden = ordenDoble(host.d.sesion, 'natacion');
           host.d.dobleCondicional = !!DOBLES_TURNOS[host.d.turno].condicional;
           const diaNat = nat.dia;
-          nat.sesion = 'running';
+          nat.sesion = C.cardio;
           delete nat.franja;
           avisos.push({ semana: ds[0].fecha, fecha: nat.fecha, tipo: 'natacion_cede_a_running',
             texto: `Día ${diaNat}: el running no tenía dónde doblar. La natación pasa a segunda sesión del día ${host.d.dia} (${host.d.sesion}) y le deja el día.` });
@@ -714,7 +739,9 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
         // guardar el token genérico dejaba días con sesionSecundaria: 'gym'.
         // Con guardarraíl: un gym doblado también es un gym consecutivo.
         const gymDoble = queFalta === 'gym' ? proximaGym() : null;
-        const sesionPendiente = gymDoble ? gymDoble.sesion : queFalta;
+        // El cupo de cardio se llama 'running' por dentro; lo que se pone es el
+        // cardio del plan (v7: bici).
+        const sesionPendiente = gymDoble ? gymDoble.sesion : (queFalta === 'running' ? C.cardio : queFalta);
 
         const anfitriones = anfitrionesPara(sesionPendiente);
 
@@ -870,6 +897,25 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
         d.sugerida = varianteNatacion();      // la que tocaba, para marcarla en la UI
         d.variante = sellar(deFamilia('natacion', d.varianteFijada));
       }
+      // v7 · la bici alterna zona 2 y 4×4. Solo desde el plan de Bogotá: antes la
+      // bici era una sola sesión y sus días conservan esa.
+      const v7 = d.fecha >= PLAN_BOGOTA.desde;
+      const sellarBici = (fijada) => {
+        if (fijada === 'ciclismo') return 'ciclismo';
+        const debida = SECUENCIA_BICI[biciIdx % SECUENCIA_BICI.length];
+        const v = fijada ?? debida;
+        if (!fijada || fijada === debida || POLITICA_FIJADO === 'resincroniza') biciIdx++;
+        return v;
+      };
+      const fijadaBici = (f) => (f === 'ciclismo' ? 'ciclismo' : deFamilia('ciclismo', f));
+      if (v7 && d.sesion === 'ciclismo' && !d.variante) {
+        d.sugerida = SECUENCIA_BICI[biciIdx % SECUENCIA_BICI.length];
+        d.variante = sellarBici(fijadaBici(d.varianteFijada));
+      }
+      if (v7 && d.sesionSecundaria === 'ciclismo' && !d.varianteSecundaria) {
+        d.sugeridaSecundaria = SECUENCIA_BICI[biciIdx % SECUENCIA_BICI.length];
+        d.varianteSecundaria = sellarBici(fijadaBici(d.varianteFijadaSecundaria));
+      }
       if (d.sesion === 'running' && !d.variante) {
         d.sugerida = varianteRunning();
         d.variante = sellarRun(d.varianteFijada === 'running' ? 'running' : deFamilia('running', d.varianteFijada));
@@ -892,11 +938,14 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
     // Consolidar la semana
     // Semana del bloque de 8: la 8ª es descarga (P4). Se marca en TODOS los días
     // para que la app pueda avisarlo el día que toca, no solo en el resumen semanal.
+    // En el plan de Bogotá no hay descargas fijas (P4 se quitó).
     const semanaDelBloque = Math.floor(diffDias(deISO(ds[0].fecha), inicio) / 7) % DOBLES.semanasBloque + 1;
     for (const d of ds.sort((a, b) => a.fecha.localeCompare(b.fecha))) {
       if (!d.sesion) d.sesion = 'descanso';
-      d.semanaBloque = semanaDelBloque;
-      d.descarga = semanaDelBloque === DOBLES.semanasBloque;
+      if (C.descarga) {
+        d.semanaBloque = semanaDelBloque;
+        d.descarga = semanaDelBloque === DOBLES.semanasBloque;
+      } else d.descarga = false;
       if (d.sesion.startsWith('gym')) gymSeguidos++; else gymSeguidos = 0;
       dias.push(d);
     }
@@ -908,14 +957,14 @@ export function generarDesdeAncla({ hasta, ancla = ANCLA_DEFAULT, fijados = {}, 
 // ─── API principal: el calendario de UN mes ───
 // Devuelve el mismo shape que consumía la app (dia, sem, turno, sesion, festivo)
 // más los campos nuevos (fecha, momento, franja, flexible, fijado).
-export function generarMes({ anio, mes, ancla = ANCLA_DEFAULT, fijados = {}, festivos = FESTIVOS_DEFAULT, config = {} }) {
+export function generarMes({ anio, mes, ancla = ANCLA_DEFAULT, fijados = {}, festivos = FESTIVOS_DEFAULT, config = {}, planFijo = null }) {
   const ultimoDelMes = new Date(Date.UTC(anio, mes + 1, 0));
   // Se genera hasta el DOMINGO que cierra la semana del último día del mes.
   // Si se cortara en el día 31, la semana a caballo entre dos meses se generaría
   // distinta según qué mes pidieras (cupo a medias) y la cola de gym se saltaría
   // posiciones en cada cambio de mes.
   const finSemana = sumarDias(ultimoDelMes, (7 - ultimoDelMes.getUTCDay()) % 7);
-  const { dias, avisos } = generarDesdeAncla({ hasta: aISO(finSemana), ancla, fijados, festivos, config });
+  const { dias, avisos } = generarDesdeAncla({ hasta: aISO(finSemana), ancla, fijados, festivos, config, planFijo });
   const delMes = dias.filter(d => {
     const f = deISO(d.fecha);
     return f.getUTCFullYear() === anio && f.getUTCMonth() === mes;

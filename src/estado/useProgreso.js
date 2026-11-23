@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { CLAVE_CAMBIOS } from '../alternativas.js';
 import { SESIONES, E11 } from '../data.js';
+import { SESIONES_V6 } from '../planV6.js';
 import { calcularAvisosReset } from '../reglas.js';
 import { parseRest } from '../utiles/formato.js';
 import { vibrate } from '../utiles/sonido.js';
@@ -187,7 +188,7 @@ export function useProgreso({ activeFecha, diaActivo, fijarPorRegistro, startTim
   }, []);
 
   // ─── Avisos de reset (regla P6) ───
-  const avisosReset = useMemo(() => calcularAvisosReset(progress, SESIONES), [progress]);
+  const avisosReset = useMemo(() => calcularAvisosReset(progress, [...Object.values(SESIONES_V6), ...Object.values(SESIONES)]), [progress]);
 
   return {
     progress, prMap, avisosReset,

@@ -2,6 +2,7 @@
 
 Capturado el 2026-09-03, antes de tocar `src/`. Actualizado el 2026-11-13 con
 el rediseño D (rama `rediseno-d`): mismas seis puertas, números de abajo.
+Actualizado el 2026-11-23 con el plan v7 · Bogotá (desde el 30 de noviembre).
 
 Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 "no petar". Si un paso no pasa las cinco puertas, se revierte ese paso entero.
@@ -10,14 +11,15 @@ Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 
 | # | Comando | Baseline |
 |---|---|---|
-| 1 · Lógica | `npm test` | 155/155 + 85/85 + 62/62 + 60/60 + 30/30 = **392** (158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4; +15 en la decisión 1; +15 en la decisión 2; +1 en el rediseño D: S4 a dos tramos; +60 con las sesiones de running; +30 con las alternativas de ejercicio) |
+| 1 · Lógica | `npm test` | 155/155 + 94/94 + 62/62 + 60/60 + 30/30 + 75/75 = **476** (+84 con el plan de Bogotá: 75 propias, +9 en el verificador; 158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4; +15 en la decisión 1; +15 en la decisión 2; +1 en el rediseño D: S4 a dos tramos; +60 con las sesiones de running; +30 con las alternativas de ejercicio) |
 | 1b · Configuración | `node test-config.mjs` (dentro de `npm test`) | **62/62** · con la config vacía el calendario es idéntico al del plan; cada ajuste hace lo que dice; S1, S3, S7 y turnos aguantan cualquier config |
 | 1c · Running | `node test-running.mjs` (dentro de `npm test`) | **60/60** · cada carrera resuelve a una variante sin cambiar la clave del día; rotación de las 4 indispensables (Rodaje suave → Tempo → Fondo largo → Series 4×4) con test de 30 min cada ~12 carreras; S3 intacta; los días registrados antes de las variantes conservan la sesión genérica |
+| 1e · Bogotá | `node test-bogota.mjs` (dentro de `npm test`) | **75/75** · todo lo anterior al 30-nov es idéntico al v6; cada semana de Bogotá trae 4 gym + 2 bici (zona 2 y 4×4 alternadas), sin natación automática, sin descargas fijas; cola Torso A → Pierna A → Torso B → Pierna B (la opción B sigue la cola de siempre sin reiniciarla); S1 y S7 intactas; pierna + bici el mismo día vale (S3 quitada); las diez sesiones pasan el verificador; volumen semanal por músculo; rutina por fecha (una edición anterior al 30 cede ante el plan nuevo); doble progresión y S4 a dos tramos |
 | 1d · Alternativas | `node test-alternativas.mjs` (dentro de `npm test`) | **30/30** · cada ejercicio de gym tiene su familia (mismo músculo, otro equipo); la alternativa conserva series, reps, bi-serie y músculos con un id propio (historial propio); «solo hoy» va en `__cambios` del día y no toca la rutina; «desde ahora» es una versión nueva; volver al del plan recupera su id |
-| 2a · Interfaz | `npm run test:ui` | **369/369** · 0 errores de página (227 antes del rediseño D; la suite se reescribió para la navegación nueva conservando cada comprobación, +43 nuevas; +24 con el running; +17 con las alternativas) |
+| 2a · Interfaz | `npm run test:ui` | **382/382** · 0 errores de página (227 antes del rediseño D; la suite se reescribió para la navegación nueva conservando cada comprobación, +43 nuevas; +24 con el running; +17 con las alternativas; +13 con Bogotá. La suite vive en agosto de 2026 —plan v6—; Ajustes y las dos rutinas se prueban con `hoy` en diciembre y Rutinas antes del 30 con `hoy` = 23-nov) |
 | 2b · Auditoría | `npm run audit` | **23/23** · 0 errores de página (recorre también Progreso, Rutinas, el editor y Ajustes) |
 | 3 · Lint | `npx oxlint` | **0 avisos / 0 errores** |
-| 4 · Build | `npm run build` | compila · 393 kB (gzip 117) + Geist 29 kB |
+| 4 · Build | `npm run build` | compila · 517 kB (gzip 146) + Geist 29 kB |
 | 5 · Snapshot | `npm run test:snapshot` | **2/2** · contrato de localStorage intacto |
 | 6 · Renders | `npm run test:renders` | **App = 0** al marcar la 2ª serie (y DiaView/PanelDia = 0) |
 
@@ -299,3 +301,25 @@ tragaba el fallo y aparecía 30 s después como un timeout sin relación.
 - La auditoría sí son 21.
 
 Entorno: Node v24.20.0 · npm 11.19.0 · 409 paquetes.
+
+## Plan v7 · Bogotá (2026-11-23)
+
+El plan cambia por fecha, no por versión de la app: hasta el domingo 29 de
+noviembre rige el v6 (Barranquilla) y desde el lunes 30, el de Bogotá.
+
+- **Sesiones.** Las de gym del v6 viven intactas en `src/planV6.js`
+  (`SESIONES_V6`); `planBase(clave, fecha)` y `sesionBase(clave, fecha)` sirven
+  la que toca a cada día. Las claves internas no cambian (`gymA`, `gymC1`…:
+  opción B con los ejercicios nuevos y sus ids de siempre); las nuevas son
+  `gymTA`, `gymPA`, `gymTB`, `gymPB`, `gymE` (opción A) y `biciZ2` / `bici4x4`.
+- **Calendario.** `PLAN_V6` y `PLAN_BOGOTA` en `data.js`; el generador elige el
+  de cada semana (`planFijo` lo fuerza en las pruebas). Cupo de Bogotá: 4 gym,
+  0 natación, 2 cardio (bici), 1 flexible. Sin S3, sin descargas, sin horario
+  de piscina.
+- **Ajustes** se refieren al plan de Bogotá (`rutinaGym: 'B'` elige la opción
+  B; la A no se guarda). La vista previa empieza el 30 si hoy es anterior.
+- **Comprobación de oro.** El calendario anterior al 30 de noviembre es
+  idéntico byte a byte al del commit `8d9ce25` (4 escenarios + 12 meses, 605 días).
+- **Historial.** Progreso junta los básicos de Bogotá con los compuestos del v6
+  (por nombre o por id); el catálogo del editor incluye los ejercicios del v6
+  que ya no están; P6 lee las definiciones de los dos planes.

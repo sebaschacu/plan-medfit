@@ -19,6 +19,8 @@ const claveDe = clavePrincipal;
 // Lo que cabe en una celda: el nombre partido en dos líneas, nunca a mitad de palabra.
 const CELDA = {
   gymA: 'Empuje', gymB: 'Tracción', gymD: 'Torso', gymC1: 'Pierna\nfuerza', gymC2: 'Pierna\nvolumen',
+  gymTA: 'Torso A', gymPA: 'Pierna A', gymTB: 'Torso B', gymPB: 'Pierna B', gymE: 'Brazos\nhombros',
+  bici4x4: 'Bici\n4×4', biciZ2: 'Bici\nzona 2',
   natA1: 'Técnica\ncrawl', natA2: 'Espalda\ny pecho', natA3: 'Estilos', natB1: 'Umbral',
   natB2: 'Aguas\nabiertas', natB3: 'Ritmo\nvariable', natCSS: 'Test\nCSS', natacion: 'Nado',
   running: 'Running', ciclismo: 'Bici', calistenia: 'Calis.',
@@ -26,7 +28,7 @@ const CELDA = {
   runB2: 'Series\numbral', runB3: 'Series\n4×4', runTest: 'Test\n30 min',
 };
 // La segunda sesión, en una palabra.
-const SEGUNDA = { running: 'Run', ciclismo: 'Bici', calistenia: 'Calis.' };
+const SEGUNDA = { running: 'Run', ciclismo: 'Bici', calistenia: 'Calis.', bici4x4: 'Bici', biciZ2: 'Bici' };
 const segundaDe = (k) => SEGUNDA[k] ?? (String(k).startsWith('nat') ? 'Nado' : String(k).startsWith('run') ? 'Run' : CELDA[k]?.split('\n')[0] ?? SESION_INFO[k]?.label);
 const claveSecDe = claveSecundaria;
 
