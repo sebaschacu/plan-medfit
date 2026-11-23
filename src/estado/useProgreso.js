@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { CLAVE_CAMBIOS } from '../alternativas.js';
 import { SESIONES, E11 } from '../data.js';
 import { calcularAvisosReset } from '../reglas.js';
 import { parseRest } from '../utiles/formato.js';
@@ -162,6 +163,22 @@ export function useProgreso({ activeFecha, diaActivo, fijarPorRegistro, startTim
     });
   }, [activeFecha]);
 
+  // ─── Cambiar un ejercicio por una alternativa, solo hoy ───
+  // Como E11: una nota del día en `__cambios` ({ idEnLaRutina: nombre }), que no
+  // fija el día ni cuenta como registro. `null` vuelve al de la rutina.
+  const cambiarHoy = useCallback((exId, nombre) => {
+    setProgress(prev => {
+      const day = prev[activeFecha] || {};
+      const cambios = { ...(day[CLAVE_CAMBIOS] ?? {}) };
+      if (nombre) cambios[exId] = nombre; else delete cambios[exId];
+      const nd = { ...day };
+      if (Object.keys(cambios).length) nd[CLAVE_CAMBIOS] = cambios; else delete nd[CLAVE_CAMBIOS];
+      const n = { ...prev };
+      if (Object.keys(nd).length) n[activeFecha] = nd; else delete n[activeFecha];
+      return n;
+    });
+  }, [activeFecha]);
+
   // ─── Borrar el registro de un día cualquiera ───
   // Lo pide App al cambiar la sesión de un día con entrenamiento registrado
   // (tras confirmarlo): ese registro apuntaría a ejercicios que ya no existen.
@@ -175,6 +192,6 @@ export function useProgreso({ activeFecha, diaActivo, fijarPorRegistro, startTim
   return {
     progress, prMap, avisosReset,
     setProgress, setPrMap,   // los usa importar
-    toggleSet, registrarSerie, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta, borrarRegistro,
+    toggleSet, registrarSerie, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta, cambiarHoy, borrarRegistro,
   };
 }

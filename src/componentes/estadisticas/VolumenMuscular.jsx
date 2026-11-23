@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { MUSCULOS, CAT_MUSCULO, RANGO_VOLUMEN, clavePrincipal, claveSecundaria } from '../../data.js';
-import { resolverRutina } from '../../rutina.js';
+import { ejerciciosDelDia } from '../../rutina.js';
 import { mesDeISO } from '../../utiles/formato.js';
 import { usePlanCtx, useProgresoCtx } from '../../estado/contextos.js';
 
@@ -60,7 +60,7 @@ const VolumenMuscular = () => {
         ...(d.complementos ?? []),
       ].filter(Boolean);
       const pDia = progress[d.fecha] || {};
-      claves.flatMap(k => resolverRutina(k, d.fecha, rutina)).forEach(ex => {
+      claves.flatMap(k => ejerciciosDelDia(k, d.fecha, rutina, pDia)).forEach(ex => {
         if (!ex.musculos || typeof ex.series !== 'number' || ex.series === 0) return;
         // Planificadas = solo lo no opcional: los `*` son lo primero que se recorta (R2),
         // así que son suelo comprometido, no promesa.

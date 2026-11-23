@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ChevronDown, TrendingUp } from 'lucide-react';
 import { SESIONES, SESION_INFO, DOBLES, clavePrincipal, claveSecundaria, familiaDe } from '../../data.js';
 import { historialEjercicio, mmss } from '../../reglas.js';
-import { resolverRutina } from '../../rutina.js';
+import { ejerciciosDelDia } from '../../rutina.js';
 import { COLUMNA } from '../../utiles/constantes-ui.js';
 import { contarRender } from '../../utiles/medir.js';
 import { usePlanCtx, useProgresoCtx } from '../../estado/contextos.js';
@@ -121,8 +121,8 @@ const ProgresoView = () => {
   const semana = useMemo(() => (hoy ? calendario.filter(d => lunesDe(d.fecha) === lunesDe(hoy.fecha)) : []), [calendario, hoy]);
   const cupo = useMemo(() => {
     const hecha = (fecha, clave) => {
-      const ejs = resolverRutina(clave, fecha, rutina);
       const p = progress[fecha] || {};
+      const ejs = ejerciciosDelDia(clave, fecha, rutina, p);
       return ejs.length > 0 && ejs.every(ex => { const sc = typeof ex.series === 'number' ? ex.series : 1; return sc > 0 && p[ex.id]?.sets?.length === sc && p[ex.id].sets.every(Boolean); });
     };
     const grupo = (k) => (String(k).startsWith('gym') ? 'gym' : String(k).startsWith('nat') ? 'natacion' : k === 'running' || k === 'ciclismo' || familiaDe(k) === 'running' ? 'cardio' : SESION_INFO[k]?.deporte ? k : null);

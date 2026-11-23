@@ -2,7 +2,8 @@ import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { RotateCcw, ArrowLeft, AlertTriangle, Pencil, Check, Moon } from 'lucide-react';
 import { SESION_INFO, SESIONES, PARTES, GRUPOS_SESION as GRUPOS, E11 } from '../../data.js';
 import { S4, ultimaSesion, sugerirCarga } from '../../reglas.js';
-import { estaEditada, huerfanosDelDia } from '../../rutina.js';
+import { estaEditada, huerfanosDelDia, resolverRutina } from '../../rutina.js';
+import { opcionesDe, alternativa } from '../../alternativas.js';
 import { VACIO, COLUMNA } from '../../utiles/constantes-ui.js';
 import { proponerSerie, textoSerie } from '../../utiles/serie.js';
 import { contarRender } from '../../utiles/medir.js';
@@ -11,6 +12,7 @@ import RestTimer from '../comunes/RestTimer.jsx';
 import { Detalle, BotonCTA } from '../comunes/ui.jsx';
 import ExerciseCard from './ExerciseCard.jsx';
 import HojaSerie from './HojaSerie.jsx';
+import HojaCambio from './HojaCambio.jsx';
 import PanelCSS from './PanelCSS.jsx';
 import PanelRitmosRun from './PanelRitmosRun.jsx';
 
@@ -28,7 +30,7 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
   contarRender('SessionView');
   const { todayISO, rutina, activeFecha, diaActivo: diaData, claveVista: sesionKey, ejerciciosVigentes } = usePlanCtx();
   const { progress: progresoTotal, prMap, avisosReset, restTimer } = useProgresoCtx();
-  const { backToCalendar: onBack, resetDay: onReset, skipTimer: onSkipTimer, registrarSerie, toggleSet } = useAccionesCtx();
+  const { backToCalendar: onBack, resetDay: onReset, skipTimer: onSkipTimer, registrarSerie, toggleSet, cambiarHoy, guardarRutina } = useAccionesCtx();
 
   const progress = progresoTotal[activeFecha];
   const huerfanos = huerfanosDelDia(progress ?? {}, ejerciciosVigentes ?? []);
@@ -121,6 +123,25 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
     });
     return () => cancelAnimationFrame(id);
   }, [seriesMarcadas]);
+
+  // ─── Cambiar un ejercicio por una alternativa (solo gym) ───
+  // `cambio` es el ejercicio tal como se ve hoy; el de la rutina es el que
+  // tiene el id guardado en `cambioHoy` (si hoy va cambiado) o el mismo.
+  const [cambio, setCambio] = useState(null);
+  const conAlternativas = String(sesionKey).startsWith('gym');
+  const onCambiar = useCallback((ex) => setCambio(ex), []);
+  const rutinaDelDia = useMemo(() => resolverRutina(sesionKey, activeFecha, rutina), [sesionKey, activeFecha, rutina]);
+  const exRutina = cambio && rutinaDelDia.find(e => e.id === (cambio.cambioHoy ?? cambio.id));
+  const desdeAhora = (nombre) => {
+    const vigente = resolverRutina(sesionKey, todayISO, rutina);
+    if (vigente.some(e => e.id === exRutina.id)) {
+      guardarRutina(sesionKey, vigente.map(e => (e.id === exRutina.id ? alternativa(e, nombre) : e)),
+        `Cambio: ${exRutina.nombre} → ${nombre}`);
+    }
+    cambiarHoy(exRutina.id, null);
+    setElegido({ id: alternativa(exRutina, nombre).id, completo: false });   // sigue abierto
+    setCambio(null);
+  };
 
   let numero = 0;
 
@@ -218,6 +239,7 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
                       abierta={abierta} onAbrir={onAbrir} onAjustar={onAjustar} onHecha={onHecha}
                       avisoReset={avisosReset[ex.id]}
                       bsSuelta={!!ex.bs && bsSueltas.includes(ex.bs)}
+                      onCambiar={conAlternativas && opcionesDe(ex).length > 1 ? onCambiar : undefined}
                       ultima={d?.ultima} sugerencia={d?.sugerencia} />
                   );
                 })}
@@ -272,6 +294,17 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
       <RestTimer timer={restTimer} onSkip={onSkipTimer} color={color}
         guardada={logUltima ? `serie ${ultima.i + 1} guardada · ${textoSerie(logUltima)}` : null}
         onCorregir={logUltima ? () => setHoja(ultima) : null} />
+
+      {exRutina && (
+        <HojaCambio opciones={opcionesDe(cambio)} actual={cambio.nombre} enRutina={exRutina.nombre}
+          plan={exRutina.alt?.nombre0 ?? exRutina.nombre} color={color}
+          onSoloHoy={(nombre) => {
+            cambiarHoy(exRutina.id, nombre);
+            setElegido({ id: nombre ? alternativa(exRutina, nombre).id : exRutina.id, completo: false });
+            setCambio(null);
+          }}
+          onDesdeAhora={desdeAhora} onCerrar={() => setCambio(null)} />
+      )}
 
       {exHoja && (() => {
         const d = datosDe(exHoja);

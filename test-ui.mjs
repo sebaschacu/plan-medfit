@@ -1555,6 +1555,82 @@ seccion('RUNNING');
   await p.close();
 }
 
+// ══ ALTERNATIVAS DE EJERCICIO ══
+seccion('ALTERNATIVAS');
+{
+  const diaA = ago.find(d => d.sesion === 'gymA' && !d.sesionSecundaria);
+  const lat = SESIONES.gymA.ejercicios.find(e => e.nombre === 'Elevación lateral en polea');
+  p = await nuevaPagina();
+  await abrirSesion(p, diaA.fecha);
+  await abrirEjercicio(p, lat.nombre);
+  const btn = p.locator(`button[aria-label="Cambiar ${lat.nombre}"]`);
+  ok('Un ejercicio de gym abierto tiene «Cambiar»', await btn.count() === 1);
+  await btn.click(); await p.waitForTimeout(300);
+  const hoja = p.locator('[role="dialog"]');
+  ok('Se abre la hoja con las alternativas de su familia',
+    await hoja.locator('[role="radio"]').count() === 4 && await hoja.locator('text=Tu plan').count() === 0
+    && await hoja.locator('[role="radio"][aria-checked="true"]', { hasText: lat.nombre }).count() === 1);
+  ok('Con la actual elegida, no se puede confirmar nada',
+    await hoja.locator('button', { hasText: 'Solo hoy' }).isDisabled() && await hoja.locator('button', { hasText: 'Desde ahora' }).isDisabled());
+  await hoja.locator('[role="radio"]', { hasText: 'Elevación lateral con mancuernas' }).click();
+  await hoja.locator('button', { hasText: 'Solo hoy' }).click(); await p.waitForTimeout(500);
+  const dia1 = (await ls(p)).prog?.[diaA.fecha];
+  ok('«Solo hoy» se guarda como nota del día', dia1?.__cambios?.[lat.id] === 'Elevación lateral con mancuernas', JSON.stringify(dia1));
+  ok('Y no fija el día en el calendario', !(await ls(p)).fijados?.[diaA.fecha]);
+  ok('La tarjeta pasa a ser la alternativa, marcada «Solo hoy»',
+    await p.locator('[data-abierto] h3', { hasText: 'Elevación lateral con mancuernas' }).count() === 1
+    && await p.locator('[data-abierto]', { hasText: 'Solo hoy' }).count() >= 1);
+  ok('Sigue en su bi-serie', await p.locator('[data-abierto]', { hasText: lat.bs }).count() >= 1);
+  await hecha(p, 'Elevación lateral con mancuernas', 1, 500);
+  await saltarDescanso(p);
+  const dia2 = (await ls(p)).prog?.[diaA.fecha];
+  const idAlt = `${lat.id}~elevacion-lateral-con-mancuernas`;
+  ok('La serie se registra con el id de la alternativa (historial propio)', dia2?.[idAlt]?.sets?.[0] === true && !dia2?.[lat.id], Object.keys(dia2 ?? {}).join(','));
+  await abrirEjercicio(p, 'Elevación lateral con mancuernas');
+  ok('Con una serie hecha ya no se puede cambiar', await p.locator('button[aria-label="Cambiar Elevación lateral con mancuernas"]').count() === 0);
+  ok('No aparece como ejercicio huérfano', await p.locator('text=/ya no están en tu rutina/').count() === 0);
+  await p.close();
+
+  // Otro día de la misma sesión: vuelve la de la rutina
+  const otroA = ago.find(d => d.sesion === 'gymA' && d.fecha > diaA.fecha);
+  p = await nuevaPagina({ v: 3, prs: {}, fijados: {}, extras: {}, css: null, rutina: {},
+    prog: { [diaA.fecha]: { __cambios: { [lat.id]: 'Elevación lateral con mancuernas' } } } });
+  await abrirSesion(p, otroA.fecha);
+  await abrirEjercicio(p, lat.nombre);
+  ok('Otro día vuelve el ejercicio de la rutina', await p.locator('[data-abierto] h3', { hasText: lat.nombre }).count() === 1);
+
+  // Desde ahora
+  await p.locator(`button[aria-label="Cambiar ${lat.nombre}"]`).click(); await p.waitForTimeout(300);
+  await p.locator('[role="dialog"] [role="radio"]', { hasText: 'Elevación lateral en máquina' }).click();
+  await p.locator('[role="dialog"] button', { hasText: 'Desde ahora' }).click(); await p.waitForTimeout(600);
+  const rut = (await ls(p)).rutina?.gymA;
+  const ult = rut?.at(-1);
+  ok('«Desde ahora» guarda una versión nueva de la rutina, con motivo',
+    ult?.ejercicios.some(e => e.nombre === 'Elevación lateral en máquina' && e.alt?.de === lat.id)
+    && ult.motivo === `Cambio: ${lat.nombre} → Elevación lateral en máquina`, JSON.stringify(ult?.motivo));
+  ok('Y la sesión la enseña sin la marca «Solo hoy»',
+    await p.locator('[data-ejercicio] h3', { hasText: 'Elevación lateral en máquina' }).count() === 1
+    && await p.locator('[data-abierto]', { hasText: 'Solo hoy' }).count() === 0);
+  ok('El resto de la rutina queda igual', ult?.ejercicios.length === SESIONES.gymA.ejercicios.length
+    && ult.ejercicios.filter(e => !e.alt).every(e => SESIONES.gymA.ejercicios.some(x => x.id === e.id)));
+  await abrirEjercicio(p, 'Elevación lateral en máquina');
+  await p.locator('button[aria-label="Cambiar Elevación lateral en máquina"]').click(); await p.waitForTimeout(300);
+  ok('Desde la rutina cambiada, la del plan sale marcada «Tu plan»',
+    await p.locator('[role="dialog"] [role="radio"]', { hasText: lat.nombre }).filter({ hasText: 'Tu plan' }).count() === 1);
+  await p.locator('[role="dialog"] [role="radio"]', { hasText: lat.nombre }).click();
+  await p.locator('[role="dialog"] button', { hasText: 'Desde ahora' }).click(); await p.waitForTimeout(600);
+  ok('Y se puede volver a ella para siempre, con su id de siempre',
+    (await ls(p)).rutina.gymA.at(-1).ejercicios.some(e => e.id === lat.id && e.nombre === lat.nombre && !e.alt));
+  await p.close();
+
+  // Lo que no es gym no ofrece alternativas
+  const runDia = ago.find(d => d.sesion === 'running');
+  p = await nuevaPagina();
+  await abrirSesion(p, runDia.fecha);
+  ok('Una carrera no tiene «Cambiar»', await p.locator('button[aria-label^="Cambiar "]').count() === 0);
+  await p.close();
+}
+
 console.log('\n=== Errores de página: ' + (errores.length || 'ninguno') + ' ===');
 if (errores.length) console.log(errores.slice(0, 5).join('\n'));
 console.log(`\n══ ${n - fallos}/${n} pruebas de interfaz ══`);

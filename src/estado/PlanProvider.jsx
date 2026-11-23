@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { resolverRutina } from '../rutina.js';
+import { ejerciciosDelDia } from '../rutina.js';
 import { hoyISO } from '../utiles/formato.js';
 import { guardar, descargarJSON, leerRespaldo } from './persistencia.js';
 import { configVacia } from '../config.js';
@@ -41,7 +41,7 @@ export function PlanProvider({ children }) {
 
   const {
     progress, prMap, avisosReset, setProgress, setPrMap,
-    toggleSet, registrarSerie, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta, borrarRegistro,
+    toggleSet, registrarSerie, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta, cambiarHoy, borrarRegistro,
   } = useProgreso({ activeFecha, diaActivo, fijarPorRegistro, startTimer });
 
   // ─── Persistencia robusta ───
@@ -156,8 +156,8 @@ export function PlanProvider({ children }) {
     : clavePrincipal(diaActivo)),
   [diaActivo, activeSesion]);
   const ejerciciosVigentes = useMemo(
-    () => claveVista ? resolverRutina(claveVista, activeFecha, rutina) : null,
-    [claveVista, activeFecha, rutina]
+    () => claveVista ? ejerciciosDelDia(claveVista, activeFecha, rutina, progress[activeFecha]) : null,
+    [claveVista, activeFecha, rutina, progress]
   );
 
   // ─── Los tres valores ───
@@ -187,7 +187,7 @@ export function PlanProvider({ children }) {
     // rutinas
     guardarRutina, restaurarRutina,
     // progreso
-    toggleSet, registrarSerie, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta,
+    toggleSet, registrarSerie, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta, cambiarHoy,
     // temporizador
     skipTimer,
     // datos
@@ -196,7 +196,7 @@ export function PlanProvider({ children }) {
     saveEdit, liberarDia, onSecundaria, onComplemento, fijarVariante, soltarVariante,
     onFlexible, onConvertirFlexible, setCss, setUmbralRun, setConfig,
     guardarRutina, restaurarRutina,
-    toggleSet, registrarSerie, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta,
+    toggleSet, registrarSerie, onLog, onLastre, usarSugerido, onBanda, resetDay, onSueno, toggleBiserieSuelta, cambiarHoy,
     skipTimer, onExportar, onImportar]);
 
   return (

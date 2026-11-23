@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Trophy, AlertTriangle, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { Check, Trophy, AlertTriangle, SlidersHorizontal, ChevronDown, ArrowLeftRight } from 'lucide-react';
 import { PALAS_MAX_M, E11 } from '../../data.js';
 import { useAccionesCtx } from '../../estado/contextos.js';
 import { anotaCarga, proponerSerie, textoSerie, serieQueToca } from '../../utiles/serie.js';
@@ -23,7 +23,7 @@ const Etiqueta = ({ children, tono = 'neutro' }) => (
   </span>
 );
 
-const ExerciseCard = ({ ex, numero, prog, pr, color, avisoReset, ultima, sugerencia, bsSuelta = false, abierta, onAbrir, onAjustar, onHecha }) => {
+const ExerciseCard = ({ ex, numero, prog, pr, color, avisoReset, ultima, sugerencia, bsSuelta = false, abierta, onAbrir, onAjustar, onHecha, onCambiar }) => {
   const { toggleSet, registrarSerie, onLastre, onBanda, toggleBiserieSuelta } = useAccionesCtx();
   const setCount = typeof ex.series === 'number' ? ex.series : 1;
   const p = prog || { sets: [], logs: [], lastre: null };
@@ -89,6 +89,15 @@ const ExerciseCard = ({ ex, numero, prog, pr, color, avisoReset, ultima, sugeren
             {ex.opcional && <Etiqueta>Opcional</Etiqueta>}
             {ex.bs && <Etiqueta>{nombreBS}</Etiqueta>}
             {allDone && <Etiqueta><Check size={12} strokeWidth={3} />Hecho</Etiqueta>}
+            {ex.cambioHoy && <Etiqueta>Solo hoy</Etiqueta>}
+            {/* Alternativa con otro equipo. Solo antes de la primera serie: después,
+                los kilos ya registrados son de este ejercicio. */}
+            {onCambiar && hechas === 0 && (
+              <button onClick={() => onCambiar(ex)} aria-label={`Cambiar ${ex.nombre}`}
+                className="ml-auto h-8 -my-1 -mr-1.5 px-2.5 rounded-xl flex items-center gap-1.5 text-sm text-tinta3">
+                <ArrowLeftRight size={15} /> Cambiar
+              </button>
+            )}
             {(ex.lastre || ex.acarreo) && pr?.kg != null && (
               <Etiqueta tono="ambar"><Trophy size={12} />Récord {pr.kg} kg{pr.flash ? ' · nuevo' : ''}</Etiqueta>
             )}

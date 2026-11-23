@@ -17,6 +17,7 @@
 //   }
 
 import { SESIONES } from './data.js';
+import { aplicarCambios } from './alternativas.js';
 
 // Ejercicios vigentes de una sesión en una fecha dada.
 export function resolverRutina(sesionKey, fecha, rutina = {}) {
@@ -29,6 +30,11 @@ export function resolverRutina(sesionKey, fecha, rutina = {}) {
     .at(-1);
   return vigente?.ejercicios ?? base;
 }
+
+// Lo que se hace ESE día: la rutina vigente con los cambios de solo hoy
+// (ejercicio por una alternativa, guardado en el registro del día).
+export const ejerciciosDelDia = (sesionKey, fecha, rutina, progresoDia) =>
+  aplicarCambios(resolverRutina(sesionKey, fecha, rutina), progresoDia);
 
 // ¿Esta sesión está editada respecto al plan, en esta fecha?
 export function estaEditada(sesionKey, fecha, rutina = {}) {

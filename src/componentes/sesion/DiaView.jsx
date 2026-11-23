@@ -2,7 +2,7 @@ import React from 'react';
 import { ArrowLeft, ArrowRight, Settings, Star, Clock, Moon, AlertTriangle, ChevronRight } from 'lucide-react';
 import { SESION_INFO, SESIONES, GRUPOS_SESION as GRUPOS, PISCINA_DURACION_MIN, clavePrincipal, claveSecundaria } from '../../data.js';
 import { S4, SUENO_POCO, SUENO_BIEN, ultimaSesion, sugerirCarga } from '../../reglas.js';
-import { resolverRutina } from '../../rutina.js';
+import { ejerciciosDelDia } from '../../rutina.js';
 import { VACIO, COLUMNA, NOMBRES_MES } from '../../utiles/constantes-ui.js';
 import { anotaCarga, proponerSerie, serieQueToca } from '../../utiles/serie.js';
 import { contarRender } from '../../utiles/medir.js';
@@ -57,7 +57,7 @@ const DiaView = ({ onVerFicha }) => {
   const proximos = calendario.filter(d => d.fecha > activeFecha).slice(0, 2);
   const sec = dia.sesionSecundaria;
   const claveSec = claveSecundaria(dia);
-  const listaSec = sec ? resolverRutina(claveSec, activeFecha, rutina) : [];
+  const listaSec = sec ? ejerciciosDelDia(claveSec, activeFecha, rutina, progress[activeFecha]) : [];
 
   return (
     <div className="min-h-screen bg-fondo">

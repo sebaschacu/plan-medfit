@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { SESIONES, clavePrincipal, claveSecundaria } from '../data.js';
-import { resolverRutina } from '../rutina.js';
+import { ejerciciosDelDia } from '../rutina.js';
 import { usePlanCtx, useProgresoCtx } from './contextos.js';
 
 // ═══════════════ RESUMEN DEL MES ═══════════════
@@ -18,9 +18,9 @@ export function useResumenMes() {
       claveSecundaria(d),
       ...(d.complementos ?? []),
     ].filter(Boolean);
-    const ejercicios = claves.flatMap(k => resolverRutina(k, d.fecha, rutina));
-    if (!ejercicios.length) return 'none';
     const p = progress[d.fecha] || {};
+    const ejercicios = claves.flatMap(k => ejerciciosDelDia(k, d.fecha, rutina, p));
+    if (!ejercicios.length) return 'none';
     const total = ejercicios.length;
     const done = ejercicios.filter(ex => {
       const sc = typeof ex.series === 'number' ? ex.series : 1;
