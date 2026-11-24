@@ -2,7 +2,8 @@
 
 Capturado el 2026-09-03, antes de tocar `src/`. Actualizado el 2026-11-13 con
 el rediseño D (rama `rediseno-d`): mismas seis puertas, números de abajo.
-Actualizado el 2026-11-23 con el plan v7 · Bogotá (desde el 30 de noviembre).
+Actualizado el 2026-11-23 con el plan v7 · Bogotá (desde el 30 de noviembre) y el
+2026-11-24 con el contador por hora real y el aviso de descanso.
 
 Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 "no petar". Si un paso no pasa las cinco puertas, se revierte ese paso entero.
@@ -11,15 +12,16 @@ Cada paso del refactor debe reproducir **estos mismos números**, no simplemente
 
 | # | Comando | Baseline |
 |---|---|---|
-| 1 · Lógica | `npm test` | 155/155 + 94/94 + 62/62 + 60/60 + 30/30 + 75/75 = **476** (+84 con el plan de Bogotá: 75 propias, +9 en el verificador; 158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4; +15 en la decisión 1; +15 en la decisión 2; +1 en el rediseño D: S4 a dos tramos; +60 con las sesiones de running; +30 con las alternativas de ejercicio) |
+| 1 · Lógica | `npm test` | 155/155 + 94/94 + 62/62 + 60/60 + 30/30 + 75/75 + 32/32 = **508** (+32 con el aviso de descanso; +84 con el plan de Bogotá: 75 propias, +9 en el verificador; 158 al cerrar la Tarea 1; +16 en 1.2; +10 en 1.3; +6 en 1.4; +6 en 1.5; +7 en 2.2; +3 en 2.4; +15 en la decisión 1; +15 en la decisión 2; +1 en el rediseño D: S4 a dos tramos; +60 con las sesiones de running; +30 con las alternativas de ejercicio) |
 | 1b · Configuración | `node test-config.mjs` (dentro de `npm test`) | **62/62** · con la config vacía el calendario es idéntico al del plan; cada ajuste hace lo que dice; S1, S3, S7 y turnos aguantan cualquier config |
 | 1c · Running | `node test-running.mjs` (dentro de `npm test`) | **60/60** · cada carrera resuelve a una variante sin cambiar la clave del día; rotación de las 4 indispensables (Rodaje suave → Tempo → Fondo largo → Series 4×4) con test de 30 min cada ~12 carreras; S3 intacta; los días registrados antes de las variantes conservan la sesión genérica |
 | 1e · Bogotá | `node test-bogota.mjs` (dentro de `npm test`) | **75/75** · todo lo anterior al 30-nov es idéntico al v6; cada semana de Bogotá trae 4 gym + 2 bici (zona 2 y 4×4 alternadas), sin natación automática, sin descargas fijas; cola Torso A → Pierna A → Torso B → Pierna B (la opción B sigue la cola de siempre sin reiniciarla); S1 y S7 intactas; pierna + bici el mismo día vale (S3 quitada); las diez sesiones pasan el verificador; volumen semanal por músculo; rutina por fecha (una edición anterior al 30 cede ante el plan nuevo); doble progresión y S4 a dos tramos |
+| 1f · Aviso | `node test-aviso.mjs` (dentro de `npm test`) | **32/32** · `api/_descanso.js` con reloj y envío falsos: rechaza lo mal formado y lo que no es un servicio de notificaciones; programa y avisa a la hora; cancelar o un descanso nuevo del mismo celular anulan el anterior; dos celulares no se pisan; sin `VAPID_PRIVATE_KEY` la función dice `listo: false` y no programa |
 | 1d · Alternativas | `node test-alternativas.mjs` (dentro de `npm test`) | **30/30** · cada ejercicio de gym tiene su familia (mismo músculo, otro equipo); la alternativa conserva series, reps, bi-serie y músculos con un id propio (historial propio); «solo hoy» va en `__cambios` del día y no toca la rutina; «desde ahora» es una versión nueva; volver al del plan recupera su id |
-| 2a · Interfaz | `npm run test:ui` | **382/382** · 0 errores de página (227 antes del rediseño D; la suite se reescribió para la navegación nueva conservando cada comprobación, +43 nuevas; +24 con el running; +17 con las alternativas; +13 con Bogotá. La suite vive en agosto de 2026 —plan v6—; Ajustes y las dos rutinas se prueban con `hoy` en diciembre y Rutinas antes del 30 con `hoy` = 23-nov) |
+| 2a · Interfaz | `npm run test:ui` | **410/410** · (+28 con el peso tecleado, el contador por hora real y el aviso; `nuevaPagina(seed, { antes })` monta relojes y APIs falsas antes de cargar) · 0 errores de página (227 antes del rediseño D; la suite se reescribió para la navegación nueva conservando cada comprobación, +43 nuevas; +24 con el running; +17 con las alternativas; +13 con Bogotá. La suite vive en agosto de 2026 —plan v6—; Ajustes y las dos rutinas se prueban con `hoy` en diciembre y Rutinas antes del 30 con `hoy` = 23-nov) |
 | 2b · Auditoría | `npm run audit` | **23/23** · 0 errores de página (recorre también Progreso, Rutinas, el editor y Ajustes) |
 | 3 · Lint | `npx oxlint` | **0 avisos / 0 errores** |
-| 4 · Build | `npm run build` | compila · 517 kB (gzip 146) + Geist 29 kB |
+| 4 · Build | `npm run build` | compila · 524 kB (gzip 149) + Geist 29 kB |
 | 5 · Snapshot | `npm run test:snapshot` | **2/2** · contrato de localStorage intacto |
 | 6 · Renders | `npm run test:renders` | **App = 0** al marcar la 2ª serie (y DiaView/PanelDia = 0) |
 
@@ -323,3 +325,19 @@ noviembre rige el v6 (Barranquilla) y desde el lunes 30, el de Bogotá.
 - **Historial.** Progreso junta los básicos de Bogotá con los compuestos del v6
   (por nombre o por id); el catálogo del editor incluye los ejercicios del v6
   que ya no están; P6 lee las definiciones de los dos planes.
+
+## Contador y aviso de descanso (2026-11-24)
+
+- **Peso.** La rueda de la hoja de la serie solo cambia el valor si la mueve el
+  dedo; lo tecleado se guarda tal cual (texto aparte del número, para poder
+  escribir 41,5 cifra a cifra).
+- **Contador.** `useTemporizador` cuenta con la hora de fin; al volver a la app
+  recalcula. Si acabó fuera, «Listo · hace 00:40» hasta Cerrar. La sesión pide
+  `wakeLock` (pantalla encendida) mientras está abierta.
+- **Aviso.** Al salir de la app con un descanso en marcha, `sendBeacon` a
+  `/api/descanso` (Vercel, espera hasta el fin y manda Web Push); al volver antes
+  se cancela. `public/sw-aviso.js` muestra la notificación. Sin base de datos:
+  lo vigente de cada celular vive en memoria de la función. La clave privada va
+  en la variable `VAPID_PRIVATE_KEY` de Vercel; la pública, en
+  `src/utiles/avisoDescanso.js`. Sin la variable, la app no ofrece el aviso.
+  Estado del aviso en `plan-internado-aviso`, aparte del estado del plan.

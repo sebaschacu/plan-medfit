@@ -1,0 +1,6 @@
+{
+  "fluid": true,
+  "functions": {
+    "api/descanso.js": { "maxDuration": 300, "memory": 1024 }
+  }
+}

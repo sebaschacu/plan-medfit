@@ -9,6 +9,7 @@ import { proponerSerie, textoSerie } from '../../utiles/serie.js';
 import { contarRender } from '../../utiles/medir.js';
 import { usePlanCtx, useProgresoCtx, useAccionesCtx } from '../../estado/contextos.js';
 import RestTimer from '../comunes/RestTimer.jsx';
+import { usePantallaEncendida } from '../../estado/usePantallaEncendida.js';
 import { Detalle, BotonCTA } from '../comunes/ui.jsx';
 import ExerciseCard from './ExerciseCard.jsx';
 import HojaSerie from './HojaSerie.jsx';
@@ -30,6 +31,7 @@ const SessionView = ({ onEditarRutina, onVerFicha }) => {
   contarRender('SessionView');
   const { todayISO, rutina, activeFecha, diaActivo: diaData, claveVista: sesionKey, ejerciciosVigentes } = usePlanCtx();
   const { progress: progresoTotal, prMap, avisosReset, restTimer } = useProgresoCtx();
+  usePantallaEncendida();      // entre series se mira de lejos: que no se bloquee
   const { backToCalendar: onBack, resetDay: onReset, skipTimer: onSkipTimer, registrarSerie, toggleSet, cambiarHoy, guardarRutina } = useAccionesCtx();
 
   const progress = progresoTotal[activeFecha];

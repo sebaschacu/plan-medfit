@@ -19,7 +19,8 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
         ]
       },
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'] }
+      // sw-aviso.js: la notificación de «Descanso listo» (ver src/utiles/avisoDescanso.js)
+      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'], importScripts: ['sw-aviso.js'], navigateFallbackDenylist: [/^\/api\//] }
     })
   ]
 })

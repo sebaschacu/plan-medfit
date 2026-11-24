@@ -7,7 +7,10 @@ import { textoSerie } from '../../utiles/serie.js';
 // ═══════════════ AJUSTAR UNA SERIE · rueda ═══════════════
 // Solo aparece cuando hay que cambiar algo: lo normal es «Hecha» de un toque.
 // Cada columna es una rueda que se arrastra con el pulgar; encima queda el campo
-// de texto de siempre, por si se prefiere teclear. Los dos mueven el mismo valor.
+// de texto de siempre, por si se prefiere teclear. Los dos mueven el mismo valor,
+// pero solo el dedo manda en la rueda: lo tecleado se guarda TAL CUAL (40, 41,5)
+// y la rueda se coloca en la cifra más cercana sin pisarlo. Antes, al teclear
+// «4» la rueda saltaba a 5 y, al moverse sola, cambiaba el número a 5.
 const ALTO = 48;        // alto de cada cifra
 const VISIBLES = 5;
 
@@ -24,23 +27,30 @@ const masCercano = (valores, v) => {
 const Rueda = ({ valores, valor, onCambiar, etiqueta, color }) => {
   const ref = useRef(null);
   const espera = useRef(null);
+  const tocada = useRef(false);   // el dedo (o la rueda del ratón) la movió
   const idx = masCercano(valores, valor);
 
-  // La rueda sigue al valor (al abrir, y cuando se teclea en el campo).
+  // La rueda sigue al valor (al abrir, y cuando se teclea en el campo). Ese
+  // movimiento no es del dedo: lo que quedara de un toque anterior se olvida.
   useLayoutEffect(() => {
+    tocada.current = false;
     const el = ref.current;
     if (el && Math.round(el.scrollTop / ALTO) !== idx) el.scrollTop = idx * ALTO;
   }, [idx]);
 
-  // Al soltar, el valor es la cifra que quedó en el centro.
+  // Al soltar, el valor es la cifra que quedó en el centro. Un desplazamiento
+  // que no empezó con el dedo (la rueda siguiendo a lo tecleado) no cambia nada.
   const alDesplazar = useCallback(() => {
+    if (!tocada.current) return;
     clearTimeout(espera.current);
     espera.current = setTimeout(() => {
       const el = ref.current; if (!el) return;
+      tocada.current = false;
       const i = Math.max(0, Math.min(valores.length - 1, Math.round(el.scrollTop / ALTO)));
       if (valores[i] !== valor) onCambiar(valores[i]);
     }, 90);
   }, [valores, valor, onCambiar]);
+  const alTocar = () => { tocada.current = true; };
 
   const alTeclear = (e) => {
     const paso = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
@@ -54,6 +64,7 @@ const Rueda = ({ valores, valor, onCambiar, etiqueta, color }) => {
       <div aria-hidden="true" className="absolute inset-x-2 rounded-xl pointer-events-none"
         style={{ top: ALTO * 2, height: ALTO, background: color + '2e' }} />
       <div ref={ref} onScroll={alDesplazar} onKeyDown={alTeclear} tabIndex={0}
+        onPointerDown={alTocar} onTouchStart={alTocar} onWheel={alTocar}
         role="spinbutton" aria-label={etiqueta} aria-valuenow={valores[idx]}
         aria-valuemin={valores[0]} aria-valuemax={valores.at(-1)}
         className="relative h-full overflow-y-scroll snap-y snap-mandatory sin-barra"
@@ -77,7 +88,19 @@ const Rueda = ({ valores, valor, onCambiar, etiqueta, color }) => {
 const HojaSerie = ({ ex, indice, inicial, pista, color, marcada, onGuardar, onDesmarcar, onCerrar }) => {
   const [kg, setKg] = useState(inicial.kg);
   const [reps, setReps] = useState(inicial.reps);
-  const num = (txt, entero) => (txt === '' ? null : entero ? parseInt(txt, 10) : parseFloat(txt));
+  // El campo guarda el TEXTO tecleado: «41.» tiene que seguir siendo «41.» para
+  // poder escribir 41,5 cifra a cifra (como número se quedaba en 41).
+  const [kgTxt, setKgTxt] = useState(inicial.kg ?? '');
+  const [repsTxt, setRepsTxt] = useState(inicial.reps ?? '');
+  const num = (txt, entero) => {
+    if (txt === '' || txt === '.') return null;
+    const n = entero ? parseInt(txt, 10) : parseFloat(txt);
+    return Number.isNaN(n) ? null : n;
+  };
+  const teclearKg = (v) => { setKgTxt(v); setKg(num(v, false)); };
+  const teclearReps = (v) => { setRepsTxt(v); setReps(num(v, true)); };
+  const ruedaKg = (v) => { setKg(v); setKgTxt(v); };
+  const ruedaReps = (v) => { setReps(v); setRepsTxt(v); };
   const log = { kg: kg ?? null, reps: reps ?? null };
   const texto = textoSerie(log);
 
@@ -98,17 +121,17 @@ const HojaSerie = ({ ex, indice, inicial, pista, color, marcada, onGuardar, onDe
         <div className="grid grid-cols-2 gap-3 mt-4">
           <div>
             <div className="flex items-center justify-center gap-2 mb-2">
-              <NumInput value={kg} onChange={(v) => setKg(num(v, false))} placeholder="kg" etiqueta="kg" w="w-24" />
+              <NumInput value={kgTxt} onChange={teclearKg} placeholder="kg" etiqueta="kg" w="w-24" />
               <span className="text-sm text-tinta3">kg</span>
             </div>
-            <Rueda valores={KG} valor={kg} onCambiar={setKg} etiqueta="Rueda de kilos" color={color} />
+            <Rueda valores={KG} valor={kg} onCambiar={ruedaKg} etiqueta="Rueda de kilos" color={color} />
           </div>
           <div>
             <div className="flex items-center justify-center gap-2 mb-2">
-              <NumInput value={reps} onChange={(v) => setReps(num(v, true))} placeholder="rep" etiqueta="rep" w="w-24" />
+              <NumInput value={repsTxt} onChange={teclearReps} placeholder="rep" etiqueta="rep" w="w-24" />
               <span className="text-sm text-tinta3">reps</span>
             </div>
-            <Rueda valores={REPS} valor={reps} onCambiar={setReps} etiqueta="Rueda de repeticiones" color={color} />
+            <Rueda valores={REPS} valor={reps} onCambiar={ruedaReps} etiqueta="Rueda de repeticiones" color={color} />
           </div>
         </div>
 

@@ -48,8 +48,10 @@ const alCalendario = async (p) => {
 };
 // `hoy` cambia la fecha de la app (por defecto HOY, en agosto). Con otra fecha
 // la página se queda en su mes: no navega hasta el del ancla.
-const nuevaPagina = async (seed, { hoy = HOY, ...opts } = {}) => {
+// `antes(p)` corre antes de cargar la app (relojes falsos, APIs simuladas…).
+const nuevaPagina = async (seed, { hoy = HOY, antes, ...opts } = {}) => {
   const p = await b.newPage({ viewport: { width: 430, height: 1400 }, ...opts });
+  if (antes) await antes(p);
   p.on('pageerror', e => errores.push(e.message.split('\n')[0]));
   await p.addInitScript(([h]) => localStorage.setItem('plan-internado-hoy', h), [hoy]);
   if (seed) await p.addInitScript(([s]) => localStorage.setItem('plan-internado', JSON.stringify(s)), [seed]);
@@ -1223,6 +1225,139 @@ await p.locator('[data-ejercicio="A-3"] button[aria-label^="Serie 1 hecha"]').cl
 await p.locator('button', { hasText: 'Desmarcar esta serie' }).click(); await p.waitForTimeout(400);
 ok('Desmarcar una serie no arranca el temporizador', (await segundosTimer()) == null);
 ok('Y la serie queda sin marcar', (await ls(p)).prog[gymT.fecha]['A-3'].sets[0] === false);
+await p.close();
+
+// ══ 16b-2 · PESO TECLEADO, CONTADOR POR HORA REAL Y AVISO ══
+// Lo tecleado en la hoja de la serie se queda tal cual (antes, «4» pasaba a 5).
+seccion('PESO · LO TECLEADO SE QUEDA');
+p = await nuevaPagina();
+await abrirSesion(p, gymT.fecha);
+await hecha(p, 'Press banca', 1);
+await p.getByRole('button', { name: 'Corregir' }).click(); await p.waitForTimeout(400);
+const campoKg = p.getByLabel('kg', { exact: true });
+await campoKg.fill('');  await p.waitForTimeout(300);
+await campoKg.pressSequentially('4', { delay: 60 }); await p.waitForTimeout(400);
+ok('Teclear «4» deja 4 (no salta a 5)', await campoKg.inputValue() === '4', await campoKg.inputValue());
+await campoKg.pressSequentially('0', { delay: 60 }); await p.waitForTimeout(400);
+ok('Y luego «0» deja 40', await campoKg.inputValue() === '40', await campoKg.inputValue());
+await campoKg.fill(''); await campoKg.pressSequentially('41.5', { delay: 80 }); await p.waitForTimeout(400);
+ok('Con decimales cifra a cifra: 41.5', await campoKg.inputValue() === '41.5', await campoKg.inputValue());
+ok('La rueda se coloca en la cifra más cercana sin pisarlo', await p.locator('[aria-label="Rueda de kilos"]').getAttribute('aria-valuenow') === '42.5' || await p.locator('[aria-label="Rueda de kilos"]').getAttribute('aria-valuenow') === '40');
+await p.locator('[aria-label="Rueda de kilos"] div', { hasText: /^45$/ }).click(); await p.waitForTimeout(400);
+ok('Tocar una cifra de la rueda sí cambia el número', await campoKg.inputValue() === '45', await campoKg.inputValue());
+await campoKg.fill(''); await campoKg.pressSequentially('41,5', { delay: 80 }); await p.waitForTimeout(400);
+await p.locator('[role=dialog] button', { hasText: 'Guardar' }).click(); await p.waitForTimeout(450);
+ok('Con coma también, y se guarda 41.5', (await ls(p)).prog[gymT.fecha]['A-1'].logs[0]?.kg === 41.5, JSON.stringify((await ls(p)).prog[gymT.fecha]['A-1'].logs[0]));
+await p.close();
+
+// El contador cuenta con la hora de fin: al volver a la app marca lo que de
+// verdad queda. Se simula con un reloj falso: la hora salta sin que corran los
+// temporizadores (lo que hace el celular al salir de la app).
+seccion('CONTADOR · HORA REAL Y AVISO QUE SE QUEDA');
+const VISIBILIDAD = () => {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => window.__vis ?? 'visible' });
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => (window.__vis ?? 'visible') === 'hidden' });
+};
+const verComo = (p, v) => p.evaluate((v) => { window.__vis = v; document.dispatchEvent(new Event('visibilitychange')); }, v);
+p = await nuevaPagina(null, { antes: async (q) => { await q.addInitScript(VISIBILIDAD); await q.clock.install(); } });
+await abrirSesion(p, gymT.fecha);
+await hecha(p, 'Press banca', 1);
+const tIni = await segundosTimer();
+ok('Arranca en 3 min', tIni >= 178 && tIni <= 180, String(tIni));
+await verComo(p, 'hidden');
+const ahoraFalso = await p.evaluate(() => Date.now());
+await p.clock.setSystemTime(ahoraFalso + 100_000);
+await verComo(p, 'visible'); await p.waitForTimeout(200);
+const tVuelta = await segundosTimer();
+ok('Fuera 100 s sin que el contador corra: al volver marca ~80 s, no ~180', tVuelta != null && tVuelta >= 78 && tVuelta <= 81, String(tVuelta));
+await p.clock.setSystemTime(ahoraFalso + 220_000);
+await verComo(p, 'visible'); await p.waitForTimeout(200);
+const txtListo = await p.locator('[role=timer]').innerText();
+ok('Si acabó estando fuera: «Listo · hace 00:40»', /Listo · hace/i.test(txtListo) && /00:40/.test(txtListo), txtListo.replace(/\n/g, ' | '));
+await p.clock.runFor(10_000); await p.waitForTimeout(200);
+ok('Y no desaparece solo (antes se iba a los 3 s): sigue contando', /00:50/.test(await p.locator('[role=timer]').innerText()));
+await p.locator('[role=timer] button', { hasText: /^Cerrar$/ }).click(); await p.waitForTimeout(300);
+ok('«Cerrar» lo quita', await p.locator('[role=timer]').count() === 0);
+await p.close();
+
+// El aviso por notificación: al SALIR con un descanso en marcha se le pide al
+// servidor; al volver antes de que acabe, se cancela. Aquí el envío (sendBeacon)
+// y la suscripción son falsos: se mira qué se manda y cuándo.
+seccion('AVISO · SE PIDE AL SALIR Y SE CANCELA AL VOLVER');
+const AVISO_FALSO = () => {
+  try { Object.defineProperty(Notification, 'permission', { configurable: true, get: () => window.__permiso ?? 'granted' }); } catch { /* */ }
+  Notification.requestPermission = async () => { window.__pedido = true; return window.__respuesta ?? 'granted'; };
+  const sub = { endpoint: 'https://fcm.googleapis.com/fcm/send/prueba', keys: { p256dh: 'p', auth: 'a' } };
+  PushManager.prototype.getSubscription = async function () { return window.__sinSub ? null : { toJSON: () => sub, unsubscribe: async () => true }; };
+  PushManager.prototype.subscribe = async function () { window.__sinSub = false; return { toJSON: () => sub, unsubscribe: async () => true }; };
+  window.__beacons = [];
+  navigator.sendBeacon = (url, datos) => { datos.text().then(t => window.__beacons.push({ url, ...JSON.parse(t) })); return true; };
+};
+const beacons = (p) => p.evaluate(() => window.__beacons.map(b => b.accion + ':' + b.id));
+p = await nuevaPagina(null, { antes: async (q) => {
+  await q.addInitScript(VISIBILIDAD); await q.addInitScript(AVISO_FALSO);
+  await q.addInitScript(() => localStorage.setItem('plan-internado-aviso', JSON.stringify({ activo: true })));
+} });
+await abrirSesion(p, gymT.fecha);
+await hecha(p, 'Press banca', 1);
+ok('Dentro de la app no se pide nada (el contador ya está a la vista)', (await beacons(p)).length === 0);
+await verComo(p, 'hidden'); await p.waitForTimeout(200);
+let bs = await p.evaluate(() => window.__beacons);
+ok('Al salir con el descanso en marcha, se pide el aviso', bs.length === 1 && bs[0].accion === 'programar' && bs[0].url === '/api/descanso', JSON.stringify(bs));
+ok('Con la hora de fin (~3 min) y el ejercicio', bs[0] && Math.abs(bs[0].fin - Date.now() - 180_000) < 6000 && bs[0].nombre?.startsWith('Press banca') && bs[0].sub.endpoint.includes('fcm'), JSON.stringify(bs[0]));
+await verComo(p, 'visible'); await p.waitForTimeout(200);
+bs = await p.evaluate(() => window.__beacons);
+ok('Al volver antes de que acabe, se cancela', bs.length === 2 && bs[1].accion === 'cancelar' && bs[1].id === bs[0].id);
+await verComo(p, 'hidden'); await p.waitForTimeout(200);
+ok('Si vuelve a salir, se pide otra vez', (await beacons(p)).at(-1) === `programar:${bs[0].id}`);
+await verComo(p, 'hidden'); await p.waitForTimeout(200);
+ok('Sin pedirlo dos veces seguidas', (await beacons(p)).length === 3);
+await verComo(p, 'visible'); await p.waitForTimeout(200);
+await hecha(p, 'Press banca', 2);
+await verComo(p, 'hidden'); await p.waitForTimeout(200);
+const ids = (await beacons(p)).filter(b => b.startsWith('programar')).map(b => b.split(':')[1]);
+ok('Una serie nueva es otro descanso, con otro id', ids.length === 3 && ids[2] !== ids[0]);
+await verComo(p, 'visible'); await p.waitForTimeout(200);
+await saltarDescanso(p); await p.waitForTimeout(200);
+ok('Saltar no deja avisos pendientes', (await beacons(p)).at(-1) === `cancelar:${ids[2]}`);
+await p.close();
+
+// Activarlo: una línea bajo el contador, solo si el servidor tiene su clave.
+seccion('AVISO · ACTIVARLO');
+const avisoSinActivar = async (q) => {
+  await q.addInitScript(AVISO_FALSO);
+  await q.addInitScript(() => { window.__permiso = 'default'; window.__sinSub = true; });
+  await q.route('**/api/descanso', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"listo":true}' }));
+};
+p = await nuevaPagina(null, { antes: avisoSinActivar });
+await abrirSesion(p, gymT.fecha);
+await hecha(p, 'Press banca', 1, 900);
+const lineaAviso = p.locator('[role=timer] button', { hasText: 'Avisarme al acabar' });
+ok('Con un descanso en marcha se ofrece activar el aviso', await lineaAviso.count() === 1);
+await p.evaluate(() => { window.__permiso = 'granted'; });
+await lineaAviso.click(); await p.waitForTimeout(500);
+ok('Un toque pide permiso y lo deja activado', await p.evaluate(() => window.__pedido === true) && (await p.evaluate(() => JSON.parse(localStorage.getItem('plan-internado-aviso')))).activo === true);
+ok('Y lo confirma', /te avisará al acabar cada descanso/.test(await p.locator('[role=timer]').innerText()));
+ok('El estado del plan no se toca (va en su propia clave)', !JSON.stringify(await ls(p)).includes('aviso'));
+await saltarDescanso(p);
+await alCalendario(p);
+await irAAjustes(p);
+ok('Ajustes lo enseña activado, con botón para apagarlo', await p.locator('[data-estado-aviso="activo"]').count() === 1 && await p.locator('section[aria-label="Aviso de descanso"] button', { hasText: 'Apagar' }).count() === 1);
+await p.locator('section[aria-label="Aviso de descanso"] button', { hasText: 'Apagar' }).click(); await p.waitForTimeout(400);
+ok('Apagar lo deja apagado', await p.locator('[data-estado-aviso="apagado"]').count() === 1 && (await p.evaluate(() => JSON.parse(localStorage.getItem('plan-internado-aviso')))).activo === false);
+await p.close();
+p = await nuevaPagina(null, { antes: avisoSinActivar });
+await abrirSesion(p, gymT.fecha);
+await hecha(p, 'Press banca', 1, 900);
+await p.locator('[role=timer] button[aria-label="No mostrar más"]').click(); await p.waitForTimeout(300);
+ok('La X la quita', await p.locator('[role=timer] button', { hasText: 'Avisarme al acabar' }).count() === 0);
+await hecha(p, 'Press banca', 2, 900);
+ok('Y no vuelve a salir en el siguiente descanso', await p.locator('[role=timer] button', { hasText: 'Avisarme al acabar' }).count() === 0);
+await p.close();
+p = await nuevaPagina();
+await abrirSesion(p, gymT.fecha);
+await hecha(p, 'Press banca', 1, 900);
+ok('Sin servidor listo (en local, o sin la clave en Vercel) no se ofrece', await p.locator('[role=timer] button', { hasText: 'Avisarme al acabar' }).count() === 0);
 await p.close();
 
 // ══ 16c · E11 · DESHACER UNA BI-SERIE SOBRE LA MARCHA ══

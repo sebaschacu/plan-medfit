@@ -9,6 +9,7 @@ import AjustesSemana from './AjustesSemana.jsx';
 import AjustesTurnos from './AjustesTurnos.jsx';
 import AjustesRotacion from './AjustesRotacion.jsx';
 import { ListaDeportes, FormDeporte } from './AjustesDeportes.jsx';
+import AjustesAviso from './AjustesAviso.jsx';
 
 // ═══════════════ AJUSTES ═══════════════
 // Arriba, el plan: la semana, los turnos, la rotación y tus deportes. Cada uno
@@ -78,6 +79,9 @@ const AjustesView = ({ seccion, setSeccion, onEditarRutina }) => {
             </button>
           )
         )}
+
+        <div className="rotulo px-1 pt-4">Avisos</div>
+        <AjustesAviso />
 
         <div className="rotulo px-1 pt-4">Tus datos</div>
         <section className="rounded-3xl bg-tarjeta divide-y divide-divisor">
